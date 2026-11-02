@@ -283,7 +283,9 @@ class NativeShutdownRequestTest {
         inject(server, "hasStopped", false); inject(server, "pluginManager", f.plugins);
         var players = new java.util.HashMap<java.util.UUID, Player>(); players.put(f.player.getUniqueId(), f.player);
         inject(server, "players", players); inject(server, "levelArray", new cn.nukkit.level.Level[]{f.level});
-        inject(server, "scheduler", server.getScheduler());
+        var scheduler = mock(cn.nukkit.scheduler.ServerScheduler.class);
+        when(server.getScheduler()).thenReturn(scheduler);
+        inject(server, "scheduler", scheduler);
         Field console = Server.class.getDeclaredField("consoleThread"); console.setAccessible(true);
         console.set(server, mock(console.getType()));
         var network = mock(cn.nukkit.network.Network.class);

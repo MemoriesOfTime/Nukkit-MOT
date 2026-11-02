@@ -12,6 +12,7 @@ import cn.nukkit.entity.passive.*;
 import cn.nukkit.entity.projectile.*;
 import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.network.protocol.types.EntityLink;
+import cn.nukkit.network.protocol.types.PassengerOfBlockArguments;
 import cn.nukkit.network.protocol.types.PropertySyncData;
 import cn.nukkit.utils.Binary;
 import lombok.ToString;
@@ -202,6 +203,10 @@ public class AddEntityPacket extends DataPacket {
      * @since v557
      */
     public PropertySyncData properties = new PropertySyncData(new int[]{}, new float[]{});
+    /**
+     * @since v2225
+     */
+    public PassengerOfBlockArguments passengerOfBlockArguments;
 
     @Override
     public void decode() {
@@ -272,6 +277,9 @@ public class AddEntityPacket extends DataPacket {
         this.putUnsignedVarInt(this.links.length);
         for (EntityLink link : links) {
             putEntityLink(protocol, link);
+        }
+        if (protocol >= ProtocolInfo.v1_26_60) {
+            this.putOptionalNull(this.passengerOfBlockArguments, PassengerOfBlockArguments::put);
         }
     }
 

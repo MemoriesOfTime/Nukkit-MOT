@@ -87,6 +87,44 @@ class PlayerInventoryScreenLifecycleTest {
         assertTrue(sent.stream().anyMatch(ContainerOpenPacket.class::isInstance));
     }
 
+    @ParameterizedTest @MethodSource("protocols")
+    void emittedFakeMenuRejectionClearsScreenAndAllowsNextOpen(int protocol) {
+        player.protocol(protocol);
+        Inventory rejected = new ContainerInventory(new FakeBlockMenu(null,
+                new cn.nukkit.level.Position(1, 64, 1, level)), InventoryType.CHEST) { };
+        player.getInventory().setItem(0, Item.get(Item.DIAMOND, 0, 3));
+        int oldId = player.addWindow(rejected);
+        assertTrue(oldId > 0);
+        sent.clear();
+
+        player.receiveClose(-1, ContainerType.NONE);
+
+        assertEquals(-1, player.getWindowId(rejected));
+        assertFalse(rejected.getViewers().contains(player));
+        assertFalse(player.isAwaitingContainerClose(oldId));
+        assertEquals(3, player.getInventory().getItem(0).getCount());
+        assertEquals(1, sent.size());
+        ContainerClosePacket response = assertInstanceOf(ContainerClosePacket.class, sent.get(0));
+        assertEquals(-1, response.windowId);
+        assertFalse(response.wasServerInitiated);
+        assertEquals(ContainerType.CONTAINER, response.type);
+        response.protocol = protocol;
+        response.encode();
+        assertArrayEquals(protocol >= 685 ? new byte[] {47, -1, 0, 0} : new byte[] {47, -1, 0},
+                response.getBuffer());
+
+        sent.clear();
+        player.receiveClose(-1, ContainerType.NONE);
+        assertTrue(sent.isEmpty(), "duplicate rejection without an active screen must be ignored");
+        Inventory next = shulker();
+        int nextId = player.addWindow(next);
+        assertTrue(nextId > 0);
+        sent.clear();
+        player.receiveClose(oldId, ContainerType.CONTAINER);
+        assertEquals(nextId, player.getWindowId(next));
+        assertTrue(sent.isEmpty(), "a late exact close must not close the next screen");
+    }
+
     @Test void canceledOpenDoesNotLeakMapViewerOrTopWindow() {
         ChestInventory chest = chest();
         doAnswer(call -> { if (call.getArgument(0) instanceof InventoryOpenEvent event) event.setCancelled(); return null; })

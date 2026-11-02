@@ -64,6 +64,17 @@ public final class PlayerDataMigrator {
         INSPECT_FAILED
     }
 
+    /** Reuses the migrator's no-IO identity guards before a native strict source read. */
+    public static boolean isSourceIdentityEligible(UUID previous, UUID current, boolean xboxAuthed) {
+        return !xboxAuthed && previous != null && current != null && !previous.equals(current)
+                && !COLLAPSED_IDENTITIES.contains(previous) && !isAuthenticatedAccountIdentity(previous);
+    }
+
+    /** Keeps native recovery under the same authenticated-payload handover guard. */
+    public static boolean isSourcePayloadEligible(CompoundTag tag, UUID previous) {
+        return isHandoverAllowed(tag, previous);
+    }
+
     /**
      * Migrate data only when the server has deliberately replaced an unauthenticated identity.
      * Authenticated identities belong to an Xbox account and must never inherit data merely

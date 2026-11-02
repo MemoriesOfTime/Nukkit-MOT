@@ -8,9 +8,11 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * 配方书容器槽位类型 (64-66) 的版本边界回归。
  * <p>
- * Recipe book container slot types (64-66) exist on the wire only since v944 (1.26.10);
- * Cloudburst Protocol inserts them into its type map at the same version. They must decode
- * to null and refuse to encode on every older protocol, including 1.21.20-1.26.0.
+ * International decoding recognizes recipe slots 64-66 from v944 (1.26.10).
+ * The current upstream encoder rejects these slots in the v712-v898 window, but retains
+ * older fallback IDs before v712. Characterize that API asymmetry without treating its
+ * legacy encode result as proof that those clients can decode the slot. NetEase uses its
+ * separate one-slot wire offset.
  */
 class ContainerSlotTypeRecipeContainersTest {
 
@@ -39,10 +41,9 @@ class ContainerSlotTypeRecipeContainersTest {
     }
 
     @Test
-    void recipeContainersRefuseToEncodeBelowV1_26_10() {
+    void recipeContainersRefuseToEncodeFromV1_21_20UntilV1_26_10() {
         for (GameVersion version : new GameVersion[]{
-                GameVersion.V1_19_80, GameVersion.V1_20_50, GameVersion.V1_21_20,
-                GameVersion.V1_21_124, GameVersion.V1_26_0}) {
+                GameVersion.V1_21_20, GameVersion.V1_21_124, GameVersion.V1_26_0}) {
             for (ContainerSlotType type : new ContainerSlotType[]{
                     ContainerSlotType.RECIPE_FOOD_CONTAINER,
                     ContainerSlotType.RECIPE_BLOCKS_CONTAINER,
@@ -50,6 +51,40 @@ class ContainerSlotTypeRecipeContainersTest {
                 String message = type + " must not encode on " + version;
                 assertThrows(IllegalArgumentException.class, () -> type.getId(version), message);
             }
+        }
+    }
+
+    @Test
+    void legacyEncodingKeepsUpstreamIdsWithoutClaimingDecodeSupport() {
+        for (GameVersion version : new GameVersion[]{GameVersion.V1_19_80, GameVersion.V1_20_50}) {
+            assertEquals(64, ContainerSlotType.RECIPE_FOOD_CONTAINER.getId(version));
+            assertEquals(65, ContainerSlotType.RECIPE_BLOCKS_CONTAINER.getId(version));
+            assertEquals(66, ContainerSlotType.RECIPE_FURNACE_ITEMS_CONTAINER.getId(version));
+            for (int id = 64; id <= 66; id++) assertNull(ContainerSlotType.fromId(id, version));
+        }
+    }
+
+    @Test
+    void netEaseRecipeContainersUseTheirMappedOffset() {
+        for (GameVersion version : new GameVersion[]{GameVersion.V1_20_50_NETEASE, GameVersion.V1_21_124_NETEASE}) {
+            assertEquals(65, ContainerSlotType.RECIPE_FOOD_CONTAINER.getId(version));
+            assertEquals(66, ContainerSlotType.RECIPE_BLOCKS_CONTAINER.getId(version));
+            assertEquals(67, ContainerSlotType.RECIPE_FURNACE_ITEMS_CONTAINER.getId(version));
+            assertEquals(ContainerSlotType.RECIPE_FOOD_CONTAINER, ContainerSlotType.fromId(65, version));
+            assertEquals(ContainerSlotType.RECIPE_BLOCKS_CONTAINER, ContainerSlotType.fromId(66, version));
+            assertEquals(ContainerSlotType.RECIPE_FURNACE_ITEMS_CONTAINER, ContainerSlotType.fromId(67, version));
+        }
+    }
+
+    @Test
+    void newReservedContainersBeginAtV1_26_60() {
+        for (ContainerSlotType type : new ContainerSlotType[]{ContainerSlotType.RESERVED_CONTAINER_A,
+                ContainerSlotType.RESERVED_CONTAINER_B, ContainerSlotType.RESERVED_CONTAINER_C,
+                ContainerSlotType.RESERVED_CONTAINER_D}) {
+            assertThrows(IllegalArgumentException.class, () -> type.getId(GameVersion.V1_26_10));
+            assertNull(ContainerSlotType.fromId(type.getId(), GameVersion.V1_26_10));
+            assertEquals(type.getId(), type.getId(GameVersion.V1_26_60));
+            assertEquals(type, ContainerSlotType.fromId(type.getId(), GameVersion.V1_26_60));
         }
     }
 

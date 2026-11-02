@@ -319,6 +319,7 @@ class PlayerTotemHandPriorityTest {
         Level level = mock(Level.class);
         entity.level = level;
         when(level.getNearbyEntities(any(), any())).thenReturn(new Entity[0]);
+        when(level.getNearbyRideables(any(), any())).thenReturn(new Entity[0]);
         when(level.getNearbyEntities(any(), any(), anyBoolean(), anyBoolean())).thenReturn(new Entity[0]);
         when(level.getGameRules()).thenReturn(GameRules.getDefault());
         when(level.getVibrationManager()).thenReturn(mock(VibrationManager.class));

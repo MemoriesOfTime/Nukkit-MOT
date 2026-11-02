@@ -61,7 +61,13 @@ public final class NativeContainerTransaction {
             event.call();
             // A callback may perform an independent inventory operation. Never replay a stale
             // source or refund that accepted effect; only this transaction's writes are rolled back.
-            if (event.isCancelled() || !matches(before) || !intact(contexts, actorContext, routeIntact)) return false;
+            if (event.isCancelled()) {
+                if (hopper instanceof cn.nukkit.block.BlockHopper.IHopper nativeHopper) {
+                    nativeHopper.requestTransferRetry();
+                }
+                return false;
+            }
+            if (!matches(before) || !intact(contexts, actorContext, routeIntact)) return false;
             Item approved = event.getItem();
             if (approved == null || approved.isNull() || approved.getCount() <= 0) return false;
             approved = approved.clone();
@@ -234,6 +240,9 @@ public final class NativeContainerTransaction {
     }
 
     private static boolean fits(Inventory requested, PhysicalSlot slot, Item item) {
+        // Ordinary potions belong only in native bottle slots, not fuel or ingredient roles.
+        if (requested instanceof BrewingInventory && item.getId() == Item.POTION
+                && (slot.index() < 1 || slot.index() > 3)) return false;
         Item existing = slot.inventory().getItem(slot.index());
         int limit = Math.min(item.getMaxStackSize(), Math.min(requested.getMaxStackSize(), slot.inventory().getMaxStackSize()));
         return item.getCount() > 0 && limit > 0 && (existing.isNull()

@@ -6,6 +6,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.DefaultPlayerDataSerializer;
 import java.io.*;
 import java.nio.file.*;
+import java.nio.channels.FileChannel;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.*;
@@ -50,14 +51,13 @@ class StockProfilePublicationTest {
     }
     @Test void nativeCloseFailureKeepsThePreviousGzipAndTheVoidFailureContract() throws Exception {
         IOException failure=new IOException("native stream close failure");AtomicInteger closed=new AtomicInteger();
-        try(var files=mockStatic(Files.class,CALLS_REAL_METHODS)) {
-            files.when(()->Files.newOutputStream(any(Path.class),any(OpenOption[].class))).thenAnswer(call->{
-                OutputStream actual=(OutputStream)call.callRealMethod();
-                return new FilterOutputStream(actual) {
-                    @Override public void close() throws IOException {
-                        super.close();if(closed.getAndIncrement()==0)throw failure;
-                    }
-                };
+        try(var channels=mockStatic(FileChannel.class,CALLS_REAL_METHODS)) {
+            channels.when(()->FileChannel.open(any(Path.class),any(OpenOption[].class))).thenAnswer(call->{
+                FileChannel actual=(FileChannel)call.callRealMethod();
+                if(!call.getArgument(0,Path.class).toString().endsWith(".tmp"))return actual;
+                FileChannel instrumented=spy(actual);
+                doAnswer(close->{actual.close();if(closed.getAndIncrement()==0)throw failure;return null;}).when(instrumented).close();
+                return instrumented;
             });
             assertDoesNotThrow(()->fixture.server.saveOfflinePlayerData("player",new CompoundTag().putString("marker","new"),false));
         }

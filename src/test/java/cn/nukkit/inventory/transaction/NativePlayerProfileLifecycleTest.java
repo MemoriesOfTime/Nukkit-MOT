@@ -133,9 +133,9 @@ class NativePlayerProfileLifecycleTest {
         assertTrue(f.player.closed); assertNull(f.player.getInventory());
         assertEquals(1, quits.get()); assertEquals(2, serializations.get());
         assertEquals(throwing ? 1 : 2, store.writes);
-        for (var task : store.tasks) task.onRun(1);
+        for (var task : store.tasks) { task.run(); task.run(); }
         assertEquals(throwing ? 1 : 2, store.writes);
-        assertTrue(store.pending.isEmpty()); assertTrue(f.world.isEmpty());
+        assertTrue(store.queue.flushAll().toCompletableFuture().isDone()); assertTrue(f.world.isEmpty());
         var saved = store.read();
         assertEquals(3, saved.getList("PlayerUIItems", CompoundTag.class).getAll().stream().map(NBTIO::getItemHelper)
                 .filter(item -> item.equals(finalInput, true, true)).mapToInt(Item::getCount).sum());
@@ -143,33 +143,57 @@ class NativePlayerProfileLifecycleTest {
         assertTrue(finalInput.equalsExact(fresh.player.getUIInventory().getItem(1)));
     }
 
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void refusedFinalAdmissionRetainsOwnerAndRecapturesALateCreditWithoutRepeatingQuit(boolean lateCredit) throws Exception {
+        var f = fixture(); var store = new ProfileStore(f, null, true);
+        var quits = new AtomicInteger(); var serializations = new AtomicInteger();
+        f.events(event -> {
+            if (event instanceof PlayerQuitEvent) quits.incrementAndGet();
+            if (event instanceof cn.nukkit.event.server.PlayerDataSerializeEvent) serializations.incrementAndGet();
+            if (event instanceof cn.nukkit.event.entity.ItemSpawnEvent spawn) spawn.getEntity().close();
+        });
+        for (int i = 0; i < 32; i++) assertTrue(store.queue.admit("occupied-" + i, () -> true).accepted());
+        f.player.close();
+        assertFalse(f.player.isConnected()); assertFalse(f.player.closed); assertNotNull(f.player.getInventory());
+        assertEquals(1, quits.get()); assertEquals(1, serializations.get()); assertEquals(0, store.writes);
+        if (lateCredit) {
+            Item credit = marked(1);
+            credit.setCount(7);
+            f.player.getUIInventory().setItemForce(1, credit);
+        }
+        store.tasks.get(0).run(); // One bounded write credit becomes available.
+        f.player.close();
+        assertTrue(f.player.closed); assertNull(f.player.getInventory()); assertEquals(1, quits.get());
+        assertEquals(lateCredit ? 2 : 1, serializations.get());
+        for (int i = 1; i < store.tasks.size(); i++) store.tasks.get(i).run();
+        assertEquals(1, store.writes);
+        var latest = store.read();
+        int count = latest.getList("PlayerUIItems", CompoundTag.class).getAll().stream().map(NBTIO::getItemHelper)
+                .filter(item -> item.equals(lateCredit ? marked(1) : f.input, true, true)).mapToInt(Item::getCount).sum();
+        assertEquals(lateCredit ? 7 : f.input.getCount(), count);
+        assertTrue(store.queue.flushAll().toCompletableFuture().isDone());
+    }
+
     static final class ProfileStore {
-        final List<cn.nukkit.scheduler.Task> tasks = new ArrayList<>();
-        final java.util.concurrent.ConcurrentHashMap<String, ArrayDeque<cn.nukkit.scheduler.Task>> pending = new java.util.concurrent.ConcurrentHashMap<>();
+        final List<Runnable> tasks = new ArrayList<>();
+        final cn.nukkit.utils.PlayerDataSaveQueue queue;
         byte[] bytes; int writes;
-        ProfileStore(NativeWorkstationOverflowTest.Fixture f) throws Exception {
-            Server server = MockServer.get();
-            inject(server, "playerDataLocks", new java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.locks.ReentrantLock>());
-            inject(server, "pendingPlayerDataSaves", pending); inject(server, "pluginManager", f.plugins);
-            inject(server, "playerDataSerializer", new cn.nukkit.utils.PlayerDataSerializer() {
+        ProfileStore(NativeWorkstationOverflowTest.Fixture f) throws Exception { this(f, null); }
+        ProfileStore(NativeWorkstationOverflowTest.Fixture f, List<CompoundTag> observed) throws Exception { this(f, observed, false); }
+        ProfileStore(NativeWorkstationOverflowTest.Fixture f, List<CompoundTag> observed, boolean delayed) throws Exception {
+            cn.nukkit.utils.PlayerDataSerializer serializer = new cn.nukkit.utils.PlayerDataSerializer() {
                 public Optional<java.io.InputStream> read(String name, UUID id) { return Optional.ofNullable(bytes).map(java.io.ByteArrayInputStream::new); }
                 public java.io.OutputStream write(String name, UUID id) {
                     return new java.io.ByteArrayOutputStream() {
                         boolean closed;
                         public void close() throws java.io.IOException {
                             if (closed) return; closed = true; super.close(); bytes = toByteArray(); writes++;
+                            if (observed != null) observed.add(ProfileStore.this.read().copy());
                         }
                     };
                 }
-            });
-            when(server.shouldSavePlayerData()).thenReturn(true);
-            doCallRealMethod().when(server).saveOfflinePlayerData(anyString(), any(CompoundTag.class), anyBoolean());
-            var scheduler = mock(cn.nukkit.scheduler.ServerScheduler.class); when(server.getScheduler()).thenReturn(scheduler);
-            when(scheduler.scheduleTask(any(cn.nukkit.plugin.Plugin.class), any(Runnable.class), eq(true))).thenAnswer(call -> {
-                cn.nukkit.scheduler.Task task = call.getArgument(1);
-                var handler = new cn.nukkit.scheduler.TaskHandler(call.getArgument(0), task, tasks.size()+1, true);
-                task.setHandler(handler); tasks.add(task); return handler;
-            });
+            };
+            queue = NativeProfileTestAccess.storage(MockServer.get(), serializer, f.plugins, task -> { tasks.add(task); if (!delayed) task.run(); });
         }
         CompoundTag read() throws java.io.IOException { return NBTIO.readCompressed(new java.io.ByteArrayInputStream(bytes)); }
         void inject(Server server, String name, Object value) throws Exception {
@@ -190,8 +214,7 @@ class NativePlayerProfileLifecycleTest {
         when(MockServer.get().getLanguage()).thenReturn(new BaseLang("eng"));
         return f;
     }
-    static void observeSaves(NativeWorkstationOverflowTest.Fixture f, List<CompoundTag> saved) {
-        doAnswer(call -> { saved.add(((CompoundTag) call.getArgument(1)).copy()); return null; })
-                .when(MockServer.get()).saveOfflinePlayerData(anyString(), any(CompoundTag.class), anyBoolean());
+    static void observeSaves(NativeWorkstationOverflowTest.Fixture f, List<CompoundTag> saved) throws Exception {
+        new ProfileStore(f, saved);
     }
 }

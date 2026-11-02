@@ -13,6 +13,17 @@ import java.util.UUID;
  */
 public interface PlayerDataSerializer {
 
+    /** Successful publication contract; none is a promise about remote storage or power-loss hardware. */
+    enum WriteAcknowledgement {
+        /** The selected custom provider accepted and closed its stream. */
+        PROVIDER_ACK,
+        /** Atomic native rename after file force; this provider has no directory-force API. */
+        ATOMIC_FILE_SYNC,
+        /** Atomic native rename after file force, followed by successful parent-directory force. */
+        ATOMIC_FILE_AND_DIRECTORY_SYNC
+    }
+
+
     /**
      * Reads player data from {@link InputStream} if the file exists otherwise it will create the default data.
      *
@@ -21,6 +32,12 @@ public interface PlayerDataSerializer {
      * @return {@link InputStream} if the player data exists
      */
     Optional<InputStream> read(String name, UUID uuid) throws IOException;
+
+    /**
+     * Opts into profile read/decode on the bounded player-data read pool.
+     * Selection events still run on MAIN. Legacy serializers retain their original read thread.
+     */
+    default boolean supportsConcurrentReads() { return false; }
 
     /**
      * Writes player data to given {@link OutputStream}.

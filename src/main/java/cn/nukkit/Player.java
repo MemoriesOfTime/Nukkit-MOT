@@ -3,10 +3,7 @@ package cn.nukkit;
 import cn.nukkit.AdventureSettings.Type;
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.block.*;
-import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.blockentity.BlockEntityCampfire;
-import cn.nukkit.blockentity.BlockEntityItemFrame;
-import cn.nukkit.blockentity.BlockEntitySpawnable;
+import cn.nukkit.blockentity.*;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
@@ -87,6 +84,7 @@ import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
+import cn.nukkit.network.session.NetherNetPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode;
 import cn.nukkit.network.session.login.SessionLoginPhase;
@@ -136,6 +134,10 @@ import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -285,6 +287,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private Runnable pendingProfileClose;
     private Runnable pendingPlayerCloseContinuation;
     private Boolean pendingProfileSave;
+    private PlayerDataSaveQueue.Admission<PlayerDataSerializer.WriteAcknowledgement> lastProfileAdmission;
+    private NativeProfileLogin nativeProfileLogin;
+    private boolean loginDataStarted;
+    private Server.PreparedPlayerData lastPreparedProfile;
+    private Server.PreparedPlayerData pendingFinalProfile;
+    private long profileCloseRetryDeadline;
+    private boolean profileCloseRetryExpired;
     protected CraftingGrid craftingGrid;
     protected CraftingTransaction craftingTransaction;
     protected EnchantTransaction enchantTransaction;
@@ -341,7 +350,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private final int loaderId;
 
-    public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
+    public final Map<Long, Boolean> usedChunks = new ConcurrentHashMap<>();
 
     private int chunksSent = 0;
     private long chunkDeliveryEpoch;
@@ -457,6 +466,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private static final int NO_SHIELD_DELAY = 10;
     private static final int TELEPORT_CHUNK_READY_OFFSET = 1;
+    // 出生/传送额外等待列方块数据的上限(tick)，超时即放行
+    // Upper bound (ticks) spawn/teleport waits for column block data before releasing
+    private static final int DATA_WAIT_TICKS = 40;
     private int noShieldTicks;
 
     public int pickedXPOrb = 0;
@@ -1333,6 +1345,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             this.usedChunks.remove(index);
+            this.forgetColumnData(index);
         }
         level.unregisterChunkLoader(this, x, z);
         this.loadQueue.remove(index);
@@ -1419,6 +1432,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         this.usedChunks.put(index, Boolean.TRUE);
         this.chunksSent++;
+
+        boolean pullShell = packet instanceof LevelChunkPacket levelChunk && levelChunk.requestSubChunks;
+        this.trackColumnSent(index, pullShell);
 
         if (this.spawned) {
             for (Entity entity : this.level.getChunkEntities(x, z).values()) {
@@ -1582,7 +1598,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 ++count;
 
                 try {
-                    this.usedChunks.put(index, false);
+                    this.usedChunks.put(index, Boolean.FALSE);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
 
                     // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
@@ -1642,7 +1658,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold) {
+        if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold && this.isSpawnAreaDataReady()) {
             this.hasSpawnChunks = true;
 
             if (this.protocol <= ProtocolInfo.v1_5_0) {
@@ -2929,6 +2945,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendRotation = true;
                     }
                 } else {
+                    // Seed the rollback position when the first input only changes rotation.
+                    this.lastX = this.x;
+                    this.lastY = this.y;
+                    this.lastZ = this.z;
                     this.lastYaw = this.yaw;
                     this.lastPitch = this.pitch;
                     this.needSendRotation = true;
@@ -3012,6 +3032,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             // Ground check
             if (!this.isSpectator() && (!this.onGround || dy != 0)) {
                 AxisAlignedBB bb = this.boundingBox.clone();
+                // Only exposed faces below the feet support a player; wall/head contacts do not.
+                bb.setMaxY(bb.getMinY() + 1.0E-4);
                 bb.setMinY(bb.getMinY() - 0.75);
 
                 // Hack: fix fall damage from walls while falling
@@ -3022,7 +3044,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     bb.setMaxZ(bb.getMaxZ() - 0.1);
                 }
 
-                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+                this.onGround = CollisionHelper.hasExposedBlockSupport(this.level, this, bb);
             }
 
             this.isCollided = this.onGround;
@@ -3778,12 +3800,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            // miss 补发先排空：兑现的是已发出的哈希引用，子区块队列可多等一 tick
+            // miss 补发先排空：兑现的是已发出的哈希引用，子区块队列可多等一 tick；
+            // 随后子区块：先发送异步已完成的应答（预算/字节账本内），再按 in-flight 余量提交延期请求
             // / Miss backlog drains first: it fulfills already-sent hash references,
-            // while the sub-chunk queue can wait another tick
+            // while the sub-chunk queue can wait another tick; then sub-chunks: async
+            // completions are sent first (within the entry/byte ledgers), then deferred
+            // requests are submitted with the remaining in-flight credit
             ClientCacheBlobStatusProcessor.drainDeferredMissResponses(this.playerHandle);
 
-            SubChunkRequestProcessor.drainDeferredRequests(this.playerHandle);
+            SubChunkRequestProcessor.tickRequests(this.playerHandle);
 
             if (!this.loadQueue.isEmpty() || !this.spawned) {
                 this.sendNextChunk();
@@ -3860,18 +3885,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected void processLogin() {
-        String lowerName = this.username.toLowerCase(Locale.ROOT);
-        if (!this.server.isWhitelisted(lowerName)) {
-            this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, server.whitelistReason);
-            return;
-        } else if (this.isBanned()) {
-            String reason = this.server.getNameBans().getEntires().get(lowerName).getReason();
-            this.kick(PlayerKickEvent.Reason.NAME_BANNED, "You are banned!" + (reason.isEmpty() ? "" : (" Reason: " + reason)));
-            return;
-        } else if (!server.strongIPBans && this.server.getIPBans().isBanned(this.getAddress())) {
-            this.kick(PlayerKickEvent.Reason.IP_BANNED, "Your IP is banned!");
-            return;
-        }
+        if (this.nativeProfileLogin != null || this.loginDataProcessed) return;
+        if (!this.checkLoginPolicy()) return;
 
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
@@ -3902,48 +3917,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        CompoundTag nbt;
-        File legacyDataFile = new File(server.getDataPath() + "players/" + lowerName + ".dat");
-        File dataFile = new File(server.getDataPath() + "players/" + this.uuid.toString() + ".dat");
-        if (this.server.savePlayerDataByUuid) {
-            if (!loginChainData.isXboxAuthed() && !dataFile.exists()) {
-                // The identity of unauthenticated players is no longer taken from the client, so
-                // data saved under their previous UUID has to follow them over — unless the name
-                // was last used by an Xbox authenticated account, whose data must stay with it.
-                Optional<Server.NameEntry> previousIdentity = this.server.lookupNameEntry(lowerName);
-                boolean authedOwner = previousIdentity.isPresent()
-                        && previousIdentity.get().provenance() == Server.NameProvenance.XBOX_AUTHED;
-                if (authedOwner) {
-                    this.server.getLogger().info("Not migrating player data for " + this.username
-                            + ": the name was last used by an Xbox authenticated account");
-                } else if (previousIdentity.isPresent() && this.server.migratePlayerData(previousIdentity.get().uuid(), this.uuid)
-                        == PlayerDataMigrator.Result.FAILED) {
-                    this.server.getLogger().warning("Aborted login of " + this.username + ": player data migration from "
-                            + previousIdentity.get().uuid() + " to " + this.uuid + " failed and will be retried");
-                    this.close("", "Failed to load your player data, please reconnect");
-                    return;
-                }
-            }
-            boolean dataFound = dataFile.exists();
-            if (!dataFound && legacyDataFile.exists()) {
-                // 按名直读，不经查找表解析——否则条目指向认证账户或塌缩身份时绕过守卫
-                // Read by name directly; lookup resolution would bypass the migration guards
-                nbt = this.server.getLegacyPlayerDataByName(lowerName);
-                if (!legacyDataFile.delete()) {
-                    this.server.getLogger().warning("Could not delete legacy player data for " + this.username);
-                }
-            } else {
-                nbt = this.server.getOfflinePlayerData(this.uuid, !dataFound);
-            }
-        } else {
-            boolean legacyMissing = !legacyDataFile.exists();
-            if (legacyMissing && dataFile.exists()) {
-                nbt = this.server.getOfflinePlayerData(this.uuid, false);
-            } else {
-                nbt = this.server.getOfflinePlayerData(lowerName, legacyMissing);
-            }
+        this.nativeProfileLogin = new NativeProfileLogin();
+        this.nativeProfileLogin.step();
+    }
+
+    private boolean checkLoginPolicy() {
+        String lowerName = this.username.toLowerCase(Locale.ROOT);
+        if (!this.server.isWhitelisted(lowerName)) {
+            this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, server.whitelistReason);
+            return false;
+        } else if (this.isBanned()) {
+            String reason = this.server.getNameBans().getEntires().get(lowerName).getReason();
+            this.kick(PlayerKickEvent.Reason.NAME_BANNED, "You are banned!" + (reason.isEmpty() ? "" : (" Reason: " + reason)));
+            return false;
+        } else if (!server.strongIPBans && this.server.getIPBans().isBanned(this.getAddress())) {
+            this.kick(PlayerKickEvent.Reason.IP_BANNED, "Your IP is banned!");
+            return false;
         }
 
+        return true;
+    }
+
+    /** Applies a successful observed profile on MAIN, once. Each user callback has a freshness fence. */
+    private void applyLoginData(CompoundTag nbt, NativeProfileLogin flow) {
         if (nbt == null) {
             this.close(this.getLeaveMessage(), "Invalid data");
             return;
@@ -3958,6 +3954,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         nbt.putString("NameTag", this.username);
 
         this.setExperience(nbt.getInt("EXP"), nbt.getInt("expLevel"));
+        if (!flow.fresh()) throw new CancellationException("Experience listener superseded login profile");
 
         if (this.server.getForceGamemode()) {
             this.gamemode = this.server.getGamemode();
@@ -4041,20 +4038,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             nbt.putString("XUID", xuid == null || xuid.isEmpty() ? "authenticated" : xuid);
         }
 
-        if (this.server.getAutoSave()) {
-            if (this.server.savePlayerDataByUuid) {
-                this.server.saveOfflinePlayerData(this.uuid, nbt, true);
-            } else {
-                this.server.saveOfflinePlayerData(this.username, nbt, true);
-            }
-        }
 
+        if ((this.server.getAutoSave() || flow.created) && this.server.shouldSavePlayerData()) {
+            flow.initialSave = this.server.admitPlayerData(
+                    this.server.savePlayerDataByUuid ? this.uuid.toString() : flow.name, nbt, true, flow::fresh);
+            if (!flow.initialSave.accepted()) throw new RejectedExecutionException("Initial profile checkpoint was refused");
+            // Resume after ACK without repeating experience/events or treating our own write as an external change.
+            flow.initialTag = nbt;
+            return;
+        }
+        finishLoginData(nbt, flow);
+    }
+
+    private void finishLoginData(CompoundTag nbt, NativeProfileLogin flow) {
         this.sendPlayStatus(PlayStatusPacket.LOGIN_SUCCESS);
+        if (!flow.fresh()) throw new CancellationException("Login success listener superseded profile");
 
         ListTag<DoubleTag> posList = nbt.getList("Pos", DoubleTag.class);
 
         super.init(this.level.getChunk((int) posList.get(0).data >> 4, (int) posList.get(2).data >> 4, true), nbt);
 
+        if (!flow.fresh()) throw new CancellationException("Entity initialization superseded login profile");
         if (!this.namedTag.contains("foodLevel")) {
             this.namedTag.putInt("foodLevel", 20);
         }
@@ -4095,7 +4099,170 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
+        if (!flow.fresh()) throw new CancellationException("Resource pack listener superseded login profile");
         this.syncLoginPhase(SessionLoginPhase.RESOURCE_PACK);
+        this.loginDataProcessed = true;
+        flow.complete();
+        if (this.preLoginEventTask != null) this.preLoginEventTask.onCompletion(this.server);
+    }
+
+    /** One bounded native flow, polled only on MAIN; no Player state is touched by an IO callback. */
+    private final class NativeProfileLogin {
+        final UUID identity = uuid;
+        final String name = username.toLowerCase(Locale.ROOT);
+        final String exactName = username;
+        final boolean uuidStorage = server.savePlayerDataByUuid;
+        final Object chain = loginChainData, session = networkSession, task = preLoginEventTask;
+        final long deadline;
+        final Map<String, CompletableFuture<PlayerDataMigrator.Result>> migrations = new HashMap<>();
+        final Set<String> refreshedMigrations = new HashSet<>();
+        PlayerDataSaveQueue.ReadHandle<Server.LoginProfileFiles> files;
+        Server.LoginProfileRead read;
+        PlayerDataSaveQueue.Admission<PlayerDataSerializer.WriteAcknowledgement> initialSave;
+        CompoundTag initialTag;
+        boolean created, applied, active = true;
+
+        NativeProfileLogin() {
+            long now = System.nanoTime();
+            long bound = TimeUnit.MILLISECONDS.toNanos(server.networkLoginTimeoutMilliseconds > 0
+                    ? server.networkLoginTimeoutMilliseconds : 25_000);
+            long lastActivity = networkSession == null || networkSession.getState() == null
+                    ? now : networkSession.getState().getLogin().getPhaseStartedNanos();
+            deadline = Math.min(now + bound, lastActivity + bound);
+        }
+
+        boolean valid() {
+            return active && nativeProfileLogin == this && connected && !closed && !loginDataProcessed
+                    && uuid.equals(identity) && Objects.equals(username, exactName)
+                    && loginChainData == chain && networkSession == session && preLoginEventTask == task
+                    && server.savePlayerDataByUuid == uuidStorage
+                    && (!(loginChainData instanceof ClientChainData client) || client.isAuthenticationCurrent())
+                    && (!server.xboxAuth || loginChainData.isXboxAuthed())
+                    && getCurrentLoginPhase() == SessionLoginPhase.PRE_LOGIN && System.nanoTime() < deadline;
+        }
+
+        boolean fresh() {
+            if (!valid()) return false;
+            return initialSave != null ? server.profileQueue().isLatest(initialSave)
+                    : files != null && files.isCurrent() && read != null && read.isCurrent();
+        }
+
+        void step() {
+            if (!valid()) { fail(new IllegalStateException("Profile login expired or changed identity")); return; }
+            try {
+                if (!checkLoginPolicy()) { cancel(); return; }
+                if (initialSave != null) {
+                    CompletableFuture<?> ack = initialSave.completion().toCompletableFuture();
+                    if (ack.isDone()) {
+                        ack.join();
+                        if (!fresh()) throw new CancellationException("Initial profile checkpoint superseded");
+                        finishLoginData(initialTag, this);
+                    }
+                } else if (!applied) {
+                    if (server.reserveLoginProfile(Player.this, name, identity) && olderSessionRetired()) load();
+                }
+            } catch (Throwable error) {
+                if (error instanceof CancellationException && valid() && !applied) closeReads();
+                else fail(error);
+            }
+            if (active) {
+                try { server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::step, 1); }
+                catch (RuntimeException stopped) { fail(stopped); }
+            }
+        }
+
+        boolean olderSessionRetired() {
+            for (Player older : new ArrayList<>(server.playerList.values())) {
+                if (older != Player.this && !older.closed && (identity.equals(older.uuid)
+                        || older.username != null && name.equalsIgnoreCase(older.username))) {
+                    if (older.connected && server.isDuplicateLoginKeepingExistingSession()) {
+                        Player.this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        cancel(); return false;
+                    }
+                    // A disconnected owner may still be waiting for physical claims or final queue admission.
+                    older.close("", "disconnectionScreen.loggedinOtherLocation");
+                    if (!older.closed) return false;
+                }
+            }
+            return true;
+        }
+
+        void load() throws IOException {
+            if (files != null && files.isSuperseded()) closeReads();
+            if (files != null && files.completion().toCompletableFuture().isCompletedExceptionally())
+                files.completion().toCompletableFuture().join();
+            if (files == null) files = server.inspectLoginProfile(identity, name, loginChainData.isXboxAuthed());
+            CompletableFuture<Server.LoginProfileFiles> inspected = files.completion().toCompletableFuture();
+            if (!inspected.isDone()) return;
+            Server.LoginProfileFiles paths = inspected.join();
+            if (server.savePlayerDataByUuid && !paths.uuidExists()) {
+                if (!loginChainData.isXboxAuthed() && paths.previous().isPresent()
+                        && paths.previous().get().provenance() != Server.NameProvenance.XBOX_AUTHED) {
+                    UUID previous = paths.previous().get().uuid();
+                    if (!migration("uuid:" + previous, () -> server.migratePlayerDataForLogin(previous, identity, name, this::mutationCurrent))) return;
+                }
+                if (paths.nameExists() && !migration("name:" + name,
+                        () -> server.migrateLegacyPlayerDataForLogin(name, identity, this::mutationCurrent))) return;
+            }
+            if (files == null || !files.isCurrent()) return;
+            String key = server.savePlayerDataByUuid || !paths.nameExists() && paths.uuidExists() ? identity.toString() : name;
+            if (read != null && read.isSuperseded()) { read.close(); read = null; }
+            if (read == null || !read.isCurrent()) {
+                if (read != null) {
+                    if (read.ready().isCompletedExceptionally()) read.ready().join();
+                    read.close();
+                }
+                read = server.readLoginProfile(key, identity, name, this::mutationCurrent);
+                // Serialize listener may close or replace the native owner.
+                if (!valid()) throw new CancellationException("Profile reader listener changed login owner");
+            }
+            if (!read.ready().isDone()) return;
+            CompoundTag profile = read.take();
+            // Legacy custom read may synchronously reenter events/saves/close.
+            if (!fresh()) { closeReads(); return; }
+            created = profile == null;
+            if (created) profile = server.newPlayerData();
+            if (!fresh()) { closeReads(); return; }
+            applied = true;
+            applyLoginData(profile, this);
+        }
+
+        boolean mutationCurrent() { return valid() && files != null && files.isCurrent(); }
+
+        boolean migration(String key, Supplier<CompletionStage<PlayerDataMigrator.Result>> start) {
+            CompletableFuture<PlayerDataMigrator.Result> result = migrations.get(key);
+            if (result == null) {
+                result = start.get().toCompletableFuture(); migrations.put(key, result);
+                if (!valid()) throw new CancellationException("Migration listener changed login owner");
+            }
+            if (!result.isDone()) return false;
+            if (result.join() == PlayerDataMigrator.Result.FAILED) throw new IllegalStateException("Profile migration failed");
+            if (refreshedMigrations.add(key)) { closeReads(); return false; }
+            return true;
+        }
+
+        void closeReads() {
+            if (files != null) files.close();
+            if (read != null) read.close();
+            files = null; read = null;
+        }
+
+        void complete() {
+            active = false; closeReads(); if (nativeProfileLogin == this) nativeProfileLogin = null;
+            // Keep name/UUID admission through resource packs until addOnlinePlayer, or close.
+        }
+
+        void cancel() {
+            active = false; closeReads(); if (nativeProfileLogin == this) nativeProfileLogin = null;
+            server.releaseLoginProfile(Player.this);
+        }
+
+        void fail(Throwable error) {
+            if (!active) return;
+            cancel();
+            server.getLogger().logException(error);
+            if (connected && !closed) close("", "Failed to load your player data, please reconnect");
+        }
     }
 
     private boolean rejectIfServerFull() {
@@ -6017,6 +6184,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     switch (useItemData.actionType) {
                         case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
+                            Level clickLevel = this.level;
                             boolean spamming = !server.doNotLimitInteractions
                                     && lastRightClickPos != null
                                     && System.currentTimeMillis() - lastRightClickTime < 100.0
@@ -6081,24 +6249,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
                             }
 
-                            if (blockVector.distanceSquared(this) > 10000) {
+                            if (this.level != clickLevel || blockVector.distanceSquared(this) > 10000) {
                                 break;
                             }
 
                             Block target = this.level.getBlock(blockVector.asVector3());
                             block = target.getSide(face);
 
-                            this.level.sendBlocks(new Player[]{this}, new Block[]{target, block}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-                            this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1), block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
+                            if (!this.sendRefusedBlockLayers(clickLevel, target)
+                                    || !this.sendRefusedBlockLayers(clickLevel, block)
+                                    || this.level != clickLevel) {
+                                break;
+                            }
 
                             if (target instanceof BlockDoor door && (door.getDamage() & 0x08) > 0) {
                                 Block part = target.down();
                                 if (part.getId() == target.getId()) {
                                     target = part;
-                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
+                                    if (!this.sendRefusedBlockLayers(clickLevel, target)) {
+                                        break;
+                                    }
                                 }
                             }
+                            this.resendRefusedBlockActors(clickLevel, blockVector.asVector3(), blockVector.getSide(face).asVector3());
                             break;
                         case InventoryTransactionPacket.USE_ITEM_ACTION_BREAK_BLOCK:
                             if (!this.spawned || !this.isAlive()) {
@@ -6109,6 +6282,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             Item i = this.getInventory().getItemInHand();
                             Item oldItem = i.clone();
+                            Level breakLevel = this.level;
 
                             if (this.canInteract(blockVector.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7)
                                     && (i = this.level.useBreakOn(blockVector.asVector3(), face, i, this, true)) != null) {
@@ -6131,12 +6305,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             inventory.sendHeldItem(this);
 
                             if (blockVector.distanceSquared(this) < 10000) {
-                                target = this.level.getBlock(blockVector.asVector3());
-                                this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-                                BlockEntity blockEntity = this.level.getBlockEntity(blockVector.asVector3());
-                                if (blockEntity instanceof BlockEntitySpawnable) {
-                                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                                if (this.sendRefusedBlockLayers(breakLevel, blockVector.asVector3())) {
+                                    this.resendRefusedBlockActors(breakLevel, blockVector.asVector3());
                                 }
                             }
                             break;
@@ -6626,12 +6796,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        Block target = this.level.getBlock(pos);
+        Level interactionLevel = this.level;
+        Block target = interactionLevel.getBlock(pos);
         PlayerInteractEvent playerInteractEvent = new PlayerInteractEvent(this, this.inventory.getItemInHand(), target, face,
                 target.getId() == 0 ? Action.LEFT_CLICK_AIR : Action.LEFT_CLICK_BLOCK);
         this.getServer().getPluginManager().callEvent(playerInteractEvent);
         if (playerInteractEvent.isCancelled()) {
             this.needSendHeldItem = true;
+            if (this.sendRefusedBlockLayers(interactionLevel, pos)) {
+                this.resendRefusedBlockActors(interactionLevel, pos);
+            }
             return;
         }
 
@@ -6708,17 +6882,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Item handItem = this.getInventory().getItemInHand();
         Item clone = handItem.clone();
+        Level breakLevel = this.level;
 
         boolean canInteract = this.canInteract(blockPos.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7);
         if (canInteract) {
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
                 this.armDeniedCreativeBreakCorrection(blockPos);
-                this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-                BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
-                if (blockEntity instanceof BlockEntitySpawnable) {
-                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                if (this.sendRefusedBlockLayers(breakLevel, blockPos.asVector3())) {
+                    this.resendRefusedBlockActors(breakLevel, blockPos.asVector3());
                 }
             } else if (this.isSurvival()) {
                 this.getFoodData().updateFoodExpLevel(0.005);
@@ -6742,13 +6914,87 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.armDeniedCreativeBreakCorrection(blockPos);
 
         if (blockPos.distanceSquared(this) < 10000) {
-            Vector3 pos = blockPos.asVector3();
-            this.level.sendBlocks(this, new Block[]{this.level.getBlock(pos, false)}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-            BlockEntity blockEntity = this.level.getBlockEntityIfLoaded(this.chunk, pos);
-            if (blockEntity instanceof BlockEntitySpawnable) {
-                ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+            if (this.sendRefusedBlockLayers(breakLevel, blockPos.asVector3())) {
+                this.resendRefusedBlockActors(breakLevel, blockPos.asVector3());
             }
         }
+    }
+
+    /**
+     * 拒绝的预测交互后，仅从已加载区块的权威存储按层重发方块，不触发同步区块加载。
+     * <p>
+     * Restores both block layers from still-loaded authoritative storage after a refused prediction,
+     * never triggering a synchronous chunk load. Returns false when the world or chunk became invalid.
+     */
+    private boolean sendRefusedBlockLayers(Level origin, Vector3 pos) {
+        if (this.level != origin || !origin.isYInRange(pos.getFloorY())) {
+            return false;
+        }
+        FullChunk loaded = origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4);
+        if (loaded == null) {
+            return false;
+        }
+        for (int layer = 0; layer <= 1; layer++) {
+            // Packet listeners may teleport the player or replace/unload the chunk synchronously.
+            if (this.level != origin || origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4) != loaded) {
+                return false;
+            }
+            Block block = origin.getBlock(loaded, pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), layer, false);
+            origin.sendBlocks(new Player[]{this}, new Block[]{block}, UpdateBlockPacket.FLAG_ALL_PRIORITY, layer);
+        }
+        return this.level == origin && origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4) == loaded;
+    }
+
+    /**
+     * 方块层全部重发后，补发公开的方块实体数据，含互惠相邻的双箱另一半。
+     * <p>
+     * Resends public block-actor data after the block layers, including the second half of a live,
+     * adjacent, reciprocal double chest; never opens or mutates a container.
+     */
+    private void resendRefusedBlockActors(Level origin, Vector3... positions) {
+        if (this.level != origin) {
+            return;
+        }
+        List<BlockEntitySpawnable> actors = new ArrayList<>();
+        for (Vector3 pos : positions) {
+            BlockEntity actor = origin.getBlockEntityIfLoaded(pos);
+            if (actor instanceof BlockEntitySpawnable spawnable && !spawnable.closed
+                    && spawnable.getLevel() == origin) {
+                actors.add(spawnable);
+            }
+        }
+        // A refused prediction can flip or remove both halves; only a live reciprocal pair is relevant.
+        for (int i = 0; i < actors.size(); i++) {
+            if (actors.get(i) instanceof BlockEntityChest chest) {
+                BlockEntityChest pair = chest.getPair();
+                if (pair != null && !pair.closed && pair.getLevel() == origin
+                        && pair.getFloorY() == chest.getFloorY()
+                        && Math.abs(pair.getFloorX() - chest.getFloorX())
+                        + Math.abs(pair.getFloorZ() - chest.getFloorZ()) == 1
+                        && pair.getPair() == chest && origin.getBlockEntityIfLoaded(pair) == pair
+                        && !containsIdentity(actors, pair)) {
+                    actors.add(pair);
+                    if (!this.sendRefusedBlockLayers(origin, pair)) {
+                        actors.remove(actors.size() - 1);
+                    }
+                }
+            }
+        }
+        for (BlockEntitySpawnable actor : actors) {
+            if (this.level == origin && !actor.closed && actor.getLevel() == origin
+                    && origin.getBlockEntityIfLoaded(actor) == actor) {
+                actor.spawnTo(this);
+            }
+        }
+    }
+
+    private static boolean containsIdentity(List<BlockEntitySpawnable> actors, BlockEntitySpawnable actor) {
+        for (BlockEntitySpawnable present : actors) {
+            if (present == actor) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -7282,6 +7528,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void closeNow(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
+        if (this.nativeProfileLogin != null) this.nativeProfileLogin.cancel();
+        this.server.releaseLoginProfile(this);
         if (pendingLoginVerification != null) {
             pendingLoginVerification.cancel();
             pendingLoginVerification = null;
@@ -7361,15 +7609,46 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.server.isShutdownTimedOut()) return;
         if (this.loggedIn && (ev == null || ev.getAutoSave() || this.pendingProfileSave != null)) {
             try {
-                this.save();
+                if (this.pendingFinalProfile != null) {
+                    // The disconnected owner is retained: a late native credit may have changed its slots.
+                    this.captureProfileData();
+                    if (!InventoryMutationGuard.canCaptureProfile(this.profileInventories())) {
+                        this.pendingFinalProfile = null;
+                        throw new IllegalStateException("Final retry snapshot is provisional");
+                    }
+                    CompoundTag comparable = this.namedTag.copy();
+                    // This capture's generated wall-clock value alone is not a new inventory outcome.
+                    comparable.putLong("lastPlayed", this.pendingFinalProfile.snapshot().getLong("lastPlayed"));
+                    if (!comparable.equals(this.pendingFinalProfile.snapshot())) this.pendingFinalProfile = null;
+                }
+                if (this.pendingFinalProfile == null) this.save(true);
+                else this.lastProfileAdmission = this.server.admitPreparedPlayerData(this.pendingFinalProfile);
+                if (this.lastProfileAdmission != null && !this.lastProfileAdmission.accepted())
+                    throw new RejectedExecutionException("Final profile checkpoint was refused");
             } catch (Throwable t) {
-                this.server.getLogger().logException(t);
+                if (this.lastProfileAdmission != null && !this.lastProfileAdmission.accepted()
+                        && InventoryMutationGuard.canCaptureProfile(this.profileInventories()))
+                    this.pendingFinalProfile = this.lastPreparedProfile;
+                if (this.profileCloseRetryDeadline == 0) {
+                    this.server.getLogger().logException(t);
+                    this.profileCloseRetryDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(25);
+                }
+                this.pendingPlayerCloseContinuation = () -> this.saveAndRetirePlayer(ev, reason, notify);
+                if (System.nanoTime() < this.profileCloseRetryDeadline) this.server.deferPlayerClose(this, this::close);
+                else if (!this.profileCloseRetryExpired) {
+                    this.profileCloseRetryExpired = true;
+                    this.server.getLogger().error("Final profile admission deadline expired for " + this.username + "; retained owner requires recovery");
+                }
+                return;
             }
         }
 
         if (this.server.isShutdownTimedOut()) return;
         // A serialize listener may retain a new claim after this capture. Save its final outcome before retirement.
-        if (this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify))) return;
+        if (this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify))) {
+            this.pendingFinalProfile = null; return;
+        }
+        this.pendingFinalProfile = null;
         try (InventoryMutationGuard.Lease retirement = InventoryMutationGuard.tryClaimProfile(this.profileInventories())) {
             if (retirement == null) {
                 this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify));
@@ -7381,6 +7660,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
     }
+
+    boolean hasPendingProfileRetirement() { return !this.closed && this.pendingPlayerCloseContinuation != null; }
 
     private void retirePlayerNow(PlayerQuitEvent ev, String reason, boolean notify) {
         try {
@@ -7467,9 +7748,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private boolean canCaptureProfileOnCurrentThread() {
-        if (this.server.isPrimaryThread()) return true;
-        Thread owner = this.server.getPrimaryThread();
-        return owner != null && owner.getState() == Thread.State.TERMINATED && InventoryMutationGuard.isIdle();
+        return this.server.isPrimaryThread() || this.server.isProfileOwnerThread();
     }
 
     /** Capture on the owner, or after its termination with no abandoned inventory mutation. */
@@ -7511,9 +7790,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Throwable originalFailure = null;
         try {
             this.captureProfileData();
-            if (this.level != null && !this.username.isEmpty()) {
-                if (this.server.savePlayerDataByUuid) this.server.saveOfflinePlayerData(this.uuid, this.namedTag, async);
-                else this.server.saveOfflinePlayerData(this.username, this.namedTag, async);
+            this.lastProfileAdmission = null;
+            this.lastPreparedProfile = null;
+            if (this.level != null && !this.username.isEmpty() && this.server.shouldSavePlayerData()) {
+                this.lastPreparedProfile = this.server.preparePlayerData(
+                        this.server.savePlayerDataByUuid ? this.uuid.toString() : this.username, this.namedTag, true, () -> !this.closed);
+                this.lastProfileAdmission = this.server.admitPreparedPlayerData(this.lastPreparedProfile);
+                if (!this.lastProfileAdmission.accepted()) throw new RejectedExecutionException("Player checkpoint was refused");
+                if (!async) this.server.awaitProfileIO(this.lastProfileAdmission.completion(), false);
             }
         } catch (RuntimeException | Error failure) {
             originalFailure = failure;
@@ -8350,6 +8634,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /**
+     * 传送目标 3×3 就绪判定：拉取模式下还要求各列已派发方块数据。
+     * <p>
+     * Readiness for the 3×3 around the teleport target: in pull mode each column
+     * must also have dispatched its block data.
+     */
     protected boolean checkTeleportPosition() {
         if (this.teleportPosition != null) {
             int chunkX = (int) this.teleportPosition.x >> 4;
@@ -8358,6 +8648,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
+            int tick = this.server.getTick();
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
                 for (int Z = -maxChunkOffset; Z <= maxChunkOffset; ++Z) {
                     if ((long) X * X + (long) Z * Z > chunkSendRadiusSqr) {
@@ -8365,6 +8656,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     long index = Level.chunkHash(chunkX + X, chunkZ + Z);
                     if (!this.usedChunks.containsKey(index) || !this.usedChunks.get(index)) {
+                        return false;
+                    }
+                    if (!this.isColumnDataReady(index, tick)) {
                         return false;
                     }
                 }
@@ -8376,6 +8670,53 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return false;
+    }
+
+    /**
+     * 出生点 3×3 是否有地形数据：非拉取模式恒为 true。
+     * <p>
+     * Whether spawn's 3×3 has terrain data: always true outside pull mode.
+     */
+    private boolean isSpawnAreaDataReady() {
+        if (!this.isSubChunkPullMode()) {
+            return true;
+        }
+        int centerX = this.getChunkX();
+        int centerZ = this.getChunkZ();
+        int tick = this.server.getTick();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!this.isColumnDataReady(Level.chunkHash(centerX + dx, centerZ + dz), tick)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 该列数据是否就绪；状态对象缺失(mock)时视为就绪。
+     * <p>
+     * Whether the column's data is ready; a missing state object (mocks) counts as ready.
+     */
+    private boolean isColumnDataReady(long index, int tick) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        return state == null || state.isColumnDataReady(index, tick, DATA_WAIT_TICKS);
+    }
+
+    private void trackColumnSent(long index, boolean pullShell) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        if (state == null) {
+            return;
+        }
+        state.onColumnSent(index, this.server == null ? 0 : this.server.getTick(), pullShell);
+    }
+
+    private void forgetColumnData(long index) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        if (state != null) {
+            state.forgetColumn(index);
+        }
     }
 
     protected void sendPlayStatus(int status) {
@@ -9026,7 +9367,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Inventory inventory = activeId == null ? null : this.windowIndex.get(activeId);
         boolean noneClosesActive = id == ContainerIds.NONE && activeId != null
                 && (this.inventoryOpen || activeId == ContainerIds.NONE || inventory instanceof PlayerEnderChestInventory
-                    || isWorldBlockContainer(inventory));
+                    || isWorldBlockContainer(inventory)
+                    || Objects.equals(this.inventoryScreenId, activeId) && inventory != null
+                        && inventory.getHolder() instanceof FakeBlockMenu);
         if (activeId != null && (id == (byte) activeId.intValue() || noneClosesActive)) {
             if ((inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory
                 || inventory instanceof FakeBlockUIComponent fake && fake.usesNativeInputReturn()
@@ -9560,7 +9903,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void onChunkChanged(FullChunk chunk) {
-        this.usedChunks.remove(Level.chunkHash(chunk.getX(), chunk.getZ()));
+        long index = Level.chunkHash(chunk.getX(), chunk.getZ());
+        this.usedChunks.remove(index);
+        this.forgetColumnData(index);
     }
 
     @Override
@@ -10623,15 +10968,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 // shouldLogin；守卫防止两条触发路径重复执行
                 // processLogin must run ahead of the shouldLogin check (it sends the pack info
                 // the client needs to finish); the guard keeps the two trigger paths single-shot
-                if (!playerInstance.loginDataProcessed) {
-                    playerInstance.loginDataProcessed = true;
+                if (!playerInstance.loginDataStarted) {
+                    playerInstance.loginDataStarted = true;
                     playerInstance.processLogin();
+                    // A custom protected hook that owns its complete legacy flow stays single-shot.
+                    if (playerInstance.nativeProfileLogin == null && playerInstance.connected)
+                        playerInstance.loginDataProcessed = true;
                     if (!playerInstance.connected) {
                         return;
                     }
                 }
 
-                if (playerInstance.shouldLogin) {
+                if (playerInstance.shouldLogin && playerInstance.loginDataProcessed) {
                     playerInstance.setSkin(this.event.getSkin());
                     playerInstance.completeLoginSequence();
                     for (Consumer<Server> action : this.event.getScheduledActions()) {
@@ -10843,6 +11191,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         return this.isInventoryServerAuthoritative();
+    }
+
+    /**
+     * Whether this connection proved it holds the private key of its login chain's identity: RakNet
+     * through the Bedrock encryption handshake, NetherNet through the signaling assertion signed over
+     * the DTLS fingerprints of the same connection. A well-signed chain without this proof may be a
+     * replay of one the player sent to another server.
+     */
+    public boolean isLoginKeyProven() {
+        if (this.networkSession instanceof NetherNetPlayerSession netherNet) {
+            return netherNet.isIdentityKeyBound();
+        }
+        return this.isEnableNetworkEncryption();
     }
 
     public boolean isEnableNetworkEncryption() {
