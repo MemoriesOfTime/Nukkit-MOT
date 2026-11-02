@@ -39,6 +39,7 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestSnapshot;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
@@ -379,6 +380,10 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> pendingChunkRequests = new Object2ObjectOpenHashMap<>();
+
+    private Object2ObjectMap<GameVersion, Long2IntOpenHashMap> staleChunkSendRetries;
+    private int synchronousChunkRetryTick = Integer.MIN_VALUE;
+    private static final int MAX_STALE_CHUNK_SEND_RETRIES = 3;
 
     private final Cache<Long, Boolean> entityNearbyCacheDirty = Caffeine.newBuilder()
             .maximumSize(512)
@@ -1462,13 +1467,7 @@ public class Level implements ChunkManager, Metadatable {
             NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
-                // 被超时重试取代:并行 lane 下旧任务可能晚于新任务返回,丢掉免得旧快照落地客户端
-                // Superseded by a timeout retry: with the parallel lane an older task can land last
-                if (this.isSupersededChunkCallback(data)) {
-                    continue;
-                }
-                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload(),
-                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities());
+                this.handleChunkRequestCallback(data);
             }
         }
 
@@ -4500,6 +4499,7 @@ public class Level implements ChunkManager, Metadatable {
             for (long index : pending) {
                 // Discard departed recipients before chunk lookup and serialization.
                 if (!this.retainChunkRecipients(protocolId, index, queue.get(index))) {
+                    this.clearStaleChunkSendRetries(protocolId, index);
                     continue;
                 }
                 // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
@@ -4759,6 +4759,11 @@ public class Level implements ChunkManager, Metadatable {
      * tick only when no protocol still has it in flight.
      */
     private void releaseChunkRequest(GameVersion protocol, long index) {
+        this.releaseChunkRequest(protocol, index, true);
+    }
+
+    private void releaseChunkRequest(GameVersion protocol, long index, boolean clearRetries) {
+        if (clearRetries) this.clearStaleChunkSendRetries(protocol, index);
         this.getChunkSendTasks(protocol).remove(index);
         Long2LongOpenHashMap epochs = this.chunkRequestEpochs.get(this.getChunkProtocol(protocol));
         if (epochs != null) {
@@ -4804,6 +4809,29 @@ public class Level implements ChunkManager, Metadatable {
                                           List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
         this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(
                 gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence));
+    }
+
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                          List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence,
+                                          ChunkRequestSnapshot snapshot) {
+        if (snapshot == null) {
+            this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence);
+            return;
+        }
+        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(
+                gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence, snapshot));
+    }
+
+    void handleChunkRequestCallback(NetworkChunkSerializer.NetworkChunkSerializerCallbackData data) {
+        if (this.isSupersededChunkCallback(data)) return;
+        if (data.getSnapshot() == null) {
+            // Preserve the original callback chain for custom levels and providers.
+            this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(),
+                    data.getPayload(), data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities());
+        } else {
+            this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(),
+                    data.getPayload(), data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities(), data.getSequence(), data.getSnapshot());
+        }
     }
 
     /**
@@ -4856,6 +4884,22 @@ public class Level implements ChunkManager, Metadatable {
      */
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                      List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
+        this.chunkRequestCallbackInternal(protocol, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence, null);
+    }
+
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                     List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence,
+                                     ChunkRequestSnapshot snapshot) {
+        if (snapshot == null) {
+            this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence);
+            return;
+        }
+        this.chunkRequestCallbackInternal(protocol, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence, snapshot);
+    }
+
+    private void chunkRequestCallbackInternal(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                             List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence,
+                                             ChunkRequestSnapshot snapshot) {
         long index = Level.chunkHash(x, z);
 
         if (!this.isChunkRequestCurrent(protocol, index, sequence)) {
@@ -4868,6 +4912,7 @@ public class Level implements ChunkManager, Metadatable {
             this.releaseChunkRequest(protocol, index);
             return;
         }
+        if (this.retryStaleChunkSnapshot(protocol, index, snapshot)) return;
         boolean anyBlobMode = false;
         boolean anyPullMode = false;
         for (Player player : recipients.values()) {
@@ -4886,8 +4931,13 @@ public class Level implements ChunkManager, Metadatable {
         if (server.cacheChunks && !anyBlobMode && !anyPullMode) {
             BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
-            if (chunk != null && chunk.getChanges() <= timestamp) {
+            if (this.retryStaleChunkSnapshot(protocol, index, snapshot)) return;
+            if (chunk != null && (snapshot != null || chunk.getChanges() <= timestamp)) {
                 chunk.setChunkPacket(protocol, data);
+            }
+            if (this.retryStaleChunkSnapshot(protocol, index, snapshot)) {
+                if (chunk != null) chunk.invalidateChunkPacket(protocol, data);
+                return;
             }
             //this.sendChunk(x, z, index, data);
             this.sendChunkInternal(x, z, index, data, protocol);
@@ -4897,6 +4947,7 @@ public class Level implements ChunkManager, Metadatable {
         if (this.getChunkSendTasks(protocol).contains(index)) {
             // identity check: a replaced recipient group is not ours to dispatch
             if (queue.get(index) == recipients) {
+                if (this.retryStaleChunkSnapshot(protocol, index, snapshot)) return;
                 LevelChunkPacket blobPacket = null;
                 LevelChunkPacket pullCachePacket = null;
                 LevelChunkPacket pullRawPacket = null;
@@ -4955,6 +5006,41 @@ public class Level implements ChunkManager, Metadatable {
                 this.releaseChunkRequest(protocol, index);
             }
         }
+    }
+
+    /** MAIN-only: reserve at most one hot native coordinate per level/tick, grouping protocols. */
+    public boolean shouldSerializeChunkSynchronously(ObjectSet<GameVersion> protocols, int x, int z) {
+        if (this.staleChunkSendRetries == null || this.synchronousChunkRetryTick == this.server.getTick()) return false;
+        long index = chunkHash(x, z);
+        for (GameVersion protocol : protocols) {
+            Long2IntOpenHashMap retries = this.staleChunkSendRetries.get(this.getChunkProtocol(protocol));
+            if (retries != null && retries.get(index) >= MAX_STALE_CHUNK_SEND_RETRIES) {
+                this.synchronousChunkRetryTick = this.server.getTick();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean retryStaleChunkSnapshot(GameVersion protocol, long index, ChunkRequestSnapshot snapshot) {
+        if (snapshot == null || snapshot.matches(this.getChunkIfLoaded(getHashX(index), getHashZ(index)))) return false;
+        if (this.staleChunkSendRetries == null) this.staleChunkSendRetries = new Object2ObjectOpenHashMap<>();
+        Long2IntOpenHashMap retries = this.staleChunkSendRetries.computeIfAbsent(
+                this.getChunkProtocol(protocol), ignored -> new Long2IntOpenHashMap());
+        retries.put(index, Math.min(MAX_STALE_CHUNK_SEND_RETRIES, retries.get(index) + 1));
+        this.releaseChunkRequest(protocol, index, false);
+        this.getPendingChunkRequests(protocol).add(index);
+        return true;
+    }
+
+    private void clearStaleChunkSendRetries(GameVersion protocol, long index) {
+        if (this.staleChunkSendRetries == null) return;
+        GameVersion protocolId = this.getChunkProtocol(protocol);
+        Long2IntOpenHashMap retries = this.staleChunkSendRetries.get(protocolId);
+        if (retries == null) return;
+        retries.remove(index);
+        if (retries.isEmpty()) this.staleChunkSendRetries.remove(protocolId);
+        if (this.staleChunkSendRetries.isEmpty()) this.staleChunkSendRetries = null;
     }
 
     /**
