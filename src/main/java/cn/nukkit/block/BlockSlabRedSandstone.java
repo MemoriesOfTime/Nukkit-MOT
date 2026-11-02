@@ -12,6 +12,9 @@ public class BlockSlabRedSandstone extends BlockSlab {
 
     public static final int RED_SANDSTONE = 0;
     public static final int PURPUR = 1;
+    public static final int PRISMARINE = 2;
+    public static final int PRISMARINE_BRICKS = 3;
+    public static final int DARK_PRISMARINE = 4;
 
     public BlockSlabRedSandstone() {
         this(RED_SANDSTONE);
@@ -45,6 +48,18 @@ public class BlockSlabRedSandstone extends BlockSlab {
     @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
+    }
+
+    @Override
+    public double getHardness() {
+        switch (this.getDamage() & 0x07) {
+            case PRISMARINE:
+            case PRISMARINE_BRICKS:
+            case DARK_PRISMARINE:
+                return 1.5;
+            default:
+                return 2;
+        }
     }
 
     @Override

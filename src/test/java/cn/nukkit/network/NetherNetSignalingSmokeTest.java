@@ -7,9 +7,9 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPSignaling;
-import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling.PongData;
-import org.cloudburstmc.netty.util.nethernet.ServerIdentity;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
+import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 import org.cloudburstmc.netty.util.nethernet.TokenTrust;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +57,7 @@ class NetherNetSignalingSmokeTest {
     @Test
     @Timeout(30)
     void joinEndpointServesStatus() throws Exception {
-        ServerIdentity identity = ServerIdentity.generate("smoke-test");
+        OperatorIdentity identity = OperatorIdentity.generate("smoke-test");
         PongData pong = new PongData.Builder()
                 .setServerName("NetherNetSmokeTest")
                 .setProtocol(1)
@@ -65,12 +65,12 @@ class NetherNetSignalingSmokeTest {
                 .setNonce("0123456789abcdef")
                 .build();
 
-        NetherNetHTTPSignaling signaling = new NetherNetHTTPSignaling.Builder()
+        NetherNetHTTPServerSignaling signaling = new NetherNetHTTPServerSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
                 .setIceOnLocalPort(false)
                 .setTokenTrust(TokenTrust.ANY)
-                .setMotdProvider((host, remoteAddress) -> pong)
+                .setMotdProvider((host, remoteAddress, client) -> pong)
                 .setPlayerFilter((host, player) -> null)
                 .build();
 

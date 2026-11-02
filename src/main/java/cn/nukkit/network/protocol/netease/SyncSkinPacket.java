@@ -67,7 +67,7 @@ public class SyncSkinPacket extends DataPacket {
 
     @Override
     public void decode() {
-        int count = (int) this.getUnsignedVarInt();
+        int count = this.getUnsignedVarIntCount("skin sync entry count");
         this.entries = new ObjectArrayList<>(count);
         for (int i = 0; i < count; i++) {
             this.entries.add(new SyncSkinEntry());

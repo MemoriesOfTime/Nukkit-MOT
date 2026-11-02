@@ -4,6 +4,15 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockStemStrippedWarped extends BlockStemStripped {
 
+    public BlockStemStrippedWarped() {
+        this(0);
+    }
+
+    public BlockStemStrippedWarped(int meta) {
+        super(meta);
+    }
+
+
     @Override
     public int getId() {
         return STRIPPED_WARPED_STEM;

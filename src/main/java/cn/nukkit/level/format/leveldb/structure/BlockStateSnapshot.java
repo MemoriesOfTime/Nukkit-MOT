@@ -9,7 +9,7 @@ import lombok.ToString;
 import org.cloudburstmc.nbt.NbtMap;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @ToString
 public class BlockStateSnapshot {
 

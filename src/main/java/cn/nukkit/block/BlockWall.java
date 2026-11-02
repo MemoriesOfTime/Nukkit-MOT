@@ -84,7 +84,12 @@ public class BlockWall extends BlockTransparentMeta implements BlockPropertiesHe
 
     @Override
     public double getHardness() {
-        return 2;
+        return switch (this.getWallType()) {
+            case GRANITE, DIORITE, ANDESITE, STONE_BRICK, MOSSY_STONE_BRICK, PRISMARINE -> 1.5;
+            case SANDSTONE, RED_SANDSTONE -> 0.8;
+            case END_BRICK -> 3;
+            default -> 2;
+        };
     }
 
     @Override

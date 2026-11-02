@@ -60,7 +60,8 @@ public class LevelDBChunk extends BaseChunk {
         this.storageSaveX = chunkX;
         this.storageSaveZ = chunkZ;
 
-        this.dimensionData = provider == null ? DimensionData.LEGACY_DIMENSION : provider.getLevel().getDimensionData();
+        Level levelTemp = provider == null ? null : provider.getLevel();
+        this.dimensionData = levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData();
         int minSectionY = this.dimensionData.getMinSectionY();
         int maxSectionY = this.dimensionData.getMaxSectionY();
         this.sections = new ChunkSection[this.dimensionData.getHeight() >> 4];
@@ -155,6 +156,12 @@ public class LevelDBChunk extends BaseChunk {
     @Override
     public int getSectionOffset() {
         return this.dimensionData.getSectionOffset();
+    }
+
+    /** Whether the dimension captured by this chunk has a fixed section offset. */
+    public boolean hasStableSectionOffset() {
+        return this.dimensionData.getClass() == DimensionData.class
+                || this.dimensionData == DimensionData.LEGACY_DIMENSION;
     }
 
     public void setState(@NotNull ChunkState state) {

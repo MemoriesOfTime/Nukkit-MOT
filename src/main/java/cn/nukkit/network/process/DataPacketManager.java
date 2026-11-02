@@ -245,6 +245,8 @@ public final class DataPacketManager {
                 0, //base
                 AdventureSettingsProcessor.INSTANCE,
                 BookEditProcessor.INSTANCE,
+                ClientCacheBlobStatusProcessor.INSTANCE,
+                ClientCacheStatusProcessor.INSTANCE,
                 ClientToServerHandshakeProcessor.INSTANCE,
                 EmotePacketProcessor.INSTANCE,
                 ItemFrameDropItemProcessor.INSTANCE,
@@ -269,6 +271,7 @@ public final class DataPacketManager {
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
                 SetPlayerGameTypeProcessor.INSTANCE,
+                SubChunkRequestProcessor.INSTANCE,
                 TextProcessor.INSTANCE,
                 CommandBlockUpdateProcessor.INSTANCE
         );

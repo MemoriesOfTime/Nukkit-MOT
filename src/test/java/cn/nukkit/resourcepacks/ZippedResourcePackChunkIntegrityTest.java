@@ -39,7 +39,7 @@ class ZippedResourcePackChunkIntegrityTest {
     void setUp() {
         MockServer.reset();
         BaseLang language = mock(BaseLang.class);
-        when(language.translateString(any(String.class), any(Object[].class))).thenReturn("loaded");
+        when(language.translateString(any(String.class), any(String[].class))).thenReturn("loaded");
         when(Server.getInstance().getLanguage()).thenReturn(language);
         ZippedResourcePack.cacheRootOverride = tempDir.resolve("snapshot-cache").toFile();
     }

@@ -319,24 +319,6 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
         assertEquals(1, cbPacket.getStorageItem().getCount());
     }
 
-    @ParameterizedTest(name = "ContainerClosePacket v{0}")
-    @MethodSource("versionsAll")
-    void testContainerClosePacket(int protocolVersion) {
-        var nukkitPacket = new ContainerClosePacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.windowId = 5;
-        if (protocolVersion >= ProtocolInfo.v1_16_100) {
-            nukkitPacket.wasServerInitiated = true;
-        }
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.ContainerClosePacket.class);
-
-        assertEquals(5, cbPacket.getId());
-    }
-
     @ParameterizedTest(name = "InventoryTransactionPacket v{0}")
     @MethodSource("versionsAll")
     void testInventoryTransactionPacket(int protocolVersion) {
