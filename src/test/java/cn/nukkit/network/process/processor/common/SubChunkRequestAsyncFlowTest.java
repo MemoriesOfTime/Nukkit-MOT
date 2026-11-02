@@ -78,6 +78,7 @@ class SubChunkRequestAsyncFlowTest {
         when(player.getName()).thenReturn("bench");
         when(player.getId()).thenReturn(1L);
         when(player.isClientBlobCacheActive()).thenReturn(false);
+        when(player.dataPacket(any(cn.nukkit.network.protocol.DataPacket.class))).thenReturn(true);
 
         level = mock(Level.class);
         when(player.getLevel()).thenReturn(level);
@@ -241,6 +242,8 @@ class SubChunkRequestAsyncFlowTest {
 
     @Test
     void serializationFailureDegradesOnlyThatEntryAndAllowsRetry() {
+        long column = Level.chunkHash(3, 5);
+        state.onColumnSent(column, tick.get(), true);
         BaseChunk chunk = chunkWithSection();
         ChunkSection section = chunk.getSections()[0];
         doThrow(new IllegalStateException("broken section"))
@@ -264,6 +267,7 @@ class SubChunkRequestAsyncFlowTest {
         assertEquals(1, sent.size(), "a broken section must not swallow the whole answer");
         assertEquals(SubChunkRequestResult.CHUNK_NOT_FOUND, sent.get(0).subChunks.get(0).result);
         assertNull(sent.get(0).subChunks.get(0).data, "a degraded entry carries no payload");
+        assertFalse(state.isColumnDataReady(column, tick.get(), 200), "failed absolute Y=-4 stays missing");
 
         putChunkInView(chunkWithSection());
         SubChunkRequestProcessor.INSTANCE.handle(playerHandle, request(-4, 1));
@@ -271,6 +275,7 @@ class SubChunkRequestAsyncFlowTest {
         assertEquals(2, sentPackets().size(), "a later retry can still deliver terrain");
         assertEquals(SubChunkRequestResult.SUCCESS, sentPackets().get(1).subChunks.get(0).result);
         assertEquals(0, state.inFlightOffsetCount());
+        assertTrue(state.isColumnDataReady(column, tick.get(), 200), "the exact Y=-4 retry fulfills the missing receipt");
     }
 
     @Test

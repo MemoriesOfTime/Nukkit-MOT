@@ -418,6 +418,139 @@ class SubChunkReloadAndReentryTest {
         assertEquals(0, cache.getPendingSize());
     }
 
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void failedOrCancelledSectionRemainsMissingAfterNeighborSucceeds(boolean cancelled) throws Exception {
+        Fixture f = new Fixture(directory, false);
+        f.reload(true, false, 8);
+        doReturn(10).when(f.server).getTick();
+        f.sendShell();
+        f.sent.clear();
+        PlayerSubChunkRequestState flow = (PlayerSubChunkRequestState) field(f.player, "subChunkRequestState");
+        if (cancelled) {
+            f.useNativePacketEvents(event -> {
+                if (event.getPacket() instanceof SubChunkPacket packet && packet.centerPosition.y == 4) event.setCancelled(true);
+            });
+        } else {
+            doReturn(null).when(f.level).getChunkIfLoaded(0, 0);
+        }
+        PlayerHandle handle = new PlayerHandle(f.player);
+        SubChunkRequestProcessor.INSTANCE.handle(handle, f.request());
+        assertEquals(0, flow.inFlightOffsetCount(), "a failed attempt releases active work credit");
+        assertFalse(flow.isColumnDataReady(HASH, 10, 200));
+        doReturn(f.terrain).when(f.level).getChunkIfLoaded(0, 0);
+        List<Runnable> workers = captureSerialization(f);
+        SubChunkRequestPacket neighbor = f.request(); neighbor.subChunkPosition.y = 5;
+        SubChunkRequestProcessor.INSTANCE.handle(handle, neighbor);
+        SubChunkRequestProcessor.tickRequests(handle);
+        // A canceled Y4 retry can already be queued: finish the distinct neighbor first.
+        workers.get(workers.size() - 1).run();
+        SubChunkRequestProcessor.tickRequests(handle);
+        assertTrue(f.sent.stream().filter(SubChunkPacket.class::isInstance).map(SubChunkPacket.class::cast)
+                .anyMatch(packet -> packet.centerPosition.y == 5 && packet.subChunks.stream()
+                        .anyMatch(entry -> entry.result == SubChunkRequestResult.SUCCESS_ALL_AIR)),
+                "the control neighbor must actually reach accepted transport");
+        assertFalse(flow.isColumnDataReady(HASH, 10, 200), "Y=5 cannot fulfill the missing Y=4 obligation");
+        if (cancelled) f.useNativePacketEvents(event -> { });
+        doReturn(11).when(f.server).getTick();
+        if (cancelled) workers.get(0).run();
+        else {
+            SubChunkRequestProcessor.INSTANCE.handle(handle, f.request());
+            workers.get(workers.size() - 1).run();
+        }
+        SubChunkRequestProcessor.tickRequests(handle);
+        assertTrue(flow.isColumnDataReady(HASH, 11, 200), "successful exact retry clears its own missing marker");
+        assertEquals(0, flow.inFlightOffsetCount());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"shell", "epoch", "world"})
+    void lateCompletionCannotAcknowledgeReplacementContext(String change) throws Exception {
+        Fixture f = new Fixture(directory, false);
+        f.reload(true, false, 8);
+        doReturn(10).when(f.server).getTick();
+        f.sendShell(); f.sent.clear();
+        List<Runnable> workers = captureSerialization(f);
+        PlayerHandle handle = new PlayerHandle(f.player);
+        PlayerSubChunkRequestState flow = (PlayerSubChunkRequestState) field(f.player, "subChunkRequestState");
+        SubChunkRequestPacket original = f.request();
+        SubChunkRequestProcessor.INSTANCE.handle(handle, original);
+        original.subChunkPosition.y = 9; // The worker owns its frozen center/offsets.
+        switch (change) {
+            case "shell" -> flow.onColumnSent(HASH, 10, true);
+            case "epoch" -> { flow.clear(); flow.onColumnSent(HASH, 10, true); flow.acquireInFlightOffsets(1); }
+            case "world" -> field(f.player, "level", mock(Level.class));
+            default -> throw new AssertionError(change);
+        }
+        workers.get(0).run();
+        SubChunkRequestProcessor.tickRequests(handle);
+        assertEquals(0, successfulEntries(f), "old context must not reach accepted transport");
+        assertFalse(flow.isColumnDataReady(HASH, 10, 200));
+        assertEquals(change.equals("epoch") ? 1 : 0, flow.inFlightOffsetCount());
+    }
+
+    @Test
+    void shellReplacementInsideAcceptedPacketCannotCompleteItsNewLedger() throws Exception {
+        Fixture f = new Fixture(directory, false);
+        f.reload(true, false, 8);
+        f.sendShell(); f.sent.clear();
+        PlayerSubChunkRequestState flow = (PlayerSubChunkRequestState) field(f.player, "subChunkRequestState");
+        f.useNativePacketEvents(event -> {
+            if (event.getPacket() instanceof SubChunkPacket) {
+                flow.onColumnSent(HASH, 10, true);
+                flow.addOutstandingOffsets(HASH, 1);
+            }
+        });
+        SubChunkRequestProcessor.INSTANCE.handle(new PlayerHandle(f.player), f.request());
+        assertFalse(flow.isColumnDataReady(HASH, 10, 200));
+        flow.completeOutstandingOffsets(HASH, 1, 4);
+        assertTrue(flow.isColumnDataReady(HASH, 10, 200), "only the replacement's own receipt completes it");
+        assertEquals(0, flow.inFlightOffsetCount());
+    }
+
+    @Test
+    void submittedCoordinatesCannotBeChangedThroughTheIncomingPacket() throws Exception {
+        Fixture f = new Fixture(directory, false);
+        f.reload(true, false, 8);
+        f.sendShell(); f.sent.clear();
+        List<Runnable> workers = captureSerialization(f);
+        SubChunkRequestPacket request = f.request();
+        request.positionOffsets.add(new BlockVector3(0, 0, 0));
+        PlayerHandle handle = new PlayerHandle(f.player);
+        SubChunkRequestProcessor.INSTANCE.handle(handle, request);
+        request.subChunkPosition.y = 9;
+        request.positionOffsets.get(0).y = 2;
+        workers.get(0).run();
+        SubChunkRequestProcessor.tickRequests(handle);
+        SubChunkPacket packet = f.sent.stream().filter(SubChunkPacket.class::isInstance).map(SubChunkPacket.class::cast)
+                .findFirst().orElseThrow();
+        assertEquals(4, packet.centerPosition.y);
+        assertEquals(0, packet.subChunks.get(0).offset.y);
+        assertEquals(SubChunkRequestResult.SUCCESS, packet.subChunks.get(0).result);
+    }
+
+    @Test
+    void emptyFailedCompletionRetainsItsMissingSectionAndSchedulesBoundedRetry() throws Exception {
+        Fixture f = new Fixture(directory, false);
+        f.reload(true, false, 8);
+        f.sendShell(); f.sent.clear();
+        List<Runnable> workers = captureSerialization(f);
+        PlayerSubChunkRequestState flow = (PlayerSubChunkRequestState) field(f.player, "subChunkRequestState");
+        assertEquals(1, flow.acquireInFlightOffsets(1));
+        flow.addOutstandingOffsets(HASH, 1);
+        flow.offerCompletion(new PlayerSubChunkRequestState.CompletedSubChunkAnswer(flow.epoch(), f.request(), false,
+                List.of(), null, null, null, 1, f.level, java.util.Map.of(HASH, flow.columnReceipt(HASH)),
+                List.of(new BlockVector3(0, 0, 0))));
+        PlayerHandle handle = new PlayerHandle(f.player);
+        SubChunkRequestProcessor.tickRequests(handle);
+        assertEquals(0, successfulEntries(f));
+        assertFalse(flow.isColumnDataReady(HASH, f.server.getTick(), 200));
+        assertEquals(1, workers.size(), "abandoned work transfers to the existing bounded request path");
+        assertEquals(1, flow.inFlightOffsetCount(), "only the retry owns active credit");
+        workers.get(0).run();
+        SubChunkRequestProcessor.tickRequests(handle);
+        assertTrue(flow.isColumnDataReady(HASH, f.server.getTick(), 200));
+        assertEquals(0, flow.inFlightOffsetCount());
+    }
+
     private static void offerRawAnswer(Fixture f, int... entryBytes) throws Exception {
         PlayerSubChunkRequestState flow = (PlayerSubChunkRequestState) field(f.player, "subChunkRequestState");
         List<SubChunkPacket.SubChunkData> entries = new ArrayList<>();
