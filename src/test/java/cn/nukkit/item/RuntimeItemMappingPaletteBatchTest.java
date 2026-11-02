@@ -56,7 +56,7 @@ class RuntimeItemMappingPaletteBatchTest {
                 assertEquals(3, mapping.encodes);
                 mappings++;
             }
-            assertEquals(46, mappings, "Cover every international and NetEase mapping");
+            assertEquals(47, mappings, "Cover every international and NetEase mapping");
         } finally {
             definitions.remove(items.get(0).getNamespaceId());
         }

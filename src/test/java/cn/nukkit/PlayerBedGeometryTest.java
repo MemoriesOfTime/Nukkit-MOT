@@ -1,14 +1,10 @@
 package cn.nukkit;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.player.PlayerBedEnterEvent;
 import cn.nukkit.event.player.PlayerTeleportEvent;
-import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Location;
@@ -19,13 +15,18 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /** Native sleep, wake, teleport, dimensions and solid-eye test; only world/network I/O fake. */
 class PlayerBedGeometryTest {
@@ -347,6 +348,8 @@ class PlayerBedGeometryTest {
             // Native BlockBed checks nearby hostile collisions before calling Player.sleepOn.
             when(level.getCollidingEntities(any(AxisAlignedBB.class))).thenReturn(new Entity[0]);
             when(level.getNearbyEntities(any(AxisAlignedBB.class),any(Entity.class),anyBoolean(),anyBoolean()))
+                    .thenReturn(new Entity[0]);
+            when(level.getNearbyRideables(any(AxisAlignedBB.class), any(Entity.class)))
                     .thenReturn(new Entity[0]);
             chunk = mock(BaseFullChunk.class);
             when(chunk.getProvider()).thenReturn(provider);

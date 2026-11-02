@@ -291,4 +291,197 @@ public class PlayerSubChunkRequestStateTest {
 
         assertEquals(4 * 1024 * 1024, state.remainingResponseBytes(8), "the ledger resets across ticks");
     }
+
+    @Test
+    public void inFlightAcquireClampsAtCapAndReleases() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        assertEquals(200, state.acquireInFlightOffsets(200));
+        assertEquals(PlayerSubChunkRequestState.MAX_IN_FLIGHT_OFFSETS - 200, state.remainingInFlightOffsets());
+        // 部分获批：只给到剩余额度 / partial grant: only the remaining credit
+        int granted = state.acquireInFlightOffsets(100);
+        assertEquals(PlayerSubChunkRequestState.MAX_IN_FLIGHT_OFFSETS - 200, granted);
+        assertEquals(0, state.remainingInFlightOffsets());
+        assertEquals(0, state.acquireInFlightOffsets(1), "a full window grants nothing");
+        assertEquals(0, state.acquireInFlightOffsets(0), "zero asks for nothing");
+
+        state.releaseInFlightOffsets(granted);
+        assertEquals(granted, state.remainingInFlightOffsets());
+        // 释放不向下溢出 / releases never underflow
+        state.releaseInFlightOffsets(1000);
+        assertEquals(0, state.inFlightOffsetCount());
+    }
+
+    @Test
+    public void completionsQueueFifoWithPushFront() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        PlayerSubChunkRequestState.CompletedSubChunkAnswer a = answer(1);
+        PlayerSubChunkRequestState.CompletedSubChunkAnswer b = answer(2);
+        state.offerCompletion(a);
+        state.offerCompletion(b);
+        assertTrue(state.hasCompletions());
+
+        assertSame(a, state.pollCompletion());
+        // 预算耗尽推回队头：下轮先发它 / budget-blocked head goes back to the front
+        state.pushCompletionFront(a);
+        assertSame(a, state.pollCompletion());
+        assertSame(b, state.pollCompletion());
+        assertNull(state.pollCompletion());
+        assertFalse(state.hasCompletions());
+    }
+
+    @Test
+    public void clearBumpsEpochAndResetsInFlightAndCompletions() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        int epochBefore = state.epoch();
+        state.acquireInFlightOffsets(64);
+        PlayerSubChunkRequestState.CompletedSubChunkAnswer stale = answer(1);
+        state.offerCompletion(stale);
+
+        state.clear();
+
+        assertEquals(epochBefore + 1, state.epoch(), "clear invalidates in-flight answers");
+        assertEquals(0, state.inFlightOffsetCount());
+        assertFalse(state.hasCompletions());
+        assertEquals(PlayerSubChunkRequestState.MAX_IN_FLIGHT_OFFSETS, state.remainingInFlightOffsets());
+    }
+
+    /** The window comes from the caller; tests pick 200 arbitrarily (the production gate is Player's 40-tick constant), and the timeout itself is covered by columnWaitingTimesOut. */
+    private static final int DATA_WAIT_TICKS = 200;
+
+    @Test
+    public void pullColumnBecomesReadyOnlyAfterItsOffsetsAreDispatched() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(3, 5);
+        state.onColumnSent(column, 100, true);
+
+        assertFalse(state.isColumnDataReady(column, 100, DATA_WAIT_TICKS), "a shell alone carries no block data");
+
+        state.addOutstandingOffsets(column, 2);
+        assertFalse(state.isColumnDataReady(column, 101, DATA_WAIT_TICKS));
+        state.completeOutstandingOffsets(column, 1);
+        assertFalse(state.isColumnDataReady(column, 102, DATA_WAIT_TICKS),
+                "one of the two offsets is still in flight");
+        state.completeOutstandingOffsets(column, 1);
+        assertTrue(state.isColumnDataReady(column, 103, DATA_WAIT_TICKS));
+    }
+
+    @Test
+    public void fullSendColumnIsReadyImmediately() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(-2, 7);
+        state.onColumnSent(column, 100, false);
+
+        assertTrue(state.isColumnDataReady(column, 100, DATA_WAIT_TICKS), "a full send carries its own block data");
+    }
+
+    @Test
+    public void columnWaitingTimesOutSoAClientThatNeverRequestsCannotWedgeTheGate() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(0, 0);
+        state.onColumnSent(column, 100, true);
+
+        assertFalse(state.isColumnDataReady(column, 100 + DATA_WAIT_TICKS, DATA_WAIT_TICKS),
+                "still inside the wait window");
+        assertTrue(state.isColumnDataReady(column, 100 + DATA_WAIT_TICKS + 1, DATA_WAIT_TICKS),
+                "past the wait window the gate must open anyway");
+    }
+
+    @Test
+    public void outstandingOffsetsOfNonWaitingColumnsAreIgnored() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(9, 9);
+
+        state.addOutstandingOffsets(column, 5);
+        state.completeOutstandingOffsets(column, 5);
+
+        assertTrue(state.isColumnDataReady(column, 0, DATA_WAIT_TICKS),
+                "a column that was never sent as a shell stays ready");
+    }
+
+    @Test
+    public void resendingAShellResetsDelivery() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(1, 1);
+        state.onColumnSent(column, 10, true);
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1);
+        assertTrue(state.isColumnDataReady(column, 11, DATA_WAIT_TICKS));
+
+        state.onColumnSent(column, 12, true);
+
+        assertFalse(state.isColumnDataReady(column, 13, DATA_WAIT_TICKS),
+                "a resent shell has to be requested again");
+    }
+
+    @Test
+    public void forgetColumnDropsTheLedger() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(4, 4);
+        state.onColumnSent(column, 10, true);
+        state.addOutstandingOffsets(column, 3);
+
+        state.forgetColumn(column);
+
+        assertTrue(state.isColumnDataReady(column, 11, DATA_WAIT_TICKS));
+    }
+
+    @Test
+    public void clearResetsColumnLedger() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(2, 2);
+        state.onColumnSent(column, 10, true);
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1);
+        assertTrue(state.isColumnDataReady(column, 11, DATA_WAIT_TICKS));
+
+        state.clear();
+
+        // after clear the column is no longer waiting, so readiness is always true
+        assertTrue(state.isColumnDataReady(column, 11, DATA_WAIT_TICKS));
+    }
+
+    @Test
+    public void drainServesTheNearestQueuedRequestFirst() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        SubChunkRequestPacket far = request(1);
+        far.subChunkPosition = new BlockVector3(30, 0, 5);
+        SubChunkRequestPacket near = request(1);
+        near.subChunkPosition = new BlockVector3(2, 0, 5);
+        assertTrue(state.tryDefer(far));
+        assertTrue(state.tryDefer(near));
+
+        List<SubChunkRequestPacket> order = new ArrayList<>();
+        int spent = state.drain((pk, budget) -> {
+            order.add(pk);
+            return 1;
+        }, 8, () -> true, pk -> (long) pk.subChunkPosition.x * pk.subChunkPosition.x);
+
+        assertEquals(2, spent);
+        assertEquals(List.of(near, far), order, "the queued request closest to the player must go first");
+        assertFalse(state.hasDeferred());
+    }
+
+    @Test
+    public void drainWithoutPriorityStaysFifo() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        SubChunkRequestPacket first = request(1);
+        first.subChunkPosition = new BlockVector3(30, 0, 5);
+        SubChunkRequestPacket second = request(1);
+        second.subChunkPosition = new BlockVector3(2, 0, 5);
+        assertTrue(state.tryDefer(first));
+        assertTrue(state.tryDefer(second));
+
+        List<SubChunkRequestPacket> order = new ArrayList<>();
+        state.drain((pk, budget) -> {
+            order.add(pk);
+            return 1;
+        }, 8, () -> true);
+
+        assertEquals(List.of(first, second), order);
+    }
+
+    private static PlayerSubChunkRequestState.CompletedSubChunkAnswer answer(int tag) {
+        return new PlayerSubChunkRequestState.CompletedSubChunkAnswer(0, new SubChunkRequestPacket(), false,
+                java.util.Collections.emptyList(), null, null, null, tag);
+    }
 }

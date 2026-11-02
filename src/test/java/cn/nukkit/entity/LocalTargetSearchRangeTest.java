@@ -4,11 +4,11 @@ import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
-import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.nbt.tag.CompoundTag;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -296,6 +296,7 @@ class LocalTargetSearchRangeTest {
             field(walker, Entity.class, "passengers", new ArrayList<Entity>());
             when(walker.getLevel()).thenReturn(level);
             when(walker.canTarget(any())).thenReturn(true);
+            when(walker.shouldRunTargetCheck()).thenReturn(true);
             when(walker.distanceSquared(any())).thenCallRealMethod();
             doCallRealMethod().when(walker).checkTarget();
         }
