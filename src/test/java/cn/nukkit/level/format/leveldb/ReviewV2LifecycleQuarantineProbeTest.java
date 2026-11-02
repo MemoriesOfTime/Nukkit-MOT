@@ -79,10 +79,12 @@ class ReviewV2LifecycleQuarantineProbeTest {
         field("server", lifecycleServer);
         reader = Executors.newSingleThreadExecutor();
         field("asyncChunkLoadExecutor", reader);
+        field("asyncChunkLoadSlots", new java.util.concurrent.Semaphore(16));
+        field("runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
         field("pendingChunkLoads", new ConcurrentHashMap<>());
         field("completedChunkLoads", new ConcurrentLinkedQueue<>());
         field("chunkLoadFailures", Caffeine.newBuilder().build());
-        field("unloadQueue", new Long2ObjectNonBlockingMap<Long>());
+        field("unloadQueue", new it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap());
         field("chunkLoaders", new Long2ObjectNonBlockingMap<>());
         field("playerLoaders", new Long2ObjectNonBlockingMap<>());
         field("loaders", new Int2ObjectOpenHashMap<>());

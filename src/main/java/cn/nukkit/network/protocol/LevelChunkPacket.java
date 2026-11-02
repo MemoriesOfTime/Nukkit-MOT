@@ -34,6 +34,10 @@ public class LevelChunkPacket extends DataPacket {
     public int subChunkLimit;
     public long[] blobIds;
     public byte[] data;
+    /**
+     * @since v2225
+     */
+    public boolean clientBiomeUpdate;
 
     @Override
     public void decode() {
@@ -86,5 +90,8 @@ public class LevelChunkPacket extends DataPacket {
             }
         }
         this.putByteArray(this.data);
+        if (protocol >= ProtocolInfo.v1_26_60) {
+            this.putBoolean(this.clientBiomeUpdate);
+        }
     }
 }

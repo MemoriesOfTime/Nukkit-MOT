@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,14 +44,19 @@ class EventAuthoredLegacyTransactionTest {
         MockServer.reset();
         player = Mockito.mock(Player.class);
         player.craftingType = Player.CRAFTING_BIG;
+        player.spawned = true;
         ui = new PlayerUIInventory(player);
         inventory = new PlayerInventory(player);
         pluginManager = Mockito.mock(PluginManager.class);
         level = Mockito.mock(Level.class);
         player.level = level;
+        Mockito.when(player.getLevel()).thenReturn(level);
 
         Mockito.when(player.getServer()).thenReturn(MockServer.get());
         Mockito.when(player.getName()).thenReturn("test");
+        Mockito.when(player.isAlive()).thenReturn(true);
+        Mockito.when(player.isOnline()).thenReturn(true);
+        Mockito.when(MockServer.get().isPrimaryThread()).thenReturn(true);
         Mockito.when(player.isCreative()).thenReturn(true);
         Mockito.when(player.getUIInventory()).thenReturn(ui);
         Mockito.when(player.getInventory()).thenReturn(inventory);
@@ -90,15 +94,23 @@ class EventAuthoredLegacyTransactionTest {
 
     @Test
     void craftingEventOutputRewritesAndExecutesRealSlotAction() {
+        Item input = Item.get(Item.WHEAT, 0, 3);
         Item output = Item.get(Item.BREAD, 0, 1);
-        List<InventoryAction> actions = new ArrayList<>();
-        actions.add(new CraftingTakeResultAction(output.clone(), Item.get(Item.AIR)));
-        actions.add(delivery(0, output));
-        CraftingTransaction transaction = new CraftingTransaction(player, actions) {
-            @Override public boolean canExecute() { return true; }
-        };
+        CraftingGrid grid = ui.getBigCraftingGrid();
+        assertTrue(grid.setItem(0, input, false));
+        CraftingManager manager = new CraftingManager();
+        manager.registerShapelessRecipe(new ShapelessRecipe(output, List.of(input)));
+        Mockito.when(MockServer.get().getCraftingManager()).thenReturn(manager);
+        CraftingTransaction transaction = new CraftingTransaction(player, List.of(
+                new CraftingTransferMaterialAction(Item.AIR_ITEM.clone(), input.clone(), 0),
+                new CraftingTakeResultAction(output.clone(), Item.AIR_ITEM.clone()),
+                new SlotChangeAction(grid, 0, input.clone(), Item.AIR_ITEM.clone()),
+                delivery(0, output)));
 
+        assertTrue(transaction.canExecute());
         assertTrue(transaction.execute());
+        assertTrue(transaction.hasExecuted());
+        assertTrue(grid.getItem(0).isNull(), "the real recipe must consume its physical ingredients");
         assertDelivered(0);
     }
 
@@ -106,14 +118,19 @@ class EventAuthoredLegacyTransactionTest {
     void anvilEventOutputRewritesAndExecutesRealSlotAction() {
         AnvilInventory anvil = new AnvilInventory(ui, position());
         bindWindow(Player.ANVIL_WINDOW_ID, anvil);
-        Item output = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        Item input = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        Item output = input.clone().setCustomName("Renamed sword");
+        assertTrue(anvil.setItem(AnvilInventory.TARGET, input, false));
         RepairItemTransaction transaction = new RepairItemTransaction(player, List.of(
-                new RepairItemAction(output.clone(), Item.get(Item.AIR), NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT),
-                delivery(1, output))) {
-            @Override public boolean canExecute() { return true; }
-        };
+                new RepairItemAction(Item.AIR_ITEM.clone(), input.clone(), NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT),
+                new RepairItemAction(output.clone(), Item.AIR_ITEM.clone(), NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT),
+                new SlotChangeAction(anvil, AnvilInventory.TARGET, input.clone(), Item.AIR_ITEM.clone()),
+                delivery(1, output)));
 
+        assertTrue(transaction.canExecute());
         assertTrue(transaction.execute());
+        assertTrue(transaction.hasExecuted());
+        assertTrue(anvil.getInputSlot().isNull(), "the event-authored result cannot leave its input behind");
         assertDelivered(1);
     }
 
@@ -121,14 +138,19 @@ class EventAuthoredLegacyTransactionTest {
     void grindstoneEventOutputRewritesAndExecutesRealSlotAction() {
         GrindstoneInventory grindstone = new GrindstoneInventory(ui, position());
         bindWindow(Player.GRINDSTONE_WINDOW_ID, grindstone);
-        Item output = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        Item input = Item.get(Item.DIAMOND_SWORD, 10, 1);
+        assertTrue(grindstone.setItem(0, input, false));
+        Item output = grindstone.getResult();
         GrindstoneTransaction transaction = new GrindstoneTransaction(player, List.of(
-                new GrindstoneItemAction(output.clone(), Item.get(Item.AIR), NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT),
-                delivery(2, output))) {
-            @Override public boolean canExecute() { return true; }
-        };
+                new GrindstoneItemAction(Item.AIR_ITEM.clone(), input.clone(), NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT),
+                new GrindstoneItemAction(output.clone(), Item.AIR_ITEM.clone(), NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT),
+                new SlotChangeAction(grindstone, 0, input.clone(), Item.AIR_ITEM.clone()),
+                delivery(2, output)));
 
+        assertTrue(transaction.canExecute());
         assertTrue(transaction.execute());
+        assertTrue(transaction.hasExecuted());
+        assertTrue(grindstone.getEquipment().isNull(), "the real grindstone input must be consumed once");
         assertDelivered(2);
     }
 
@@ -196,5 +218,6 @@ class EventAuthoredLegacyTransactionTest {
 
     private void assertDelivered(int slot) {
         assertEquals("kit:legacy", inventory.getItem(slot).getNamedTag().getString("km_origin"));
+        assertEquals(1, inventory.getItem(slot).getCount());
     }
 }

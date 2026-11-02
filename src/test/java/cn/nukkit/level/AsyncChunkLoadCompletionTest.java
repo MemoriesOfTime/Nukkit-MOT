@@ -74,10 +74,12 @@ class AsyncChunkLoadCompletionTest {
         field(this.level, "provider", this.provider);
         field(this.level, "asyncChunkLoadExecutor", this.executor);
         field(this.level, "asyncChuckExecutor", this.executor);
+        field(this.level, "asyncChunkLoadSlots", new java.util.concurrent.Semaphore(16));
+        field(this.level, "runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
         field(this.level, "pendingChunkLoads", new ConcurrentHashMap<>());
         field(this.level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
         field(this.level, "chunkLoadFailures", Caffeine.newBuilder().maximumSize(1024).build());
-        field(this.level, "unloadQueue", new Long2ObjectNonBlockingMap<Long>());
+        field(this.level, "unloadQueue", new it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap());
         field(this.level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
         field(this.level, "playerLoaders", new Long2ObjectNonBlockingMap<>());
         field(this.level, "loaders", new Int2ObjectOpenHashMap<>());

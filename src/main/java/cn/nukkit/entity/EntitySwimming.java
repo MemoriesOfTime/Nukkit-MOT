@@ -37,23 +37,25 @@ public abstract class EntitySwimming extends BaseEntity {
             return;
         }
 
-        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
-            if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
-                continue;
-            }
+        if (this.shouldRunTargetCheck()) {
+            for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
+                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+                    continue;
+                }
 
-            if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly()) {
-                continue;
-            }
+                if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly()) {
+                    continue;
+                }
 
-            double distance = this.distanceSquared(creature);
-            if (!this.targetOption(creature, distance)) {
-                continue;
-            }
+                double distance = this.distanceSquared(creature);
+                if (!this.targetOption(creature, distance)) {
+                    continue;
+                }
 
-            this.stayTime = 0;
-            this.moveTime = 0;
-            this.target = creature;
+                this.stayTime = 0;
+                this.moveTime = 0;
+                this.target = creature;
+            }
         }
 
         if (this.target instanceof EntityCreature &&

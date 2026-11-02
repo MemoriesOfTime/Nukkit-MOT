@@ -74,15 +74,39 @@ class NativeHopperCommitOrderingTest {
         assertEquals(1, f.hopper.getInventory().getItem(0).getCount(), "The next tick cannot transfer again after an accepted viewer error");
     }
 
-    @Test void cancelledNativeTransferDoesNotArmAcceptedCooldown() {
+    @Test void cancelledNativeTransferKeepsItemsAndSchedulesPolicyRetry() {
         var f = fixture();
         var plugins = Server.getInstance().getPluginManager();
-        doAnswer(call -> { if (call.getArgument(0) instanceof InventoryMoveItemEvent e) e.setCancelled(); return null; })
-                .when(plugins).callEvent(any(Event.class));
-        assertFalse(f.hopper.onUpdate());
-        assertTrue(f.hopper.transferCooldown <= 0);
+        var veto = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var attempts = new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(call -> {
+            if (call.getArgument(0) instanceof InventoryMoveItemEvent event) {
+                attempts.incrementAndGet();
+                if (veto.get()) event.setCancelled();
+            }
+            return null;
+        }).when(plugins).callEvent(any(Event.class));
+        assertFalse(f.hopper.pullItems(f.chest, null), "the canceled native move is not accepted");
+        assertTrue(f.hopper.transferCooldown <= 0, "a rejected direct move cannot arm the acceptance callback");
+        assertEquals(1, attempts.get());
+        assertTrue(f.hopper.onUpdate(), "a policy veto keeps the hopper scheduled for a future retry");
+        assertEquals(8, f.hopper.transferCooldown, "the tick owns a policy-retry cooldown, not a successful transfer");
+        assertEquals(2, attempts.get());
         assertEquals(5, f.chest.getInventory().getItem(0).getCount());
         assertTrue(f.hopper.getInventory().isEmpty());
+        for (int remaining = 7; remaining > 0; remaining--) {
+            assertTrue(f.hopper.onUpdate());
+            assertEquals(remaining, f.hopper.transferCooldown);
+            assertEquals(2, attempts.get(), "retry cooldown cannot repeat the vetoed transfer every tick");
+            assertEquals(5, f.chest.getInventory().getItem(0).getCount());
+            assertTrue(f.hopper.getInventory().isEmpty());
+        }
+        veto.set(false);
+        assertTrue(f.hopper.onUpdate());
+        assertEquals(3, attempts.get());
+        assertEquals(8, f.hopper.transferCooldown);
+        assertEquals(4, f.chest.getInventory().getItem(0).getCount());
+        assertEquals(1, f.hopper.getInventory().getItem(0).getCount(), "the later admitted retry moves exactly one item");
     }
 
     @Test void precommitSetterErrorDoesNotArmAcceptedCooldown() {

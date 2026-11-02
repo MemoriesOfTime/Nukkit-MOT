@@ -44,6 +44,10 @@ public class PerformanceSettings extends OkaeriConfig {
     @CustomKey("thread-watchdog-tick")
     private int threadWatchdogTick = 60000;
 
+    @Comment("Kill a stalled shutdown after this many ms without save progress (0 = warn only)")
+    @CustomKey("shutdown-watchdog-kill-timeout")
+    private long shutdownWatchdogKillTimeout = 600000;
+
     @Comment("Enable level garbage collection")
     @CustomKey("do-level-gc")
     private boolean doLevelGc = true;

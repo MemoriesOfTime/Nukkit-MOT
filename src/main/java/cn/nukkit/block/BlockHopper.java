@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityBrewingStand;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
@@ -461,6 +462,9 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
         default boolean persistenceRetryRequested() { return false; }
 
+        /** Keep a cancelled transfer eligible when plugin policy changes without an inventory write. */
+        default void requestTransferRetry() { }
+
         default boolean pullItems() {
             Vector3 up = this.getPosition().up();
             BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
@@ -476,8 +480,8 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
             if (blockEntity instanceof InventoryHolder holder) {
                 Inventory source = holder.getInventory();
-                int start = blockEntity instanceof BlockEntityFurnace ? 2 : 0;
-                int end = blockEntity instanceof BlockEntityFurnace ? 3 : source.getSize();
+                int start = blockEntity instanceof BlockEntityFurnace ? 2 : blockEntity instanceof BlockEntityBrewingStand ? 1 : 0;
+                int end = blockEntity instanceof BlockEntityFurnace ? 3 : blockEntity instanceof BlockEntityBrewingStand ? 4 : source.getSize();
                 for (int i = start; i < end; i++) {
                     if (NativeContainerTransaction.move(this, source, i, inventory, -1,
                             () -> holder.getInventory() == source && this.getInventory() == inventory,

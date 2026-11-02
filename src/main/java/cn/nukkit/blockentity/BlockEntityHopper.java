@@ -140,8 +140,18 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
     @Override public void requestPersistenceRetry() { this.persistenceRetry = true; this.scheduleUpdate(); }
     @Override public boolean persistenceRetryRequested() { return this.persistenceRetry; }
 
+    private boolean transferRetry;
+
+    @Override
+    public void requestTransferRetry() {
+        if (this.closed || this.level == null) return;
+        this.transferRetry = true;
+        this.scheduleUpdate();
+    }
+
     @Override
     public boolean onUpdate() {
+        this.transferRetry = false;
         this.persistenceRetry = false;
         if (this.closed) {
             return false;
@@ -221,7 +231,8 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             if (changed) {
                 this.setTransferCooldown(8);
                 this.setDirty();
-            } else if (this.persistenceRetry) {
+            } else if (this.persistenceRetry || this.transferRetry) {
+                // A policy veto can change without the inventory writes that normally wake a hopper.
                 this.setTransferCooldown(8);
             } else if (searchCancelled) {
                 // Plugin cancelled the search — keep polling to match original behavior
