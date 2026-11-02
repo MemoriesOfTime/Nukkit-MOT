@@ -17,15 +17,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -49,7 +45,7 @@ class ResourcePackStackOrderTest {
     void setUp() {
         MockServer.reset();
         BaseLang language = mock(BaseLang.class);
-        when(language.translateString(any(String.class), any(Object[].class))).thenReturn("loaded");
+        when(language.translateString(any(String.class), any(String[].class))).thenReturn("loaded");
         when(Server.getInstance().getLanguage()).thenReturn(language);
         ZippedResourcePack.cacheRootOverride = tempDir.resolve("snapshot-cache").toFile();
     }

@@ -11,6 +11,15 @@ import cn.nukkit.math.BlockFace;
  */
 public class BlockDaylightDetectorInverted extends BlockDaylightDetector {
 
+    public BlockDaylightDetectorInverted() {
+        this(0);
+    }
+
+    public BlockDaylightDetectorInverted(int meta) {
+        super(meta);
+    }
+
+
     @Override
     public int getId() {
         return DAYLIGHT_DETECTOR_INVERTED;
@@ -34,7 +43,7 @@ public class BlockDaylightDetectorInverted extends BlockDaylightDetector {
 
     @Override
     public boolean isPowerSource() {
-        return !this.level.isAnimalSpawningAllowedByTime();
+        return true;
     }
 
     @Override

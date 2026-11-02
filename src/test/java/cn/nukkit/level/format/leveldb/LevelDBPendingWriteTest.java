@@ -10,23 +10,14 @@ import cn.nukkit.level.generator.Flat;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBException;
 import org.iq80.leveldb.WriteBatch;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.AdditionalAnswers;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -527,6 +518,38 @@ public class LevelDBPendingWriteTest {
         // Reopen the database to verify the pending write landed before the db closed
         this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
         Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(1, 4));
+    }
+
+    @Test
+    public void closeStagesAndDrainsNeverQueuedDirtyChunks() throws Exception {
+        // auto-save=off 语义:脏块从未排队,close 补排队并经 executor 落盘。/ auto-save=off: never staged; close stages and drains.
+        this.newDirtyChunk(5, 2, BLOCK_A);
+        Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+
+        this.provider.close();
+        Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+
+        this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
+        Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(5, 2));
+    }
+
+    @Test
+    public void closeSkipsRestagingAlreadyQueuedCurrentBatch() throws Exception {
+        // auto-save=on 语义:已排队批次在 close 时被复用。/ auto-save=on: the staged batch is reused at close.
+        LevelDBChunk chunk = this.newDirtyChunk(7, 3, BLOCK_A);
+        CountDownLatch release = this.pauseExecutor();
+        try {
+            this.provider.saveChunk(7, 3, chunk);
+            Assertions.assertEquals(1, this.provider.getPendingWriteCount());
+        } finally {
+            release.countDown();
+        }
+
+        this.provider.close();
+        Assertions.assertEquals(0, this.provider.getPendingWriteCount());
+
+        this.provider = new LevelDBProvider(this.level, this.tempDir.toString());
+        Assertions.assertEquals(BLOCK_A, this.readBlockFromDisk(7, 3));
     }
 
     @Test

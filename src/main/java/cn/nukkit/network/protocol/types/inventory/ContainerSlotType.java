@@ -75,7 +75,35 @@ public enum ContainerSlotType {
     /**
      * @since v712
      */
-    DYNAMIC_CONTAINER(63);
+    DYNAMIC_CONTAINER(63),
+    /**
+     * @since v944
+     */
+    RECIPE_FOOD_CONTAINER(64),
+    /**
+     * @since v944
+     */
+    RECIPE_BLOCKS_CONTAINER(65),
+    /**
+     * @since v944
+     */
+    RECIPE_FURNACE_ITEMS_CONTAINER(66),
+    /**
+     * @since v2225
+     */
+    RESERVED_CONTAINER_A(67),
+    /**
+     * @since v2225
+     */
+    RESERVED_CONTAINER_B(68),
+    /**
+     * @since v2225
+     */
+    RESERVED_CONTAINER_C(69),
+    /**
+     * @since v2225
+     */
+    RESERVED_CONTAINER_D(70);
 
     private final int id;
     private static final Int2ObjectArrayMap<ContainerSlotType> VALUES = new Int2ObjectArrayMap<>();
@@ -101,7 +129,19 @@ public enum ContainerSlotType {
             return this.id + 1;
         }
         int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_26_60) {
+            return this.id;
+        }
+        if (protocol >= ProtocolInfo.v1_26_10) {
+            if (this.id >= RESERVED_CONTAINER_A.id) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
+            return this.id;
+        }
         if (protocol >= ProtocolInfo.v1_21_20) {
+            if (this.id >= RECIPE_FOOD_CONTAINER.id) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
             return this.id;
         }
         if (protocol >= ProtocolInfo.v1_20_50) {
@@ -143,8 +183,14 @@ public enum ContainerSlotType {
             return fromId(id > RECIPE_ITEMS.id ? id - 1 : id);
         }
         int protocol = gameVersion.getProtocol();
-        if (protocol >= ProtocolInfo.v1_21_20) {
+        if (protocol >= ProtocolInfo.v1_26_60) {
             return fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_26_10) {
+            return id >= RESERVED_CONTAINER_A.id ? null : fromId(id);
+        }
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return id >= RECIPE_FOOD_CONTAINER.id ? null : fromId(id);
         }
         if (protocol >= ProtocolInfo.v1_20_50) {
             return id == DYNAMIC_CONTAINER.id ? null : fromId(id);
