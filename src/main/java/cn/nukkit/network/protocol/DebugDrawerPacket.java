@@ -192,6 +192,11 @@ public class DebugDrawerPacket extends DataPacket {
                     this.putBoolean(false);
                     break;
             }
+        } else if (this.protocol >= ProtocolInfo.v1_21_90) {
+            // Legacy deletion retains all six absent shape-payload optionals.
+            for (int i = 0; i < 6; i++) {
+                this.putBoolean(false);
+            }
         }
     }
 

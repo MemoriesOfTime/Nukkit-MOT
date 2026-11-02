@@ -277,8 +277,9 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
 
     @Override
     public void populateBlockLight() {
-        int minY = this.getProvider().getMinBlockY();
-        int maxY = this.getProvider().getMaxBlockY();
+        LevelProvider providerTemp = this.getProvider();
+        int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
+        int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
         int sectionOffset = this.getSectionOffset();
         IntArrayFIFOQueue pending = new IntArrayFIFOQueue();
         for (int i = 0; i < this.sections.length; i++) {

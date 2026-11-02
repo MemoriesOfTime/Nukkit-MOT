@@ -75,7 +75,8 @@ public class BlockQuartz extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(QUARTZ_BLOCK), this.getDamage() & 0x03, 1);
+        int itemMeta = this.getDamage() & 0x03;
+        return new ItemBlock(Block.get(QUARTZ_BLOCK, itemMeta), itemMeta, 1);
     }
 
     @Override

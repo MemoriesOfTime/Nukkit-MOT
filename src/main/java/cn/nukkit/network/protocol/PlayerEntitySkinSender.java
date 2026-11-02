@@ -23,6 +23,10 @@ public final class PlayerEntitySkinSender {
 
     private static final String EMPTY_SKIN_ID = "nukkit.empty-player-entity-skin";
 
+    private static final class PlaceholderSkinPixels {
+        private static final byte[] DATA = Base64.getDecoder().decode(Skin.STEVE_SKIN);
+    }
+
     /** 握手后移除 PlayerList 条目的延迟（tick），对齐 Geyser SkullPlayerEntity 的 250ms。
      *  <p>Delay (in ticks) before removing the entry after the skin handshake, mirroring Geyser's 250ms. */
     private static final int DELAYED_REMOVE_TICKS = 5;
@@ -424,7 +428,7 @@ public final class PlayerEntitySkinSender {
     private static Skin createPlaceholderListSkin() {
         Skin skin = new Skin();
         skin.setSkinId(EMPTY_SKIN_ID);
-        skin.setSkinData(Base64.getDecoder().decode(Skin.STEVE_SKIN));
+        skin.setSkinData(PlaceholderSkinPixels.DATA.clone());
         skin.setGeometryName("geometry.humanoid.custom");
         if (!skin.isValid()) {
             throw new IllegalStateException("Placeholder player list skin must be valid");

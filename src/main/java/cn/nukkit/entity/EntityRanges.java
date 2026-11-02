@@ -10,6 +10,45 @@ import java.util.Map;
 public class EntityRanges {
     private static final Map<Class<?>, Integer> FOLLOW_RANGES = new HashMap<>();
 
+    // Upper bounds of known pure/bounded MOT predicates. Skeleton, Stray,
+    // Piglin and Pillager mutate state even on rejection: keep their old cuboid.
+    // ClassValue resolves the declaring
+    // method once: a custom override must keep its existing search cuboid.
+    private static final Map<Class<?>, Integer> LOCAL_TARGET_RANGES = Map.ofEntries(
+            Map.entry(BaseEntity.class, 10),
+            Map.entry(EntityWalkingAnimal.class, 10),
+            Map.entry(EntityEnderman.class, 32),
+            Map.entry(EntityWitch.class, 16),
+            Map.entry(EntityWolf.class, 16),
+            Map.entry(EntityHorse.class, 10),
+            Map.entry(EntityDonkey.class, 10),
+            Map.entry(EntityLlama.class, 10),
+            Map.entry(EntityMule.class, 7),
+            Map.entry(EntityRabbit.class, 10),
+            Map.entry(EntityIronGolem.class, 10),
+            Map.entry(EntitySnowGolem.class, 10),
+            Map.entry(EntityPolarBear.class, 10),
+            Map.entry(EntitySpider.class, 10),
+            Map.entry(EntityZombiePigman.class, 10),
+            Map.entry(EntitySkeletonHorse.class, 0),
+            Map.entry(EntityZombieHorse.class, 0));
+
+    private static final ClassValue<Integer> LOCAL_TARGET_RANGE = new ClassValue<>() {
+        @Override
+        protected Integer computeValue(Class<?> type) {
+            if (!EntityWalking.class.isAssignableFrom(type)) {
+                return -1;
+            }
+            try {
+                Class<?> declaration = type.getMethod("targetOption", EntityCreature.class, double.class).getDeclaringClass();
+                return LOCAL_TARGET_RANGES.getOrDefault(declaration, -1);
+            } catch (NoSuchMethodException impossible) {
+                throw new IllegalStateException("Walking entity lacks targetOption", impossible);
+            }
+        }
+    };
+
+
     /*
       follow_range from bedrock-samples
       [https://github.com/Mojang/bedrock-samples/tree/preview/behavior_pack/entities]
@@ -61,8 +100,20 @@ public class EntityRanges {
      * @return AxisAlignedBB
      */
     public static AxisAlignedBB createTargetSearchBox(Entity entity) {
-        int radius = getFollowRange(entity);
+        int radius = getTargetSearchRange(entity);
         return entity.boundingBox.clone().grow(radius, radius, radius);
+    }
+
+    /**
+     * Local candidate search is separate from retaining a known owner/target.
+     * Allay's vanilla 1024-block follow_range belongs to following its owner;
+     * its local pickup_items search has max_dist 32, not that navigation range.
+     */
+    public static int getTargetSearchRange(Entity entity) {
+        if (entity instanceof EntityAllay) return 32;
+        int legacyRange = getFollowRange(entity);
+        int predicateRange = LOCAL_TARGET_RANGE.get(entity.getClass());
+        return predicateRange < 0 ? legacyRange : Math.min(legacyRange, predicateRange);
     }
 
     private static int getAttribute(Entity entity) {

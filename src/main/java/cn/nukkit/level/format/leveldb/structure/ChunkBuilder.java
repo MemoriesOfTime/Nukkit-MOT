@@ -1,6 +1,7 @@
 package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.serializer.ChunkDataLoader;
@@ -84,7 +85,8 @@ public class ChunkBuilder {
 
     public DimensionData getDimensionData() {
         Preconditions.checkNotNull(provider);
-        return provider.getLevel().getDimensionData();
+        Level levelTemp = provider.getLevel();
+        return levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData();
     }
 
     public ChunkBuilder sections(ChunkSection[] sections) {
@@ -134,7 +136,7 @@ public class ChunkBuilder {
     public LevelDBChunk build() {
         Preconditions.checkNotNull(provider);
         if (state == null) state = ChunkState.NEW;
-        if (sections == null) sections = new ChunkSection[provider.getLevel().getDimensionData().getHeight() >> 4];
+        if (sections == null) sections = new ChunkSection[this.getDimensionData().getHeight() >> 4];
         if (heightMap == null) heightMap = new int[256];
         if (entities == null) entities = new ArrayList<>();
         if (blockEntities == null) blockEntities = new ArrayList<>();

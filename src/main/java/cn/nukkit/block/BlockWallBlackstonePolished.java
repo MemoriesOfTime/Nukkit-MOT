@@ -24,4 +24,9 @@ public class BlockWallBlackstonePolished extends BlockWallBlackstone {
     public String getIdentifier() {
         return "minecraft:polished_blackstone_wall";
     }
+
+    @Override
+    public double getHardness() {
+        return 2;
+    }
 }

@@ -475,6 +475,58 @@ public class BlockPointedDripstone extends BlockSolidMeta implements BlockProper
         return this.getBooleanValue(HANGING) ? BlockFace.DOWN : BlockFace.UP;
     }
 
+    // Bedrock collision (minecraft-data bedrock/1.26.30): the width follows the thickness,
+    // a standing tip is 11/16 high and a hanging tip starts 5/16 above the cell floor.
+    // Vanilla also shifts the shape by up to 1/8 per column; that offset is not reproduced,
+    // the shape stays centered. A full cube here made the server floor and walls differ
+    // from the client's and held players on dripstone.
+    private double collisionHalfWidth() {
+        switch (this.getThickness()) {
+            case FRUSTUM:
+                return 4 / 16d;
+            case MIDDLE:
+                return 5 / 16d;
+            case BASE:
+                return 6 / 16d;
+            default:
+                return 3 / 16d;
+        }
+    }
+
+    @Override
+    public double getMinX() {
+        return this.x + 0.5 - this.collisionHalfWidth();
+    }
+
+    @Override
+    public double getMaxX() {
+        return this.x + 0.5 + this.collisionHalfWidth();
+    }
+
+    @Override
+    public double getMinZ() {
+        return this.z + 0.5 - this.collisionHalfWidth();
+    }
+
+    @Override
+    public double getMaxZ() {
+        return this.z + 0.5 + this.collisionHalfWidth();
+    }
+
+    @Override
+    public double getMinY() {
+        return this.getThickness() == DripstoneThickness.TIP && this.isHanging()
+                ? this.y + 5 / 16d
+                : this.y;
+    }
+
+    @Override
+    public double getMaxY() {
+        return this.getThickness() == DripstoneThickness.TIP && !this.isHanging()
+                ? this.y + 11 / 16d
+                : this.y + 1;
+    }
+
     public boolean isHanging() {
         return this.getBooleanValue(HANGING);
     }

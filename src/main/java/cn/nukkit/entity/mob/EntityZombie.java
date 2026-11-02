@@ -26,7 +26,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -130,7 +130,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     public void attackEntity(Entity target) {
         if (this.attackDelay > 23 && target.distanceSquared(this) <= 1) {
             this.attackDelay = 0;
-            HashMap<EntityDamageEvent.DamageModifier, Float> damage = new HashMap<>();
+            EnumMap<EntityDamageEvent.DamageModifier, Float> damage = new EnumMap<>(EntityDamageEvent.DamageModifier.class);
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (target instanceof Player) {

@@ -11,6 +11,9 @@ public class ServerboundDataStorePacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.SERVERBOUND_DATA_STORE_PACKET;
 
+    private static final int MAX_KEY_CHARS = 1000;
+    private static final int MAX_STRING_VALUE_CHARS = 5000;
+
     private DataStoreUpdate update;
 
     @Override
@@ -22,9 +25,9 @@ public class ServerboundDataStorePacket extends DataPacket {
     @Override
     public void decode() {
         DataStoreUpdate update = new DataStoreUpdate();
-        update.setDataStoreName(this.getString());
-        update.setProperty(this.getString());
-        update.setPath(this.getString());
+        update.setDataStoreName(requireKey(this.getString(MAX_KEY_CHARS), "Data Store Name"));
+        update.setProperty(requireKey(this.getString(MAX_KEY_CHARS), "Property"));
+        update.setPath(this.getString(MAX_KEY_CHARS));
         int control = (int) this.getUnsignedVarInt();
         switch (control) {
             case 0:
@@ -40,7 +43,7 @@ public class ServerboundDataStorePacket extends DataPacket {
                 update.setType(DataStorePropertyType.BOOLEAN);
                 break;
             case 2:
-                String stringValue = this.getString();
+                String stringValue = this.getString(MAX_STRING_VALUE_CHARS);
                 update.setData(stringValue);
                 update.setType(DataStorePropertyType.STRING);
                 break;
@@ -72,5 +75,12 @@ public class ServerboundDataStorePacket extends DataPacket {
 
     public void setUpdate(DataStoreUpdate update) {
         this.update = update;
+    }
+
+    private static String requireKey(String key, String field) {
+        if (key.isEmpty()) {
+            throw new IllegalArgumentException(field + " MinLength is 1");
+        }
+        return key;
     }
 }

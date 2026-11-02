@@ -24,6 +24,10 @@ public class AnimatePacket extends DataPacket {
      * @since v897
      */
     public SwingSource swingSource = SwingSource.NONE;
+    /**
+     * @since v2225
+     */
+    public int hand;
     @OnlyNetEase
     public long attackId;
 
@@ -31,8 +35,6 @@ public class AnimatePacket extends DataPacket {
     public void decode() {
         if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.action = Action.fromId(this.getByte());
-        } else if (protocol < ProtocolInfo.v1_2_0) {
-            this.action = Action.fromId((int) this.getUnsignedVarInt());
         } else {
             this.action = Action.fromId(this.getVarInt());
         }
@@ -49,6 +51,9 @@ public class AnimatePacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.swingSource = this.getOptional(SwingSource.NONE, stream -> SwingSource.from(stream.getString()));
         }
+        if (protocol >= ProtocolInfo.v1_26_60) {
+            this.hand = this.getByte() & 0xff;
+        }
 
         if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_130) {
             this.attackId = this.getVarLong();
@@ -60,8 +65,6 @@ public class AnimatePacket extends DataPacket {
         this.reset();
         if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.putByte((byte) this.action.getId());
-        } else if (protocol < ProtocolInfo.v1_2_0) {
-            this.putUnsignedVarInt(this.action.getId());
         } else {
             this.putVarInt(this.action.getId());
         }
@@ -74,6 +77,9 @@ public class AnimatePacket extends DataPacket {
         }
         if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.putOptional(o -> o != SwingSource.NONE, this.swingSource, o -> this.putString(o.getName()));
+        }
+        if (protocol >= ProtocolInfo.v1_26_60) {
+            this.putByte((byte) this.hand);
         }
 
         if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_130) {
