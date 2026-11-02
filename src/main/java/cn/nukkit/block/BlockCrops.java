@@ -90,9 +90,15 @@ public abstract class BlockCrops extends BlockFlowable implements BlockPropertie
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if (Utils.random.nextInt(2) == 1) {
-                if (this.getPropertyValue(GROWTH) < 7) {
+                int growth = this.getPropertyValue(GROWTH);
+                if (growth < 7) {
 
-                    this.setPropertyValue(GROWTH, this.getPropertyValue(GROWTH) + 1);
+                    Class<?> cropType = this.getClass();
+                    if (cropType == BlockWheat.class || cropType == BlockCarrot.class || cropType == BlockPotato.class) {
+                        this.setPropertyValue(GROWTH, growth + 1);
+                    } else {
+                        this.setPropertyValue(GROWTH, this.getPropertyValue(GROWTH) + 1);
+                    }
 
                     BlockCrops block = (BlockCrops) this.clone();
                     BlockGrowEvent ev = new BlockGrowEvent(this, block);

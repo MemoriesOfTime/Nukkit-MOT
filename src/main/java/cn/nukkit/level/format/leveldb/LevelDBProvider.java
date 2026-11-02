@@ -22,9 +22,11 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.netty.buffer.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -107,6 +109,9 @@ public class LevelDBProvider implements LevelProvider {
     long closeSweepLockTimeoutMillis = TimeUnit.SECONDS.toMillis(5);
     long closeSweepBudgetMillis = TimeUnit.SECONDS.toMillis(60);
     long databaseCloseTimeoutMillis = TimeUnit.SECONDS.toMillis(5);
+    private final CompletableFuture<Void> databaseClosed = new CompletableFuture<>();
+    private final AtomicBoolean databaseCloseStarted = new AtomicBoolean();
+    private volatile boolean deferNativeCloseWait;
     // 失败槽位的重试间隔与保留上限；包内可变以便测试注入。
     // Retry interval and retention cap for failed slots; mutable for tests.
     long failedWriteRetryIntervalMillis = TimeUnit.SECONDS.toMillis(30);
@@ -147,47 +152,13 @@ public class LevelDBProvider implements LevelProvider {
         this.level = level;
         this.path = path;
         Path dirPath = Paths.get(path);
+        final PreparedLevelDB prepared;
         try {
-            Files.createDirectories(dirPath);
+            // Check reservation before reading/writing level.dat or attempting a second DB open.
+            prepared = PreparedLevelDB.forConstructor(path);
+            this.levelData = prepared == null ? readLevelData(dirPath) : prepared.metadata();
         } catch (IOException e) {
             throw new RuntimeException(e);
-        }
-
-        Path levelDatFile = dirPath.resolve("level.dat");
-        try (InputStream stream = Files.newInputStream(levelDatFile)) {
-            //noinspection ResultOfMethodCallIgnored
-            stream.skip(8);
-            this.levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
-        } catch (IOException e) {
-            log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatFile, e);
-            try {
-                Path bakPath = levelDatFile.resolveSibling("level.dat.bak");
-                if (!bakPath.toFile().isFile()) {
-                    log.fatal("The file {} does not exists!", bakPath);
-                    FileNotFoundException ex = new FileNotFoundException("The file " + bakPath + " does not exists!");
-                    ex.addSuppressed(e);
-                    throw ex;
-                }
-                try (InputStream stream = Files.newInputStream(bakPath)) {
-                    //noinspection ResultOfMethodCallIgnored
-                    stream.skip(8);
-                    this.levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
-                } catch (Exception e2) {
-                    log.fatal("Failed to load the level.dat.bak file at {}", levelDatFile);
-                    e2.addSuppressed(e);
-                    throw e2;
-                }
-            } catch (Exception e2) {
-                LevelException ex = new LevelException("Could not load the level.dat and the level.dat.bak files. You might need to restore them from a backup!", e);
-                ex.addSuppressed(e2);
-                throw ex;
-            }
-        }
-
-        try {
-            Files.copy(levelDatFile, levelDatFile.resolveSibling("level.dat.bak"), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            log.warn("Failed to backup level.dat to level.dat.bak", e);
         }
 
         if (!this.levelData.contains("Generator")) {
@@ -199,7 +170,7 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         try {
-            this.db = openDB(dirPath.resolve("db").toFile());
+            this.db = prepared == null ? openDB(dirPath.resolve("db").toFile()) : prepared.borrow();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -211,6 +182,7 @@ public class LevelDBProvider implements LevelProvider {
         builder.setNameFormat("LevelDB Executor for " + this.getName());
         builder.setUncaughtExceptionHandler((thread, ex) -> Server.getInstance().getLogger().error("Exception in " + thread.getName(), ex));
         this.executor = Executors.newSingleThreadExecutor(builder.build());
+        if (prepared != null) prepared.constructed(this);
 
         if (level.isAutoCompaction()) {
             int delay = level.getServer().getAutoCompactionTicks();
@@ -226,6 +198,65 @@ public class LevelDBProvider implements LevelProvider {
             };
             level.getServer().getScheduler().scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, autoCompactionTask, delay + ThreadLocalRandom.current().nextInt(delay), delay);
         }
+    }
+
+    /** File IO belongs to the preparation worker when a world is restored asynchronously. */
+    static CompoundTag readLevelData(Path dirPath) throws IOException {
+        Files.createDirectories(dirPath);
+        CompoundTag levelData;
+        Path levelDatFile = dirPath.resolve("level.dat");
+        boolean primaryLoaded = true;
+        try (InputStream stream = Files.newInputStream(levelDatFile)) {
+            //noinspection ResultOfMethodCallIgnored
+            stream.skip(8);
+            levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+        } catch (IOException e) {
+            primaryLoaded = false;
+            log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatFile, e);
+            try {
+                Path bakPath = levelDatFile.resolveSibling("level.dat.bak");
+                if (!bakPath.toFile().isFile()) {
+                    log.fatal("The file {} does not exists!", bakPath);
+                    FileNotFoundException ex = new FileNotFoundException("The file " + bakPath + " does not exists!");
+                    ex.addSuppressed(e);
+                    throw ex;
+                }
+                try (InputStream stream = Files.newInputStream(bakPath)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    stream.skip(8);
+                    levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                } catch (Exception e2) {
+                    log.fatal("Failed to load the level.dat.bak file at {}", levelDatFile);
+                    e2.addSuppressed(e);
+                    throw e2;
+                }
+            } catch (Exception e2) {
+                LevelException ex = new LevelException("Could not load the level.dat and the level.dat.bak files. You might need to restore them from a backup!", e);
+                ex.addSuppressed(e2);
+                throw ex;
+            }
+        }
+
+        try {
+            // A recovered backup may be the only readable copy after an interrupted startup.
+            if (primaryLoaded) {
+                Files.copy(levelDatFile, levelDatFile.resolveSibling("level.dat.bak"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            log.warn("Failed to backup level.dat to level.dat.bak", e);
+        }
+
+        return levelData;
+    }
+
+    /** Restore owns the path reservation and waits outside the main thread before renaming. */
+    public void deferNativeCloseWait() {
+        this.deferNativeCloseWait = true;
+    }
+
+    /** Completes only when native DB.close has returned successfully, including timeout cleanup. */
+    public CompletionStage<Void> databaseClosed() {
+        return this.databaseClosed.minimalCompletionStage();
     }
 
     @SuppressWarnings("unused")
@@ -350,16 +381,17 @@ public class LevelDBProvider implements LevelProvider {
                 migrated++;
             }
 
-            if (migrated == 0) {
-                return;
-            }
-
+            // Remember a successful empty scan as well, so old unchanged worlds
+            // do not repeat both complete database scans on every open.
             writeBatch.put(FINALIZATION_STATE_ENCODING_KEY, FINALIZATION_STATE_ENCODING_BEDROCK);
             this.db.write(writeBatch);
         } catch (IOException e) {
             throw new RuntimeException("Unable to migrate legacy Nukkit LevelDB finalization states for " + this.path, e);
         }
 
+        if (migrated == 0) {
+            return; // The DB marker is enough; do not rewrite unchanged metadata.
+        }
         this.levelData.putInt("StorageVersion", CURRENT_STORAGE_VERSION);
         this.saveLevelData();
         log.info("Migrated {} legacy Nukkit LevelDB finalization states for {}", migrated, this.getName());
@@ -555,6 +587,11 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ) {
+        this.requestChunkTask(protocols, chunkX, chunkZ, 0L);
+    }
+
+    @Override
+    public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ, long sequence) {
         LevelDBChunk chunk = (LevelDBChunk) this.getChunk(chunkX, chunkZ, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -562,9 +599,18 @@ public class LevelDBProvider implements LevelProvider {
 
         long timestamp = chunk.getChanges();
 
-        if (this.getServer().asyncChunkSending) {
-            final BaseChunk chunkClone = chunk.cloneForChunkSending();
-            this.level.getAsyncChuckExecutor().execute(() -> {
+        // 池可能为 null（配置关，或世界早于热重载打开开关而创建）：回退同步序列化，与 SubChunkRequestProcessor 一致
+        // The executor can be null (config off, or the world predates a hot reload turning it on):
+        // serialize synchronously, same fallback as SubChunkRequestProcessor
+        ExecutorService executor = this.getServer().asyncChunkSending ? this.level.getAsyncChuckExecutor() : null;
+        if (executor == null) {
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
+            return;
+        }
+
+        final BaseChunk chunkClone = chunk.cloneForChunkSending();
+        try {
+            executor.execute(() -> {
                 try {
                     NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
                         getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
@@ -572,32 +618,50 @@ public class LevelDBProvider implements LevelProvider {
                                 chunkX,
                                 chunkZ,
                                 networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer()
+                                networkChunkSerializerCallback.getStream().getBuffer(),
+                                networkChunkSerializerCallback.getSubChunkBlobs(),
+                                networkChunkSerializerCallback.getBiomes(),
+                                networkChunkSerializerCallback.getBlockEntities(),
+                                sequence
                         );
-                    }, level.antiXrayEnabled(), getLevel().getDimensionData());
+                    }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                     for (GameVersion gv : protocols) {
-                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
                     }
                 }
             });
-        }else {
-            try {
-                NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                    this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                            timestamp,
-                            chunkX,
-                            chunkZ,
-                            networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer()
-                    );
-                }, level.antiXrayEnabled(), this.level.getDimensionData());
-            } catch (Throwable t) {
-                getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
-                for (GameVersion gv : protocols) {
-                    getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
-                }
+        } catch (RejectedExecutionException e) {
+            // 关服中池已停：同步兜底，不让请求丢失 / pool already down during shutdown: sync fallback
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
+        }
+    }
+
+    /**
+     * 主线程同步序列化（async-chunks 关闭 / 世界早于开关创建 / 执行器已关停）
+     * <p>
+     * Main-thread serialization (async-chunks off / world predates the setting / executor shut down)
+     */
+    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, BaseChunk chunk, long timestamp, int chunkX, int chunkZ, long sequence) {
+        try {
+            NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
+                        timestamp,
+                        chunkX,
+                        chunkZ,
+                        networkChunkSerializerCallback.getSubchunks(),
+                        networkChunkSerializerCallback.getStream().getBuffer(),
+                        networkChunkSerializerCallback.getSubChunkBlobs(),
+                        networkChunkSerializerCallback.getBiomes(),
+                        networkChunkSerializerCallback.getBlockEntities(),
+                        sequence
+                );
+            }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
+        } catch (Throwable t) {
+            getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
+            for (GameVersion gv : protocols) {
+                getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
             }
         }
     }
@@ -622,7 +686,29 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        return ImmutableMap.copyOf(chunks);
+        // Chunk-coordinate Long keys often share x ^ z, which makes Guava's boxed
+        // snapshot overflow its buckets and rebuild through an exception.
+        // Keep the detached, read-only snapshot contract and synchronize iteration.
+        synchronized (this.chunks) {
+            Long2ObjectOpenHashMap<BaseFullChunk> snapshot = new Long2ObjectOpenHashMap<>(this.chunks);
+            // Match ImmutableMap's non-null value contract for callers of the unsafe map API.
+            if (snapshot.containsValue(null)) {
+                throw new NullPointerException("Loaded chunk snapshot contains a null chunk");
+            }
+            return Collections.unmodifiableMap(snapshot);
+        }
+    }
+
+    @Override
+    public long[] getLoadedChunkHashes() {
+        synchronized (this.chunks) {
+            return this.chunks.keySet().toLongArray();
+        }
+    }
+
+    @Override
+    public int getLoadedChunkCount() {
+        return this.chunks.size();
     }
 
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
@@ -1247,7 +1333,7 @@ public class LevelDBProvider implements LevelProvider {
                 || (deferredBlockUpdates != null && !deferredBlockUpdates.isEmpty())) {
             NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, deferredBlockUpdates, currentTick);
             if (ticks != null) {
-                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                ByteBuf byteBuf = Unpooled.buffer();
                 try {
                     try (NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf))) {
                         outputStream.writeTag(ticks);
@@ -1302,6 +1388,7 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void unloadChunksUnsafe(boolean wait) {
+        int failedCaptures = 0;
         Iterator<BaseFullChunk> iterator = this.chunks.values().iterator();
         while (iterator.hasNext()) {
             LevelDBChunk chunk = (LevelDBChunk) iterator.next();
@@ -1313,8 +1400,26 @@ public class LevelDBProvider implements LevelProvider {
                     // since a synchronous db.write on the main thread hangs on write stalls.
                     long hash = Level.chunkHash(chunk.getX(), chunk.getZ());
                     if (chunk.isGenerated() && chunk.hasChanged() && !this.isPendingWriteCurrent(hash, chunk)) {
-                        this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
-                        this.executor.execute(() -> this.commitPendingWrite(hash));
+                        boolean staged = false;
+                        for (int attempt = 1; attempt <= 2; attempt++) {
+                            try {
+                                this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
+                                staged = true;
+                                break;
+                            } catch (Exception failure) {
+                                if (attempt == 2) {
+                                    failedCaptures++;
+                                    log.error("Unsaved chunk {}, {} after {} close capture attempts for: {}",
+                                            chunk.getX(), chunk.getZ(), attempt, this.getName(), failure);
+                                } else {
+                                    log.warn("Retrying close capture for chunk {}, {} in: {}",
+                                            chunk.getX(), chunk.getZ(), this.getName(), failure);
+                                }
+                            }
+                        }
+                        // A rejected submission leaves a registered slot for the final sweep;
+                        // only a failed capture needs to serialize the live chunk again.
+                        if (staged) this.executor.execute(() -> this.commitPendingWrite(hash));
                     }
                 } catch (Exception e) {
                     log.error("Failed to stage chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
@@ -1325,6 +1430,10 @@ public class LevelDBProvider implements LevelProvider {
                 chunk.unload(level.isSaveOnUnloadEnabled(), false);
             }
             iterator.remove();
+        }
+        if (failedCaptures != 0) {
+            log.error("Close could not capture {} dirty chunks for: {}; latest revisions were not saved",
+                    failedCaptures, this.getName());
         }
     }
 
@@ -1631,7 +1740,9 @@ public class LevelDBProvider implements LevelProvider {
             // A daemon excludes readers and closes DB; this thread waits with a timeout.
             CompletableFuture<Void> databaseClose = this.startDatabaseClose();
             try {
-                databaseClose.get(this.databaseCloseTimeoutMillis, TimeUnit.MILLISECONDS);
+                if (!this.deferNativeCloseWait) {
+                    databaseClose.get(this.databaseCloseTimeoutMillis, TimeUnit.MILLISECONDS);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("Interrupted while waiting for database close for: {}; cleanup will continue in background", this.getName());
@@ -1646,7 +1757,8 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private CompletableFuture<Void> startDatabaseClose() {
-        CompletableFuture<Void> completion = new CompletableFuture<>();
+        CompletableFuture<Void> completion = this.databaseClosed;
+        if (!this.databaseCloseStarted.compareAndSet(false, true)) return completion;
         Thread cleanup = new Thread(() -> {
             this.dbReadCloseLock.writeLock().lock();
             try {
@@ -1663,12 +1775,8 @@ public class LevelDBProvider implements LevelProvider {
         return completion;
     }
 
-    private void closeDatabase() {
-        try {
-            this.db.close();
-        } catch (IOException e) {
-            log.error("Can not close database: {}", this.getName(), e);
-        }
+    private void closeDatabase() throws IOException {
+        this.db.close();
     }
 
     @Override

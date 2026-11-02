@@ -12,7 +12,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class PlayerChunkPacketAcceptanceTest {
@@ -31,7 +30,7 @@ class PlayerChunkPacketAcceptanceTest {
         player.protocol = 0;
         field("usedChunks", new Long2ObjectOpenHashMap<Boolean>());
         field("loadQueue", new LongLinkedOpenHashSet());
-        player.usedChunks.put(index, false);
+        player.usedChunks.put(index, Boolean.FALSE);
         doCallRealMethod().when(player).sendChunk(anyInt(), anyInt(), any(DataPacket.class));
     }
 
@@ -45,6 +44,12 @@ class PlayerChunkPacketAcceptanceTest {
         Field field = Player.class.getDeclaredField("chunksSent");
         field.setAccessible(true);
         return field.getInt(player);
+    }
+
+    @Test
+    void usedChunksKeepsItsPublishedFieldDescriptor() throws Exception {
+        assertEquals(java.util.Map.class, Player.class.getField("usedChunks").getType(),
+                "existing plugins link to usedChunks with the java.util.Map descriptor");
     }
 
     @Test
@@ -98,7 +103,7 @@ class PlayerChunkPacketAcceptanceTest {
         cleanup.setAccessible(true);
         doAnswer(call -> {
             cleanup.invoke(player, false);
-            player.usedChunks.put(index, false);
+            player.usedChunks.put(index, Boolean.FALSE);
             return true;
         }).when(player).dataPacket(packet);
         player.sendChunk(3, 5, packet);
@@ -113,7 +118,7 @@ class PlayerChunkPacketAcceptanceTest {
         assertFalse(player.usedChunks.containsKey(index));
         assertTrue(player.loadQueue.isEmpty());
         player.connected = false;
-        player.usedChunks.put(index, false);
+        player.usedChunks.put(index, Boolean.FALSE);
         player.sendChunk(3, 5, packet);
         assertFalse(player.usedChunks.get(index));
         assertTrue(player.loadQueue.isEmpty());

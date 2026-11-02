@@ -92,6 +92,7 @@ class WitherNaturalTargetTest {
             wither.boundingBox = new SimpleAxisAlignedBB(0, 64, 0, 0.9, 67.5, 0.9);
             when(wither.getLevel()).thenReturn(level);
             when(wither.isFriendly()).thenReturn(false);
+            when(wither.shouldRunTargetCheck()).thenReturn(true);
             when(cow.isFriendly()).thenReturn(true);
             when(horse.isFriendly()).thenReturn(true);
             when(wither.distanceSquared(any())).thenCallRealMethod();

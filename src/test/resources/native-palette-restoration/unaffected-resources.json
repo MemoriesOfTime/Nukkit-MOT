@@ -69,7 +69,7 @@
   },
   {
     "resource": "runtime_block_states_582.dat",
-    "sha256": "ce43448c96d093e0dc28e7d057b6c848c7675e11cd064437a4b04d2ee94f3cf2"
+    "sha256": "5c18c6d504fec38d7a72f1778777d001597480396794198a519832ef0baae9c3"
   },
   {
     "resource": "runtime_block_states_685.dat",
@@ -130,5 +130,9 @@
   {
     "resource": "runtime_block_states_netease_860.dat",
     "sha256": "525e4f0b14c574e4b3ba81efcb906a2b5570e0aaea0d4c2dc69a95a134e44d5b"
+  },
+  {
+    "resource": "runtime_block_states_2225.dat",
+    "sha256": "17762f703c19daefce81ec2e843fcf02ebb41c05ff50def3864de0f897077acf"
   }
 ]

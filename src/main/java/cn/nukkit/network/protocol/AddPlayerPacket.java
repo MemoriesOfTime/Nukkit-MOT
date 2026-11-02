@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.types.PassengerOfBlockArguments;
 import cn.nukkit.utils.Binary;
 import lombok.ToString;
 
@@ -43,6 +44,10 @@ public class AddPlayerPacket extends DataPacket {
      */
     public int gameType = Server.getInstance().getGamemode();
     public EntityMetadata metadata = new EntityMetadata();
+    /**
+     * @since v2225
+     */
+    public PassengerOfBlockArguments passengerOfBlockArguments;
     public String deviceId = "";
     public int buildPlatform = -1;
 
@@ -116,6 +121,9 @@ public class AddPlayerPacket extends DataPacket {
                 this.putLFloat(Player.DEFAULT_SPEED); // walkSpeed
             }
             this.putUnsignedVarInt(0);
+            if (protocol >= ProtocolInfo.v1_26_60) {
+                this.putOptionalNull(this.passengerOfBlockArguments, PassengerOfBlockArguments::put);
+            }
             this.putString(deviceId);
             if (protocol >= 388) {
                 this.putLInt(buildPlatform);
