@@ -197,10 +197,39 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                     !this.canFlowInto(this.level.getBlock((int) this.x, (int) this.y + 1, (int) this.z + 1)) ||
                     !this.canFlowInto(this.level.getBlock((int) this.x - 1, (int) this.y + 1, (int) this.z)) ||
                     !this.canFlowInto(this.level.getBlock((int) this.x + 1, (int) this.y + 1, (int) this.z))) {
-                vector = vector.normalize().add(0, -6, 0);
+                // This exact Vector3 remains private until the final flow cache assignment.
+                // Keep normalize() divisions and its positive-zero fallback before adding gravity.
+                double fallingLengthSquared = vector.lengthSquared();
+                if (fallingLengthSquared > 0) {
+                    double fallingLength = Math.sqrt(fallingLengthSquared);
+                    vector.x /= fallingLength;
+                    vector.y /= fallingLength;
+                    vector.z /= fallingLength;
+                } else {
+                    vector.x = 0;
+                    vector.y = 0;
+                    vector.z = 0;
+                }
+                // Keep add() arithmetic, including signed zero, without its temporary vector.
+                vector.x += 0;
+                vector.y += -6;
+                vector.z += 0;
             }
         }
-        return this.flowVector = vector.normalize();
+        // This exact Vector3 is private to this calculation until the final cache assignment.
+        // Preserve normalize() arithmetic and its positive-zero result for zero/NaN length.
+        double lengthSquared = vector.lengthSquared();
+        if (lengthSquared > 0) {
+            double length = Math.sqrt(lengthSquared);
+            vector.x /= length;
+            vector.y /= length;
+            vector.z /= length;
+        } else {
+            vector.x = 0;
+            vector.y = 0;
+            vector.z = 0;
+        }
+        return this.flowVector = vector;
     }
 
     @Override
@@ -303,17 +332,17 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                             adjacentDecay = decay + multiplier;
                         }
                         if (adjacentDecay < 8) {
-                            boolean[] flags = this.getOptimalFlowDirections();
-                            if (flags[0]) {
+                            int directions = this.getOptimalFlowDirections();
+                            if ((directions & 1) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x - 1, (int) this.y, (int) this.z), adjacentDecay);
                             }
-                            if (flags[1]) {
+                            if ((directions & 2) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x + 1, (int) this.y, (int) this.z), adjacentDecay);
                             }
-                            if (flags[2]) {
+                            if ((directions & 4) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z - 1), adjacentDecay);
                             }
-                            if (flags[3]) {
+                            if ((directions & 8) != 0) {
                                 this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z + 1), adjacentDecay);
                             }
                         }
@@ -392,19 +421,21 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                 ++z;
             }
             long hash = Level.blockHash(x, y, z, this.level.getDimensionData());
-            if (!this.flowCostVisited.containsKey(hash)) {
+            byte status = this.flowCostVisited.getOrDefault(hash, (byte) 2);
+            // The presence check preserves extension values stored in this protected map.
+            if (status == 2 && !this.flowCostVisited.containsKey(hash)) {
                 Block blockSide = this.level.getBlock(x, y, z);
                 if (!this.canFlowInto(blockSide)) {
-                    this.flowCostVisited.put(hash, BLOCKED);
+                    status = BLOCKED;
                 } else if (usesWaterLogging()?
                         this.level.getBlock(x, y - 1, z).canWaterloggingFlowInto() :
                         this.level.getBlock(x, y - 1, z).canBeFlowedInto()) {
-                    this.flowCostVisited.put(hash, CAN_FLOW_DOWN);
+                    status = CAN_FLOW_DOWN;
                 } else {
-                    this.flowCostVisited.put(hash, CAN_FLOW);
+                    status = CAN_FLOW;
                 }
+                this.flowCostVisited.put(hash, status);
             }
-            byte status = this.flowCostVisited.get(hash);
             if (status == BLOCKED) {
                 continue;
             } else if (status == CAN_FLOW_DOWN) {
@@ -431,15 +462,12 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
         return 500;
     }
 
-    private boolean[] getOptimalFlowDirections() {
-        int[] flowCost = new int[]{
-                1000,
-                1000,
-                1000,
-                1000
-        };
+    private int getOptimalFlowDirections() {
+        int minCost = Integer.MAX_VALUE;
+        int directions = 0;
         int maxCost = 4 / this.getFlowDecayPerBlock();
         for (int j = 0; j < 4; ++j) {
+            int flowCost = 1000;
             int x = (int) this.x;
             int y = (int) this.y;
             int z = (int) this.z;
@@ -459,26 +487,21 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                     this.level.getBlock(x, y - 1, z).canWaterloggingFlowInto():
                     this.level.getBlock(x, y - 1, z).canBeFlowedInto()) {
                 this.flowCostVisited.put(Level.blockHash(x, y, z, this.level.getDimensionData()), CAN_FLOW_DOWN);
-                flowCost[j] = maxCost = 0;
+                flowCost = maxCost = 0;
             } else if (maxCost > 0) {
                 this.flowCostVisited.put(Level.blockHash(x, y, z, this.level.getDimensionData()), CAN_FLOW);
-                flowCost[j] = this.calculateFlowCost(x, y, z, 1, maxCost, j ^ 0x01, j ^ 0x01);
-                maxCost = Math.min(maxCost, flowCost[j]);
+                flowCost = this.calculateFlowCost(x, y, z, 1, maxCost, j ^ 0x01, j ^ 0x01);
+                maxCost = Math.min(maxCost, flowCost);
+            }
+            if (flowCost < minCost) {
+                minCost = flowCost;
+                directions = 1 << j;
+            } else if (flowCost == minCost) {
+                directions |= 1 << j;
             }
         }
         this.flowCostVisited.clear();
-        double minCost = Double.MAX_VALUE;
-        for (int i = 0; i < 4; i++) {
-            double d = flowCost[i];
-            if (d < minCost) {
-                minCost = d;
-            }
-        }
-        boolean[] isOptimalFlowDirection = new boolean[4];
-        for (int i = 0; i < 4; ++i) {
-            isOptimalFlowDirection[i] = (flowCost[i] == minCost);
-        }
-        return isOptimalFlowDirection;
+        return directions;
     }
 
     private int getSmallestFlowDecay(Block block, int decay) {

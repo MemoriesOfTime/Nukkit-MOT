@@ -10,6 +10,7 @@ import org.mockito.InOrder;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.WeakHashMap;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -31,7 +32,7 @@ class LevelClosePendingReadTest {
         BaseFullChunk chunk = mock(BaseFullChunk.class);
         CountDownLatch enteredRead = new CountDownLatch(1);
         CountDownLatch releaseRead = new CountDownLatch(1);
-        CountDownLatch shutdownStarted = new CountDownLatch(1);
+        CountDownLatch drainStarted = new CountDownLatch(1);
         AtomicInteger reads = new AtomicInteger();
         when(provider.readChunkOffThread(anyInt(), anyInt())).thenAnswer(invocation -> {
             if (reads.incrementAndGet() == 1) {
@@ -41,22 +42,24 @@ class LevelClosePendingReadTest {
             return chunk;
         });
         ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(16)) {
-            @Override public void shutdown() {
-                super.shutdown();
-                shutdownStarted.countDown();
-            }
-        };
+                new ArrayBlockingQueue<>(16));
         Level level = mock(Level.class, CALLS_REAL_METHODS);
         set(level, "server", server);
         set(level, "provider", provider);
         set(level, "providerLock", new ReentrantReadWriteLock());
         set(level, "asyncChunkLoadExecutor", executor);
+        set(level, "asyncChunkLoadSlots", new java.util.concurrent.Semaphore(32)); // One running plus 16 queued reads.
+        set(level, "runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
+        set(level, "asyncChunkLoadDrainTimeoutMillis", 10_000L);
         set(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         set(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
-        set(level, "generators", new ThreadLocal<>());
+        set(level, "generators", new WeakHashMap<>());
         set(level, "autoSave", true);
         doReturn(true).when(level).save(true);
+        doAnswer(invocation -> {
+            drainStarted.countDown();
+            return invocation.callRealMethod();
+        }).when(level).drainAsyncChunkLoads();
 
         ExecutorService closer = Executors.newSingleThreadExecutor();
         try {
@@ -65,7 +68,7 @@ class LevelClosePendingReadTest {
             for (int x = 1; x <= 16; x++) assertTrue(level.requestChunkLoadAsync(x, 0));
 
             Future<?> closed = closer.submit(level::close);
-            assertTrue(shutdownStarted.await(5, TimeUnit.SECONDS));
+            assertTrue(drainStarted.await(5, TimeUnit.SECONDS));
             assertFalse(closed.isDone(), "close must wait for the provider read already in flight");
             verify(provider, never()).close();
             verify(level, never()).save(true);
@@ -73,6 +76,7 @@ class LevelClosePendingReadTest {
 
             releaseRead.countDown();
             closed.get(5, TimeUnit.SECONDS);
+            assertFalse(executor.isShutdown(), "a level close must retain the shared chunk-read executor");
             assertEquals(1, reads.get(), "all 16 queued read-only requests must skip disk IO");
             verify(provider, times(1)).readChunkOffThread(anyInt(), anyInt());
             InOrder saveOrder = inOrder(level, provider);

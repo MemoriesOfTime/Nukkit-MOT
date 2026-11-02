@@ -195,6 +195,8 @@ class ChunkReadAdmissionTest {
             when(provider.getLevel()).thenReturn(level);
             field(level, "pendingChunkLoads", new ConcurrentHashMap<>());
             field(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
+            field(level, "asyncChunkLoadSlots", new java.util.concurrent.Semaphore(Math.max(16, capacity)));
+            field(level, "runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
             field(level, "chunkLoadFailures", Caffeine.newBuilder().maximumSize(1024).build());
             ThreadFactory threads = action -> new Thread(action, "bounded-read-admission-test");
             executor = productionExecutor(capacity, threads);

@@ -137,8 +137,18 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         return (HopperInventory) this.inventory;
     }
 
+    private boolean transferRetry;
+
+    @Override
+    public void requestTransferRetry() {
+        if (this.closed || this.level == null) return;
+        this.transferRetry = true;
+        this.scheduleUpdate();
+    }
+
     @Override
     public boolean onUpdate() {
+        this.transferRetry = false;
         if (this.closed) {
             return false;
         }
@@ -217,6 +227,9 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             if (changed) {
                 this.setTransferCooldown(8);
                 this.setDirty();
+            } else if (this.transferRetry) {
+                // A policy veto can change without the inventory writes that normally wake a hopper.
+                this.setTransferCooldown(8);
             } else if (searchCancelled) {
                 // Plugin cancelled the search — keep polling to match original behavior
                 this.setTransferCooldown(8);
@@ -296,8 +309,10 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
 
                     InventoryMoveItemEvent ev = new InventoryMoveItemEvent(inv, this.inventory, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
                     this.server.getPluginManager().callEvent(ev);
-                    if (ev.isCancelled())
+                    if (ev.isCancelled()) {
+                        this.requestTransferRetry();
                         continue;
+                    }
 
                     Item[] items = this.inventory.addItem(itemToAdd);
                     if (items.length >= 1)
@@ -342,6 +357,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                     this.server.getPluginManager().callEvent(ev);
 
                     if (ev.isCancelled()) {
+                        this.requestTransferRetry();
                         continue;
                     }
 
@@ -427,6 +443,8 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                                 targetInv.setSmelting(itemToAdd);
                                 item.count--;
                                 pushedItem = true;
+                            } else {
+                                this.requestTransferRetry();
                             }
                         } else if (smelting.equals(itemToAdd, true, false) && smelting.count < smelting.getMaxStackSize()) {
                             InventoryMoveItemEvent event = new InventoryMoveItemEvent(inv, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
@@ -436,6 +454,8 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                                 targetInv.setSmelting(smelting);
                                 item.count--;
                                 pushedItem = true;
+                            } else {
+                                this.requestTransferRetry();
                             }
                         }
                     } else if (itemToAdd.getFuelTime() != null) {
@@ -447,6 +467,8 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                                 targetInv.setFuel(itemToAdd);
                                 item.count--;
                                 pushedItem = true;
+                            } else {
+                                this.requestTransferRetry();
                             }
                         } else if (fuel.equals(itemToAdd, true, false) && fuel.count < fuel.getMaxStackSize()) {
                             InventoryMoveItemEvent event = new InventoryMoveItemEvent(inv, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
@@ -456,6 +478,8 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                                 targetInv.setFuel(fuel);
                                 item.count--;
                                 pushedItem = true;
+                            } else {
+                                this.requestTransferRetry();
                             }
                         }
                     }
@@ -489,6 +513,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                     this.server.getPluginManager().callEvent(ev);
 
                     if (ev.isCancelled()) {
+                        this.requestTransferRetry();
                         continue;
                     }
 

@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,6 +21,14 @@ public class ItemBlock extends Item {
     public ItemBlock(Block block, Integer meta, int count) {
         super(block.getItemId(), meta, count, block.getName());
         this.block = block;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion version) {
+        // Drop2 was experimental in 1.21.80; ordinary sessions expose it from 1.21.90.
+        return (this.block.getId() != Block.DRIED_GHAST
+                || version.getProtocol() >= GameVersion.V1_21_90.getProtocol())
+                && super.isSupportedOn(version);
     }
 
     @Override

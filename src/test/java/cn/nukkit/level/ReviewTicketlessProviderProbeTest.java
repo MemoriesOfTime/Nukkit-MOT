@@ -51,6 +51,8 @@ class ReviewTicketlessProviderProbeTest {
         field("server", server);
         field("provider", provider);
         field("asyncChunkLoadExecutor", executor);
+        field("asyncChunkLoadSlots", new java.util.concurrent.Semaphore(16));
+        field("runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
         field("asyncChuckExecutor", executor);
         field("pendingChunkLoads", new ConcurrentHashMap<>());
         field("completedChunkLoads", new ConcurrentLinkedQueue<>());
