@@ -147,7 +147,7 @@ class LevelIdleChunkRequestAllocationTest {
 
         process(fixture.level);
 
-        assertTrue(pending(fixture.level, VERSION).isEmpty());
+        assertTrue(pending(fixture.level, VERSION).contains(hash), "Active work remains scheduled for completion and timeout");
         assertTrue(tasks.contains(hash));
         assertSame(owner, queue(fixture.level, VERSION).get(hash));
         assertEquals(99L, fixture.buckets.started.get(hash));
@@ -177,7 +177,7 @@ class LevelIdleChunkRequestAllocationTest {
 
         process(fixture.level);
 
-        assertTrue(pending(fixture.level, VERSION).isEmpty());
+        assertTrue(pending(fixture.level, VERSION).contains(hash), "Active work remains scheduled for completion and timeout");
         assertTrue(tasks.contains(hash));
         assertSame(owner, queue(fixture.level, VERSION).get(hash));
         assertEquals(300L, fixture.buckets.started.get(hash));
@@ -221,7 +221,8 @@ class LevelIdleChunkRequestAllocationTest {
         verify(fixture.level, times(2)).getChunk(4, 5);
         for (Player player : new Player[]{first, second}) {
             GameVersion version = player.getGameVersion();
-            assertTrue(pending(fixture.level, version).isEmpty());
+            assertEquals(Set.of(firstHash, secondHash), pending(fixture.level, version),
+                    "Both active coordinates remain scheduled while their serializers run");
             for (long hash : new long[]{firstHash, secondHash}) {
                 assertTrue(tasks(fixture.level, version).contains(hash));
                 assertSame(player, queue(fixture.level, version).get(hash).get(player.getLoaderId()));
