@@ -611,9 +611,9 @@ public final class NetherNetMediaRelay {
         }
 
         @Override
-        public void sendFullSdp(String targetNetworkId, String sdp) {
+        public void sendDescription(String targetNetworkId, String sdp) {
             NetherNetMediaRelay.this.expectUfrag(NetherNetSharedPortSdp.iceUfrag(sdp));
-            this.delegate.sendFullSdp(targetNetworkId, this.answerRewriter.apply(sdp));
+            this.delegate.sendDescription(targetNetworkId, this.answerRewriter.apply(sdp));
         }
     }
 }

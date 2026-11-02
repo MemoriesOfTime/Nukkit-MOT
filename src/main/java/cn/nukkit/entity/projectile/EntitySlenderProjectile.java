@@ -190,7 +190,8 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
                 blockFace = BlockFace.UP;
                 block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ()).up();
             }
-            if (block.getId() == 0 && collisionBlock != null) {
+            // A solid guessed neighbor must not replace the block found by the collision sweep.
+            if (collisionBlock != null) {
                 block = collisionBlock;
             }
             ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(block.getFloorX(), block.getFloorY(), block.getFloorZ(), blockFace, this));

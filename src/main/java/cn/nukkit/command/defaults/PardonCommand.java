@@ -1,11 +1,10 @@
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.IPlayer;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.command.tree.ParamList;
-import cn.nukkit.command.tree.node.IPlayersNode;
+import cn.nukkit.command.tree.node.NameOnlyPlayerTargetsNode;
 import cn.nukkit.command.utils.CommandLogger;
 
 import java.util.List;
@@ -22,14 +21,14 @@ public class PardonCommand extends VanillaCommand {
         this.setAliases(new String[]{"unban"});
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                CommandParameter.newType("player", CommandParamType.TARGET, new IPlayersNode())
+                CommandParameter.newType("player", CommandParamType.TARGET, new NameOnlyPlayerTargetsNode())
         });
         this.enableParamTree();
     }
 
     @Override
     public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
-        List<IPlayer> players = result.getValue().getResult(0);
+        List<NameOnlyPlayerTargetsNode.Target> players = result.getValue().getResult(0);
         if (players.isEmpty()) {
             log.addNoTargetMatch().output();
             return 0;

@@ -18,7 +18,7 @@ Nukkit-MOT is a fork of [Nukkit](https://github.com/CloudburstMC/Nukkit) that pr
 Only interested in newer versions? You might want to try [Lumi](https://github.com/KoshakMineDEV/Lumi) or [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### What's new in Nukkit-MOT?
-1. Support for 1.2 – 1.26.50 version (you can set the minimum protocol in the config)
+1. Support for 1.2 – 1.26.60 version (you can set the minimum protocol in the config)
 2. Supports most entities with AI
 3. Support for the nether world and The Еnd
 4. Generation of dungeons and caves
@@ -26,7 +26,7 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 6. Support for NetEase clients
 
 ## How to install?
-1. Install java 17 or higher
+1. Install Java 21 or higher
 2. Download the .jar file from the links below
 3. Write a command to run: `java -jar Nukkit-MOT-SNAPSHOT.jar` (change `Nukkit-MOT-SNAPSHOT.jar` to the name of the file you downloaded)
 
@@ -71,7 +71,7 @@ docker run -d --name nukkit-mot \
     <dependency>
         <groupId>com.nukkit-mot</groupId>
         <artifactId>nukkit-mot</artifactId>
-        <version>1.26.40-R1</version>
+        <version>1.26.50-R1</version>
         <scope>provided</scope>
     </dependency>
 </dependencies>
@@ -101,7 +101,7 @@ repositories {
 ```kts
 // Release
 dependencies {
-    compileOnly("com.nukkit-mot:nukkit-mot:1.26.40-R1")
+    compileOnly("com.nukkit-mot:nukkit-mot:1.26.50-R1")
 }
 
 // SNAPSHOT
