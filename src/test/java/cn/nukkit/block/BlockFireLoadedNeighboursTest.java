@@ -116,11 +116,11 @@ class BlockFireLoadedNeighboursTest {
 
     @Test
     void loadedFuelStillReceivesCancellableSpreadOrBurnEvent() {
-        Fixture f = new Fixture(8, 8, new BlockPlanks());
+        Fixture f = new Fixture(8, 8, new BlockStone());
         f.put(new Fuel(), 9, 64, 8);
         f.fire.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
-        // 下方 planks 燃烧能力 20 也可能随机（20/250）收到事件，只认燃料方块的那一次
-        // The planks below (burn ability 20) may also roll an event (20/250); only count the fuel's
+        // 支撑方块不可燃，燃料方块的事件是唯一可能的事件，验证不受随机分支影响
+        // The support is non-flammable, so the fuel's event is the only possible one under any roll
         verify(f.plugins).callEvent(argThat(event -> (event instanceof BlockIgniteEvent || event instanceof BlockBurnEvent)
                 && key(((BlockEvent) event).getBlock()).equals("9:64:8")));
         assertFalse(f.removed);
