@@ -1,6 +1,7 @@
 package cn.nukkit.level.generator.populator.impl.tree;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockSapling;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.generator.object.tree.ObjectBigSpruceTree;
@@ -77,7 +78,7 @@ public class SpruceBigTreePopulator extends Populator {
 
         for (int xx = 0; xx < 2; xx++) {
             for (int zz = 0; zz < 2; zz++) {
-                level.setBlockAt(x + xx, y, z + zz, Block.SAPLING);
+                level.setBlockAt(x + xx, y, z + zz, Block.SAPLING, BlockSapling.SPRUCE);
             }
         }
 

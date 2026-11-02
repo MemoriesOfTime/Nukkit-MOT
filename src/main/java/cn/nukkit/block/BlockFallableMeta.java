@@ -17,7 +17,6 @@ public abstract class BlockFallableMeta extends BlockSolidMeta {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (!this.getLevel().randomTickingEnabled()) return type;
             Block down = this.down();
             if (this.canFallInto(down)) {
                 EntityFallingBlock.startFalling(this, () -> this.createFallingEntity(new CompoundTag()));

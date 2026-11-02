@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityBrewingStand;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
@@ -301,6 +302,9 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
         void setTransferCooldown(int transferCooldown);
 
+        /** Keep a cancelled transfer eligible when plugin policy changes without an inventory write. */
+        default void requestTransferRetry() { }
+
         default boolean pullItems() {
             Vector3 up = this.getPosition().up();
             BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
@@ -330,6 +334,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                     ev.call();
 
                     if (ev.isCancelled()) {
+                        this.requestTransferRetry();
                         return false;
                     }
 
@@ -343,8 +348,10 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                 }
             } else if (blockEntity instanceof InventoryHolder) {
                 Inventory inv = ((InventoryHolder) blockEntity).getInventory();
+                int start = blockEntity instanceof BlockEntityBrewingStand ? 1 : 0;
+                int end = blockEntity instanceof BlockEntityBrewingStand ? 4 : inv.getSize();
 
-                for (int i = 0; i < inv.getSize(); i++) {
+                for (int i = start; i < end; i++) {
                     Item item = inv.getItem(i);
 
                     if (!item.isNull()) {
@@ -359,6 +366,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                         ev.call();
 
                         if (ev.isCancelled()) {
+                            this.requestTransferRetry();
                             continue;
                         }
 

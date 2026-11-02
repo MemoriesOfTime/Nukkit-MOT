@@ -228,8 +228,8 @@ class StructuralCollectionCountTest {
 
     @ParameterizedTest
     @MethodSource("windowVersions")
-    void subchunkExistingAcceptedBoundariesStayUnchanged(GameVersion version) {
-        int count = version.getProtocol() >= ProtocolInfo.v1_26_30 ? 8192 : 8193;
+    void subchunkOffsetCountCapAcceptedExactly(GameVersion version) {
+        int count = 8192; // 两条解码路径同一上限 / one shared cap for both decode paths
         BinaryStream wire = new BinaryStream();
         wire.putVarInt(0);
         if (version.getProtocol() >= ProtocolInfo.v1_26_30) {
@@ -264,6 +264,22 @@ class StructuralCollectionCountTest {
             assertThrows(IllegalArgumentException.class, packet::decode);
             assertTrue(packet.positionOffsets.isEmpty());
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("legacySubchunkVersions")
+    void legacySubchunkRejectsCountsOverCapEvenWhenBytesFit(GameVersion version) {
+        // 旧版 count 曾仅受包长约束（6MB 批次 ≈ 200 万 offset）；现在与 v1_26_30+ 同限 8192
+        // / The legacy count was once bounded only by packet size (a 6MB batch ≈ two
+        // million offsets); it now shares the 8192 cap with v1_26_30+
+        BinaryStream wire = new BinaryStream();
+        wire.putVarInt(0);
+        wire.putSignedBlockPosition(new cn.nukkit.math.BlockVector3(0, 0, 0));
+        wire.putLInt(8193);
+        wire.put(new byte[8193 * 3]);
+        SubChunkRequestPacket packet = packet(new SubChunkRequestPacket(), version, wire.getBuffer());
+        assertThrows(IllegalArgumentException.class, packet::decode);
+        assertTrue(packet.positionOffsets.isEmpty());
     }
 
     @Test
