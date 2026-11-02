@@ -50,14 +50,14 @@ class ChunkRequestEpochFenceTest {
         process(fixture.level);
         long retry = fixture.epoch(hash, VERSION);
         assertNotEquals(retired, retry, "A timeout retry is a new submission");
-        assertEquals(400L, fixture.started(hash));
+        assertEquals(400L, fixture.started(hash, VERSION));
 
         fixture.level.onAsyncChunkRequestFailed(VERSION, 3, 5, retired);
         fixture.level.drainFailedChunkRequests();
 
         assertTrue(fixture.tasks(VERSION).contains(hash), "A retired submission's failure must not drop the retry");
         assertEquals(retry, fixture.epoch(hash, VERSION));
-        assertEquals(400L, fixture.started(hash), "A retired submission's failure must not cancel the retry timeout");
+        assertEquals(400L, fixture.started(hash, VERSION), "A retired submission's failure must not cancel the retry timeout");
     }
 
     @Test
@@ -80,7 +80,8 @@ class ChunkRequestEpochFenceTest {
         assertFalse(fixture.tasks(VERSION).contains(hash));
         assertTrue(fixture.tasks(OTHER).contains(hash), "The other version is still in flight");
         assertEquals(submission, fixture.epoch(hash, OTHER));
-        assertEquals(100L, fixture.started(hash), "A live task keeps the shared timeout fence");
+        assertEquals(0L, fixture.started(hash, VERSION), "The completed protocol retires its timestamp");
+        assertEquals(100L, fixture.started(hash, OTHER), "The sibling keeps its original timeout");
     }
 
     @Test
@@ -169,7 +170,7 @@ class ChunkRequestEpochFenceTest {
         final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> queueBuckets =
                 new Object2ObjectOpenHashMap<>();
         final Object2ObjectMap<GameVersion, LongSet> pendingBuckets = new Object2ObjectOpenHashMap<>();
-        final Long2LongOpenHashMap startedTicks = new Long2LongOpenHashMap();
+        final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> startedTicks = new Object2ObjectOpenHashMap<>();
         final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> epochBuckets = new Object2ObjectOpenHashMap<>();
 
         Fixture() throws Exception {
@@ -212,8 +213,9 @@ class ChunkRequestEpochFenceTest {
             return epochs == null ? 0L : epochs.get(hash);
         }
 
-        long started(long hash) {
-            return startedTicks.get(hash);
+        long started(long hash, GameVersion version) {
+            Long2LongOpenHashMap starts = startedTicks.get(version);
+            return starts == null ? 0L : starts.get(hash);
         }
     }
 }

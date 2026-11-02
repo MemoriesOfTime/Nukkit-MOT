@@ -475,7 +475,7 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<FailedChunkRequest> asyncChunkRequestFailedQueue = new ConcurrentLinkedQueue<>();
 
     // 任务提交 tick,用于超时自愈 / Submit tick for timeout self-healing
-    private final Long2LongOpenHashMap chunkSendTaskStartTick = new Long2LongOpenHashMap();
+    private final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> chunkSendTaskStartTick = new Object2ObjectOpenHashMap<>();
 
     // 区块请求代次(仅主线程):受理时分配单调 id,回调回传比对,不符即丢;id 不复用,收尾即删
     // Chunk request epochs (main thread): a monotonic id per acceptance, echoed by
@@ -1458,7 +1458,7 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        if (this.server.asyncChunkSending) {
+        if (!this.asyncChunkRequestCallbackQueue.isEmpty()) {
             NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
@@ -4503,8 +4503,9 @@ public class Level implements ChunkManager, Metadatable {
                     continue;
                 }
                 // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
-                long startTick = this.chunkSendTaskStartTick.get(index);
-                if (startTick != 0 && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
+                Long2LongOpenHashMap starts = this.chunkSendTaskStartTick.get(protocolId);
+                long startTick = starts == null ? Long.MIN_VALUE : starts.getOrDefault(index, Long.MIN_VALUE);
+                if (startTick != Long.MIN_VALUE && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
                         && tasks.contains(index)) {
                     server.getLogger().warning("Chunk send task timed out for index " + index + " in level " + this.getName() + ", forcing retry");
                     // retiring invalidates this submission's late results
@@ -4725,7 +4726,11 @@ public class Level implements ChunkManager, Metadatable {
                 continue;
             }
 
-            this.chunkSendTaskStartTick.put(index, this.server.getTick());
+            long startTick = this.server.getTick();
+            for (GameVersion protocol : protocols) {
+                this.chunkSendTaskStartTick.computeIfAbsent(this.getChunkProtocol(protocol),
+                        ignored -> new Long2LongOpenHashMap()).put(index, startTick);
+            }
             // one id per acceptance, shared by this round's protocol buckets
             this.requireProvider().requestChunkTask(protocols, x, z, this.beginChunkRequest(protocols, index));
         }
@@ -4753,10 +4758,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     /**
-     * 收尾一次受理：清该协议桶的任务与代次；提交 tick 仅在无任何协议在飞时才清。
+     * 收尾一次受理：只清该协议桶的任务、代次与提交 tick。
      * <p>
-     * Retires one submission: clears the bucket's task and epoch; the shared submit
-     * tick only when no protocol still has it in flight.
+     * Retires one submission: clears only this protocol bucket's task, epoch and submit tick.
      */
     private void releaseChunkRequest(GameVersion protocol, long index) {
         this.getChunkSendTasks(protocol).remove(index);
@@ -4764,12 +4768,12 @@ public class Level implements ChunkManager, Metadatable {
         if (epochs != null) {
             epochs.remove(index);
         }
-        for (LongSet tasks : this.chunkSendTasks.values()) {
-            if (tasks.contains(index)) {
-                return;
-            }
+        GameVersion protocolId = this.getChunkProtocol(protocol);
+        Long2LongOpenHashMap starts = this.chunkSendTaskStartTick.get(protocolId);
+        if (starts != null) {
+            starts.remove(index);
+            if (starts.isEmpty()) this.chunkSendTaskStartTick.remove(protocolId);
         }
-        this.chunkSendTaskStartTick.remove(index);
     }
 
     /**

@@ -37,7 +37,7 @@ class ChunkSendRecipientTest {
         for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests"}) {
             set(Level.class, level, name, new Object2ObjectOpenHashMap<>());
         }
-        set(Level.class, level, "chunkSendTaskStartTick", new Long2LongOpenHashMap());
+        set(Level.class, level, "chunkSendTaskStartTick", new Object2ObjectOpenHashMap<>());
         set(Level.class, level, "chunkRequestEpochs", new Object2ObjectOpenHashMap<>());
         chunk = mock(BaseFullChunk.class);
         doReturn(chunk).when(level).getChunk(3, 5);
