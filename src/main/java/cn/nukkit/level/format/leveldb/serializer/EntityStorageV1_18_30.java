@@ -56,6 +56,12 @@ final class EntityStorageV1_18_30 implements EntityStorage {
 
     @Override
     public void saveEntities(@Nullable DB sourceDb, WriteBatch writeBatch, LevelDBChunk chunk) {
+        snapshotEntities(writeBatch, chunk).apply(sourceDb, writeBatch);
+    }
+
+    EntitySerializer.Cleanup snapshotEntities(WriteBatch writeBatch, LevelDBChunk chunk) {
+        int chunkX = chunk.getX();
+        int chunkZ = chunk.getZ();
         int dimension = chunk.getProvider().getLevel().getDimension();
         byte[] digpKey = getDigpKey(chunk.getX(), chunk.getZ(), dimension);
 
@@ -90,12 +96,13 @@ final class EntityStorageV1_18_30 implements EntityStorage {
 
             byte[] value = stream.toByteArray();
             if (value.length == 0) {
-                deleteEntities(sourceDb, writeBatch, chunk);
-                return;
+                writeBatch.delete(digpKey);
+            } else {
+                writeBatch.put(digpKey, value);
             }
-
-            writeBatch.put(digpKey, value);
-            deleteStaleActors(sourceDb, writeBatch, chunk.getX(), chunk.getZ(), dimension, writtenStorageKeys);
+            Set<Long> retained = Set.copyOf(writtenStorageKeys);
+            // Capture only coordinates and immutable IDs; worker must never inspect live entities.
+            return (database, batch) -> deleteStaleActors(database, batch, chunkX, chunkZ, dimension, retained);
         } catch (IOException e) {
             throw new RuntimeException("Can not create out stream", e);
         }

@@ -46,17 +46,17 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
             return Item.get(Item.AIR);
         }
 
+        // Both input items must be the same type
+        if (!iq.isNull() && eq.getId() != iq.getId()) {
+            return Item.get(Item.AIR);
+        }
+
         // Enchanted book handling
         if (eq.getId() == Item.ENCHANTED_BOOK) {
             return getEnchantedBookResult(eq);
         }
 
         if (!(eq instanceof ItemDurable)) {
-            return Item.get(Item.AIR);
-        }
-
-        // Both input items must be the same type
-        if (!iq.isNull() && eq.getId() != iq.getId()) {
             return Item.get(Item.AIR);
         }
 
@@ -113,7 +113,16 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
         }
 
         // No curse enchantments, convert to normal book
-        return Item.get(Item.BOOK, 0, book.getCount());
+        Item result = Item.get(Item.BOOK, 0, book.getCount());
+        CompoundTag tag = book.getNamedTag();
+        if (tag != null) {
+            tag = tag.copy();
+            tag.remove("ench");
+            tag.remove("custom_ench");
+            tag.remove("RepairCost");
+            if (!tag.isEmpty()) result.setNamedTag(tag);
+        }
+        return result;
     }
 
     private void removeNonCurseEnchantments(Item item) {
@@ -204,12 +213,7 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
         super.onClose(who);
         who.craftingType = Player.CRAFTING_SMALL;
 
-        Item[] drops = who.getInventory().addItem(this.getItem(EQUIPMENT), this.getItem(INGREDIENT));
-        for (Item drop : drops) {
-            if (!who.dropItem(drop)) {
-                this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), drop);
-            }
-        }
+        who.returnUiItems(this.getItem(EQUIPMENT), this.getItem(INGREDIENT));
 
         this.clear(EQUIPMENT);
         this.clear(INGREDIENT);

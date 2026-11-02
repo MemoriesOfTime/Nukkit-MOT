@@ -11,11 +11,6 @@ import java.util.List;
 public class EntitySerializer {
 
     public static void loadEntities(DB db, ChunkBuilder builder) {
-        if (!EntityStorageV1_18_30.INSTANCE.hasData(db, builder)) {
-            EntityStorageLegacy.INSTANCE.loadEntities(db, builder);
-            return;
-        }
-
         EntityStorageV1_18_30.EntityReadResult readResult = EntityStorageV1_18_30.INSTANCE.readEntities(
                 db,
                 builder.getChunkX(),
@@ -45,6 +40,18 @@ public class EntitySerializer {
             chunk.setNbtEntities(finalLoadableEntities);
             chunk.setPreservedEntityActors(readResult.getPreservedActors());
         });
+    }
+
+    @FunctionalInterface
+    public interface Cleanup {
+        void apply(DB sourceDb, WriteBatch writeBatch);
+    }
+
+    /** Main-thread entity snapshot; stale actor DB reads are deferred to the commit worker. */
+    public static Cleanup snapshotEntities(WriteBatch writeBatch, LevelDBChunk chunk) {
+        Cleanup cleanup = EntityStorageV1_18_30.INSTANCE.snapshotEntities(writeBatch, chunk);
+        EntityStorageLegacy.INSTANCE.deleteEntities(null, writeBatch, chunk);
+        return cleanup;
     }
 
     public static void saveEntities(DB sourceDb, WriteBatch writeBatch, LevelDBChunk chunk) {

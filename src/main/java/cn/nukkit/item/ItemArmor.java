@@ -25,6 +25,9 @@ abstract public class ItemArmor extends Item implements ItemDurable {
     public static final int TIER_NETHERITE = 7;
     public static final int TIER_OTHER = 8;
 
+    /** Resistance contributed by each worn piece of netherite armour. */
+    public static final double KNOCKBACK_RESISTANCE_PER_NETHERITE_PIECE = 0.1;
+
     public ItemArmor(int id) {
         super(id);
     }
@@ -154,6 +157,11 @@ abstract public class ItemArmor extends Item implements ItemDurable {
         }
 
         return 0;
+    }
+
+    @Override
+    public double getKnockBackResistance() {
+        return this.getTier() == TIER_NETHERITE ? KNOCKBACK_RESISTANCE_PER_NETHERITE_PIECE : 0;
     }
 
     @Override

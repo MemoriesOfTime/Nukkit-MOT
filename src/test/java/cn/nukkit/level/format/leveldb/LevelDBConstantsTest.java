@@ -47,6 +47,18 @@ public class LevelDBConstantsTest {
     }
 
     @Test
+    public void testWriteBufferSizeTiers() {
+        // 1GB / 2GB / 6GB 三道档线。/ The 1GB, 2GB and 6GB tier boundaries.
+        assertEquals(2, LevelDBProvider.writeBufferSizeMb(512L * 1024 * 1024), "below 1GB");
+        assertEquals(4, LevelDBProvider.writeBufferSizeMb(1024L * 1024 * 1024), "at the 1GB boundary");
+        assertEquals(4, LevelDBProvider.writeBufferSizeMb(2L * 1024 * 1024 * 1024), "at the 2GB boundary");
+        assertEquals(8, LevelDBProvider.writeBufferSizeMb(2L * 1024 * 1024 * 1024 + 1), "just above 2GB");
+        assertEquals(8, LevelDBProvider.writeBufferSizeMb(6L * 1024 * 1024 * 1024), "at the 6GB boundary");
+        assertEquals(16, LevelDBProvider.writeBufferSizeMb(6L * 1024 * 1024 * 1024 + 1), "just above 6GB");
+        assertEquals(16, LevelDBProvider.writeBufferSizeMb(64L * 1024 * 1024 * 1024), "large machine");
+    }
+
+    @Test
     public void testUpdaterOutputVersionMatchesPalette() {
         int version1_21_0 = (0 << 8) | (21 << 16) | (1 << 24);
 
@@ -64,6 +76,37 @@ public class LevelDBConstantsTest {
                 "Updater output version must match palette STATE_VERSION");
         assertEquals("minecraft:red_sand", updated.getString("name"));
         assertFalse(updated.containsKey("sand_type") || updated.getCompound("states").containsKey("sand_type"));
+    }
+
+    @Test
+    public void testUpdaterChainTailMatchesPaletteVersion() throws Exception {
+        java.lang.reflect.Field field = BlockStateMapping.class.getDeclaredField("LATEST_UPDATER_VERSION");
+        field.setAccessible(true);
+        assertEquals(LevelDBConstants.STATE_VERSION, field.getInt(null),
+                "Chain-tail rev drift would be silently masked by the exit normalization; assert it here so drift fails loudly");
+    }
+
+    @Test
+    public void testPre12650StairsUpgradesToCornerState() {
+        int version1_26_10 = (10 << 8) | (26 << 16) | (1 << 24);
+
+        NbtMap oldStairs = NbtMap.builder()
+                .putString("name", "minecraft:oak_stairs")
+                .putCompound("states", NbtMap.builder()
+                        .putInt("weirdo_direction", 2)
+                        .putBoolean("upside_down_bit", false)
+                        .build())
+                .putInt("version", version1_26_10)
+                .build();
+
+        NbtMap updated = BlockStateMapping.get().updateVanillaState(oldStairs);
+        assertEquals("none", updated.getCompound("states").getString("minecraft:corner"),
+                "1.26.50 updater must backfill minecraft:corner for pre-1.26.50 stairs");
+        assertEquals(LevelDBConstants.STATE_VERSION, updated.getInt("version"));
+
+        BlockStateSnapshot snapshot = BlockStateMapping.get().getStateUnsafe(updated);
+        assertNotNull(snapshot, "Upgraded stairs state must exist in the 1.26.50 palette");
+        assertFalse(snapshot.isCustom());
     }
 
     @Test
@@ -104,7 +147,7 @@ public class LevelDBConstantsTest {
         assertEquals(9, LevelDBConstants.CURRENT_STORAGE_VERSION);
         assertEquals(41, LevelDBConstants.CURRENT_LEVEL_CHUNK_VERSION);
         assertEquals(9, LevelDBConstants.CURRENT_LEVEL_SUBCHUNK_VERSION);
-        assertEquals(List.of(1, 26, 10, 0, 0), LevelDBConstants.CURRENT_LEVEL_VERSION.stream().map(IntTag::getData).toList());
+        assertEquals(List.of(1, 26, 50, 0, 0), LevelDBConstants.CURRENT_LEVEL_VERSION.stream().map(IntTag::getData).toList());
         assertArrayEquals(new byte[]{7}, LevelDBConstants.LEGACY_CHUNK_VERSION_SAVE_DATA);
         assertArrayEquals(new byte[]{0}, LevelDBConstants.GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING_SAVE_DATA);
         assertArrayEquals(new byte[]{0, 8}, LevelDBConstants.BLENDING_DATA_SAVE_DATA);

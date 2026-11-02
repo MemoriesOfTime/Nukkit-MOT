@@ -25,6 +25,11 @@ public class InventoryTransactionPacket extends DataPacket {
     public static final int USE_ITEM_ACTION_CLICK_BLOCK = 0;
     public static final int USE_ITEM_ACTION_CLICK_AIR = 1;
     public static final int USE_ITEM_ACTION_BREAK_BLOCK = 2;
+    /**
+     * Left-click that uses the held item instead of a plain attack, without a target block or
+     * entity. Sent by 1.21.110+ clients for the spear jab ({@code minecraft:piercing_weapon}).
+     */
+    public static final int USE_ITEM_ACTION_USE_AS_ATTACK = 3;
 
     public static final int RELEASE_ITEM_ACTION_RELEASE = 0; //bow shoot
     public static final int RELEASE_ITEM_ACTION_CONSUME = 1; //eat food, drink potion
@@ -112,14 +117,15 @@ public class InventoryTransactionPacket extends DataPacket {
             }
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30) {
+        // v2192 起不再写 transactionType / actions 前的恒 true bool / constant-true bools dropped in v2192
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50_27) {
             this.putBoolean(true);
         }
         this.putUnsignedVarInt(this.transactionType);
         if (protocol >= 407 && protocol < ProtocolInfo.v1_16_220) {
             this.putBoolean(this.hasNetworkIds);
         }
-        if (this.protocol >= ProtocolInfo.v1_26_30) {
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50_27) {
             this.putBoolean(true);
         }
         this.putUnsignedVarInt(this.actions.length);
@@ -150,6 +156,9 @@ public class InventoryTransactionPacket extends DataPacket {
                     this.putBlockFace(useItemData.face);
                 }
                 this.putVarInt(useItemData.hotbarSlot);
+                if (this.protocol >= ProtocolInfo.v1_26_50_27) {
+                    this.putByte((byte) useItemData.hand); // 主/副手，单字节 / main or off hand, single byte
+                }
                 if (this.protocol >= ProtocolInfo.v1_26_30) {
                     this.putNetworkItemStackDescriptor(gameVersion, useItemData.itemInHand);
                 } else {
@@ -177,6 +186,9 @@ public class InventoryTransactionPacket extends DataPacket {
                 this.putEntityRuntimeId(useItemOnEntityData.entityRuntimeId);
                 this.putTransactionActionType(useItemOnEntityData.actionType);
                 this.putVarInt(useItemOnEntityData.hotbarSlot);
+                if (this.protocol >= ProtocolInfo.v1_26_60) {
+                    this.putByte((byte) useItemOnEntityData.hand);
+                }
                 if (this.protocol >= ProtocolInfo.v1_26_30) {
                     this.putNetworkItemStackDescriptor(gameVersion, useItemOnEntityData.itemInHand);
                 } else {
@@ -196,6 +208,9 @@ public class InventoryTransactionPacket extends DataPacket {
                     this.putSlot(gameVersion, releaseItemData.itemInHand);
                 }
                 this.putVector3f(releaseItemData.headRot.asVector3f());
+                if (this.protocol >= ProtocolInfo.v1_26_60) {
+                    this.putByte((byte) releaseItemData.hand);
+                }
                 break;
             default:
                 throw new RuntimeException("Unknown transaction type " + this.transactionType);
@@ -215,7 +230,8 @@ public class InventoryTransactionPacket extends DataPacket {
             }
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30 && !this.getBoolean()) {
+        // v2192 起移除 transactionType / actions 前的恒 true bool / constant-true bools before type/actions removed in v2192
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50_27 && !this.getBoolean()) {
             throw new IllegalStateException("Expected InventoryTransactionType");
         }
         this.transactionType = (int) this.getUnsignedVarInt();
@@ -224,7 +240,7 @@ public class InventoryTransactionPacket extends DataPacket {
             this.hasNetworkIds = this.getBoolean();
         }
 
-        if (this.protocol >= ProtocolInfo.v1_26_30 && !this.getBoolean()) {
+        if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_50_27 && !this.getBoolean()) {
             throw new IllegalStateException("Expected InventoryActionData");
         }
         this.actions = new NetworkInventoryAction[Math.min((int) this.getUnsignedVarInt(), 4096)];
@@ -247,6 +263,11 @@ public class InventoryTransactionPacket extends DataPacket {
                 itemData.blockPos = this.getBlockVector3(this.gameVersion);
                 itemData.face = this.protocol >= ProtocolInfo.v1_26_30 ? BlockFace.fromIndex(this.getByte() & 0xff) : this.getBlockFace();
                 itemData.hotbarSlot = this.getVarInt();
+                if (this.protocol >= ProtocolInfo.v1_26_50_27) {
+                    // v2192 新增手持位置（主/副手），单字节（CB #355 修正，非 VarUInt）
+                    // hand (main/off-hand) added in v2192, single byte (corrected by CB #355, not VarUInt)
+                    itemData.hand = this.getByte();
+                }
                 itemData.itemInHand = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
                 itemData.playerPos = this.getVector3f().asVector3();
                 itemData.clickPos = this.getVector3f();
@@ -268,6 +289,9 @@ public class InventoryTransactionPacket extends DataPacket {
                 useItemOnEntityData.entityRuntimeId = this.getEntityRuntimeId();
                 useItemOnEntityData.actionType = this.getTransactionActionType();
                 useItemOnEntityData.hotbarSlot = this.getVarInt();
+                if (this.protocol >= ProtocolInfo.v1_26_60) {
+                    useItemOnEntityData.hand = this.getByte() & 0xff;
+                }
                 useItemOnEntityData.itemInHand = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
                 useItemOnEntityData.playerPos = this.getVector3f().asVector3();
                 useItemOnEntityData.clickPos = this.getVector3f().asVector3();
@@ -281,6 +305,9 @@ public class InventoryTransactionPacket extends DataPacket {
                 releaseItemData.hotbarSlot = getVarInt();
                 releaseItemData.itemInHand = this.protocol >= ProtocolInfo.v1_26_30 ? this.getNetworkItemStackDescriptor(this.gameVersion) : this.getSlot(this.gameVersion);
                 releaseItemData.headRot = this.getVector3f().asVector3();
+                if (this.protocol >= ProtocolInfo.v1_26_60) {
+                    releaseItemData.hand = this.getByte() & 0xff;
+                }
 
                 this.transactionData = releaseItemData;
                 break;

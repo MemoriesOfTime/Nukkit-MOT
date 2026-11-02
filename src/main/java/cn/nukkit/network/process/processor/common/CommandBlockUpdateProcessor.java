@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
@@ -118,7 +119,7 @@ public class CommandBlockUpdateProcessor extends DataPacketProcessor<CommandBloc
     }
 
     @Override
-    public boolean isSupported(int protocol) {
+    public boolean isSupported(GameVersion gameVersion) {
         return true;
     }
 }

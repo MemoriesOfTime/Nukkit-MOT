@@ -47,6 +47,11 @@ public class FileWriteTask extends AsyncTask {
     }
 
     @Override
+    protected boolean isVirtual() {
+        return true;
+    }
+
+    @Override
     public void onRun() {
         try {
             Utils.writeFile(file, contents);

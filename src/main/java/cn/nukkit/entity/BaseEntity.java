@@ -17,6 +17,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
+import cn.nukkit.level.PlayerRangeMap;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.HeartParticle;
 import cn.nukkit.math.AxisAlignedBB;
@@ -112,6 +113,72 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     public abstract Vector3 updateMove(int tickDiff);
 
+    /** A sleeping mob catches up once per this many ticks. */
+    static final int ACTIVATION_INTERVAL = 20;
+    /** Recently hurt mobs stay awake so knock-back, hurt windows and panic keep the per-tick cadence. */
+    static final int ACTIVATION_DAMAGE_GRACE_TICKS = 100;
+    /**
+     * Only this core's own mob classes may sleep: a plugin subclass can hang arbitrary per-tick logic on
+     * {@link #onUpdate(int)}. Snow golems, creakings and elder guardians keep tick-phase timers that a
+     * once-per-second catch-up would either always or never hit.
+     */
+    private static final ClassValue<Boolean> ACTIVATION_CLASS = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            return type.getName().startsWith("cn.nukkit.entity.")
+                    && !EntityBoss.class.isAssignableFrom(type)
+                    && !cn.nukkit.entity.mob.EntitySnowGolem.class.isAssignableFrom(type)
+                    && !cn.nukkit.entity.mob.EntityCreaking.class.isAssignableFrom(type)
+                    && !cn.nukkit.entity.mob.EntityElderGuardian.class.isAssignableFrom(type);
+        }
+    };
+
+    private boolean activationAsleep;
+    /** tickDiff of the base tick in progress; lets the despawn cadence survive a caught-up tick. */
+    protected int lastBaseTickDiff = 1;
+
+    /**
+     * Entity activation: a mob that is farther than {@code entity-settings.activation-blocks} from every player
+     * of its level is updated only on its own phase tick, once per {@link #ACTIVATION_INTERVAL} ticks, with the
+     * elapsed ticks as {@code tickDiff}. Mobs already stop walking past that range, so a sleeping mob only defers
+     * its environment checks (block collisions, suffocation, air). Anything that makes the per-tick cadence
+     * matter wakes the mob at once: fire, effects, recent damage, riders, leash, love, a name tag or an owner.
+     * The range is re-evaluated on every phase tick, so an approaching player wakes a mob within one second.
+     */
+    @Override
+    public boolean isActivationThrottled(int currentTick) {
+        double range = this.server.entityActivationRangeSquared;
+        if (range <= 0 || !this.canSleepOutOfRange()) {
+            this.activationAsleep = false;
+            return false;
+        }
+        if (Math.floorMod(currentTick + (int) (this.id % ACTIVATION_INTERVAL), ACTIVATION_INTERVAL) == 0) {
+            this.activationAsleep = !this.isInTickingRange(range);
+            return false;
+        }
+        return this.activationAsleep;
+    }
+
+    /** Whether this mob is currently sleeping out of the activation range. */
+    public boolean isActivationAsleep() {
+        return this.activationAsleep;
+    }
+
+    protected boolean canSleepOutOfRange() {
+        return ACTIVATION_CLASS.get(this.getClass())
+                && !this.closed && this.isAlive()
+                && this.riding == null && this.passengers.isEmpty()
+                && this.fireTicks <= 0 && this.effects.isEmpty()
+                && this.noDamageTicks <= 0 && this.attackTime <= 0
+                && this.inLoveTicks <= 0
+                // Wool regrowth counts updates, not tickDiff; keep its existing cadence while sheared.
+                && !(this instanceof cn.nukkit.entity.passive.EntitySheep sheep && sheep.isSheared())
+                && !this.isLeashed()
+                && this.server.getTick() - this.lastDamageTick > ACTIVATION_DAMAGE_GRACE_TICKS
+                && !this.hasCustomName()
+                && !(this instanceof EntityOwnable ownable && ownable.getOwnerName() != null && !ownable.getOwnerName().isEmpty());
+    }
+
     public abstract int getKillExperience();
 
     public boolean isFriendly() {
@@ -155,6 +222,24 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     public boolean isLookupForTarget() {
         return this.lookupForTarget;
+    }
+
+    /**
+     * 无目标时仅对候选扫描按实体相位降频；游走和休息仍逐 tick 更新。
+     * 补偿更新也覆盖跨过的搜索相位。
+     * <p>
+     * Phase-spread candidate scans, including caught-up ticks; wandering and resting still update every tick.
+     */
+    protected boolean shouldRunTargetCheck() {
+        if (this.followTarget != null || this.target instanceof EntityCreature || this.isKnockback() || this.attackTime > 0) {
+            return true;
+        }
+        int interval = this.server.entityTargetSearchInterval;
+        if (interval <= 1) {
+            return true;
+        }
+        int tickDiff = Math.max(1, this.lastBaseTickDiff);
+        return hitsResidue((long) this.age - tickDiff + 1 + this.id % interval, tickDiff, interval, 0);
     }
 
     public void setLookupForTarget(boolean lookupForTarget) {
@@ -257,6 +342,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
+        this.lastBaseTickDiff = tickDiff;
         if (this.canDespawn() && this.age > Server.getInstance().mobDespawnTicks && !this.hasCustomName() && !(this instanceof EntityBoss)) {
             this.close();
             return true;
@@ -697,7 +783,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
      */
     public boolean canDespawn() {
         return this.y < -128 || (this.server.despawnMobs &&
-                !this.persistent && this.age % 100 == 0 && this.riding == null && this.inLoveTicks <= 0 && this.inLoveCooldown <= 0 &&
+                !this.persistent && this.isDespawnCheckTick() && this.riding == null && this.inLoveTicks <= 0 && this.inLoveCooldown <= 0 &&
                 !this.isLeashed() && !this.hasCustomName() && server.getTick() - this.lastDamageTick > 600 && // no damage in 30 seconds
                 !this.isInTickingRange(9216) // 96 blocks
         );
@@ -833,17 +919,43 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.setBothYaw(this.yaw + delta);
     }
 
+    /**
+     * Despawn is probed when age hits a multiple of 100. A caught-up tick covers ages
+     * [age, age + tickDiff - 1] (age advances after this check), so it must not step over the multiple.
+     */
+    private boolean isDespawnCheckTick() {
+        return this.lastBaseTickDiff <= 1 ? this.age % 100 == 0 : hitsResidue(this.age, this.lastBaseTickDiff, 100, 0);
+    }
+
     protected boolean isInTickingRange() {
-        return this.isInTickingRange(6400); // 80 blocks
+        // Walking range and activation range must agree: a mob that sleeps but still walks would jump once a second.
+        double activation = this.server.entityActivationRangeSquared;
+        return this.isInTickingRange(activation > 0 ? activation : 6400); // 80 blocks by default
     }
 
     protected boolean isInTickingRange(double rangeSquared) {
+        Player[] snapshot = this.level.getPlayers() instanceof PlayerRangeMap map ? map.tickSnapshot() : null;
+        if (snapshot != null) {
+            for (Player player : snapshot) {
+                if (this.withinHorizontalRange(player, rangeSquared)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         for (Player player : this.level.getPlayers().values()) {
-            // Ignore y so mobs won't stop falling into void unless movement behavior is tweaked for this
-            if (Math.pow(player.x - this.x, 2.0) + Math.pow(player.z - this.z, 2.0) < rangeSquared) {
+            if (this.withinHorizontalRange(player, rangeSquared)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean withinHorizontalRange(Player player, double rangeSquared) {
+        // 忽略高度，避免生物掉入虚空时因垂直距离超范围而被冻结。
+        // Ignore height so mobs falling into the void keep moving instead of freezing once only the vertical gap exceeds the range.
+        double dx = player.x - this.x;
+        double dz = player.z - this.z;
+        return dx * dx + dz * dz < rangeSquared;
     }
 }

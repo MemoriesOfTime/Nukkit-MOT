@@ -1,5 +1,7 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.Server;
+import cn.nukkit.lang.BaseLang;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -12,11 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -31,6 +29,9 @@ import java.util.zip.ZipInputStream;
  * Idempotent and safe to run on every startup.
  * <p>
  * HTTP transport is handled by {@link HttpUtils}.
+ * <p>
+ * 日志文案经 BaseLang 本地化（lang.ini 键前缀 {@code nukkit.palette.*}）。
+ * Log messages are localized via the server's {@link BaseLang} (lang.ini prefix {@code nukkit.palette.*}).
  */
 @Log4j2
 public final class VanillaPaletteDownloader {
@@ -46,7 +47,22 @@ public final class VanillaPaletteDownloader {
     /** Above this many missing files, the bundle beats individual requests. */
     private static final int INCREMENTAL_THRESHOLD = 5;
 
+    /** 无 Server 上下文（单元测试）时的英文兜底 / English fallback when no server is running. */
+    private static volatile BaseLang fallbackLang;
+
     private VanillaPaletteDownloader() {
+    }
+
+    private static BaseLang getLang() {
+        Server server = Server.getInstance();
+        if (server != null) {
+            return server.getLanguage();
+        }
+        BaseLang lang = fallbackLang;
+        if (lang == null) {
+            fallbackLang = lang = new BaseLang("eng");
+        }
+        return lang;
     }
 
     /**
@@ -57,12 +73,12 @@ public final class VanillaPaletteDownloader {
      * @return a summary of the run, never {@code null}
      */
     public static Result downloadMissing(Path binDir) {
+        logDownloadIntro();
         try {
             JsonObject manifest = fetchManifest();
             return processManifest(binDir, manifest);
         } catch (Exception e) {
-            log.warn("Failed to download vanilla palettes from {}: {}", MIRROR_BASE_URL, e.toString());
-            logManualRecoveryHint();
+            log.warn(getLang().translateString("nukkit.palette.downloadFailed", new String[]{MIRROR_BASE_URL + MANIFEST_FILE, e.toString()}));
             return new Result(0, 0, 0, false);
         }
     }
@@ -72,17 +88,16 @@ public final class VanillaPaletteDownloader {
         return JsonParser.parseString(body).getAsJsonObject();
     }
 
-    private static void logManualRecoveryHint() {
-        log.warn("You can download palettes.zip manually from {} and extract the .nbt files into the bin/ folder,",
-                SOURCE_REPO_URL);
-        // Key mirrors CustomBlockSettings (@CustomKey "auto-download-vanilla-palette" in nukkit-mot.yml).
-        log.warn("or set \"auto-download-vanilla-palette: false\" under custom-block-settings in nukkit-mot.yml.");
+    private static void logDownloadIntro() {
+        for (String line : getLang().translateString("nukkit.palette.manualHint", SOURCE_REPO_URL).replace("\\n", "\n").split("\n")) {
+            log.info(line);
+        }
     }
 
     private static Result processManifest(Path binDir, JsonObject manifest) {
         List<Member> members = parseMembers(manifest);
         if (members.isEmpty()) {
-            log.warn("Mirror manifest listed no palettes, skipping download");
+            log.warn(getLang().translateString("nukkit.palette.manifestInvalid"));
             return new Result(0, 0, 0, false);
         }
 
@@ -95,12 +110,9 @@ public final class VanillaPaletteDownloader {
         int present = members.size() - missing.size();
 
         if (missing.isEmpty()) {
-            log.info("Vanilla palettes: 0 downloaded, {} already present, 0 failed ({} total)",
-                    present, members.size());
+            log.info(getLang().translateString("nukkit.palette.summary", 0, present, 0, members.size()));
             return new Result(0, present, 0, true);
         }
-
-        log.info("Vanilla palettes need updating: {} of {} missing or outdated.", missing.size(), members.size());
 
         if (missing.size() <= INCREMENTAL_THRESHOLD) {
             return downloadFilesIndividually(binDir, members, missing, present);
@@ -110,17 +122,16 @@ public final class VanillaPaletteDownloader {
         try {
             bundle = parseBundle(manifest);
         } catch (Exception e) {
-            log.warn("Manifest is missing the 'zip' bundle entry, cannot download: {}", e.toString());
-            logManualRecoveryHint();
+            log.warn(getLang().translateString("nukkit.palette.manifestInvalid"));
             return new Result(0, present, missing.size(), true);
         }
 
         Path bundlePath = binDir.resolve(bundle.file);
+        log.info(getLang().translateString("nukkit.palette.bundleDownloading", missing.size(), members.size(), formatBytes(bundle.size)));
         try {
             downloadBundle(bundlePath, bundle);
         } catch (Exception e) {
-            log.warn("Failed to obtain palettes bundle {}: {}", bundle.file, e.toString());
-            logManualRecoveryHint();
+            log.warn(getLang().translateString("nukkit.palette.downloadFailed", new String[]{MIRROR_BASE_URL + bundle.file, e.toString()}));
             return new Result(0, present, missing.size(), true);
         }
 
@@ -156,7 +167,6 @@ public final class VanillaPaletteDownloader {
 
     private static void downloadBundle(Path bundlePath, Bundle bundle)
             throws IOException, InterruptedException {
-        log.info("Downloading vanilla palettes bundle ({})...", formatBytes(bundle.size));
         Path temp = bundlePath.resolveSibling(bundlePath.getFileName().toString() + ".part");
         try {
             HttpUtils.downloadFile(MIRROR_BASE_URL + bundle.file, temp);
@@ -171,12 +181,11 @@ public final class VanillaPaletteDownloader {
 
     private static Result downloadFilesIndividually(Path binDir, List<Member> all,
                                                     List<Member> missing, int present) {
-        log.info("Downloading {} palette{} individually...", missing.size(),
-                missing.size() == 1 ? "" : "s");
-
         int downloaded = 0;
         int failed = 0;
+        int index = 0;
         for (Member member : missing) {
+            log.info(getLang().translateString("nukkit.palette.fileDownloading", ++index, missing.size(), member.file()));
             Path target = binDir.resolve(member.file);
             Path temp = target.resolveSibling(target.getFileName().toString() + ".part");
             try {
@@ -187,15 +196,14 @@ public final class VanillaPaletteDownloader {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 downloaded++;
             } catch (Exception e) {
-                log.warn("Failed to download {}: {}", member.file, e.toString());
+                log.warn(getLang().translateString("nukkit.palette.fileFailed", new String[]{member.file, e.toString()}));
                 failed++;
             } finally {
                 tryDelete(temp);
             }
         }
 
-        log.info("Vanilla palettes: {} downloaded, {} already present, {} failed ({} total)",
-                downloaded, present, failed, all.size());
+        log.info(getLang().translateString("nukkit.palette.summary", downloaded, present, failed, all.size()));
         return new Result(downloaded, present, failed, true);
     }
 
@@ -205,8 +213,6 @@ public final class VanillaPaletteDownloader {
         for (Member member : missing) {
             byFile.put(member.file, member);
         }
-
-        log.info("Verifying and extracting palettes from the bundle...");
 
         int downloaded = 0;
         int failed = 0;
@@ -232,24 +238,22 @@ public final class VanillaPaletteDownloader {
                     Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                     downloaded++;
                 } catch (Exception e) {
-                    log.warn("Failed to extract {}: {}", member.file, e.toString());
+                    log.warn(getLang().translateString("nukkit.palette.extractFailed", new String[]{member.file, e.toString()}));
                     failed++;
                     Files.deleteIfExists(temp);
                 }
             }
         } catch (IOException e) {
-            log.warn("Failed to read palettes bundle: {}", e.toString());
-            logManualRecoveryHint();
+            log.warn(getLang().translateString("nukkit.palette.bundleInvalid", e.toString()));
         }
 
         if (processed < missing.size()) {
             int absent = missing.size() - processed;
-            log.warn("Bundle was missing {} palette entr{}", absent, absent == 1 ? "y" : "ies");
+            log.warn(getLang().translateString("nukkit.palette.bundleInvalid", "zip lacks " + absent + " expected entries"));
             failed += absent;
         }
 
-        log.info("Vanilla palettes: {} downloaded, {} already present, {} failed ({} total)",
-                downloaded, present, failed, total);
+        log.info(getLang().translateString("nukkit.palette.summary", downloaded, present, failed, total));
         return new Result(downloaded, present, failed, true);
     }
 
@@ -257,7 +261,7 @@ public final class VanillaPaletteDownloader {
         try {
             Files.deleteIfExists(path);
         } catch (IOException e) {
-            log.warn("Could not delete {}: {}", path, e.toString());
+            log.warn(getLang().translateString("nukkit.palette.deleteFailed", path, e.toString()));
         }
     }
 

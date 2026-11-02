@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.event.player.PlayerEditBookEvent;
@@ -31,6 +32,14 @@ public class BookEditProcessor extends DataPacketProcessor<BookEditPacket> {
 
         if (pk.text != null && pk.text.length() > 256) {
             player.getServer().getLogger().debug(playerHandle.getUsername() + ": BookEditPacket with too long text");
+            return;
+        }
+
+        // Match ItemBookWritable's existing page contract before its throwing preconditions.
+        if (pk.action != BookEditPacket.Action.SIGN_BOOK
+                && (pk.pageNumber < 0 || pk.pageNumber >= 50
+                || (pk.action == BookEditPacket.Action.SWAP_PAGES
+                && (pk.secondaryPageNumber < 0 || pk.secondaryPageNumber >= 50)))) {
             return;
         }
 
@@ -81,7 +90,7 @@ public class BookEditProcessor extends DataPacketProcessor<BookEditPacket> {
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_1_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_1_0;
     }
 }

@@ -45,6 +45,9 @@ import java.util.concurrent.TimeUnit;
 @Log4j2
 public class RakNetInterface implements AdvancedSourceInterface {
 
+    static final int MAX_INBOUND_PACKETS_PER_INTERFACE_TICK = 2048;
+    static final long MAX_INBOUND_BYTES_PER_INTERFACE_TICK = 6L * 1024L * 1024L;
+
     private final Server server;
     private Network network;
 
@@ -56,6 +59,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private final Set<RakNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final long serverId = ThreadLocalRandom.current().nextLong();
+    private int inboundRoundRobinCursor;
 
     public RakNetInterface(Server server) {
         this.server = server;
@@ -168,6 +172,23 @@ public class RakNetInterface implements AdvancedSourceInterface {
         this.network = network;
     }
 
+    /**
+     * 底层 UDP 监听 channel（RakServerChannel 的 parent，IPv4 在前、IPv6 监听存在时在后），
+     * 供 NetherNet 共用端口时挂中继分流器。
+     * The raw UDP listener channels (the RakServerChannel parents, IPv4 first, then the IPv6
+     * listener when present), for the NetherNet relay to hook its demultiplexer onto.
+     */
+    public List<Channel> getDatagramChannels() {
+        List<Channel> channels = new ArrayList<>(2);
+        if (this.channel != null && this.channel.parent() != null) {
+            channels.add(this.channel.parent());
+        }
+        if (this.ipv6Channel != null && this.ipv6Channel.parent() != null) {
+            channels.add(this.ipv6Channel.parent());
+        }
+        return channels;
+    }
+
     @Override
     public boolean process() {
         this.expireLoginSessions();
@@ -200,6 +221,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
             }
         }
 
+        List<RakNetPlayerSession> activeSessions = new ArrayList<>(this.sessions.size());
         Iterator<RakNetPlayerSession> iterator = this.sessions.values().iterator();
         while (iterator.hasNext()) {
             RakNetPlayerSession nukkitSession = iterator.next();
@@ -214,10 +236,32 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 this.clearProxyProtocolMapping(nukkitSession);
                 iterator.remove();
             } else {
-                nukkitSession.serverTick();
+                activeSessions.add(nukkitSession);
             }
         }
+        this.drainInboundFairly(activeSessions);
         return true;
+    }
+
+    void drainInboundFairly(List<RakNetPlayerSession> activeSessions) {
+        if (activeSessions.isEmpty()) {
+            this.inboundRoundRobinCursor = 0;
+            return;
+        }
+        int size = activeSessions.size();
+        int start = Math.floorMod(this.inboundRoundRobinCursor, size);
+        int remainingPackets = MAX_INBOUND_PACKETS_PER_INTERFACE_TICK;
+        long remainingBytes = MAX_INBOUND_BYTES_PER_INTERFACE_TICK;
+        int visited = 0;
+        while (visited < size && remainingPackets > 0 && remainingBytes > 0L) {
+            RakNetPlayerSession nukkitSession = activeSessions.get((start + visited) % size);
+            RakNetPlayerSession.InboundDrain drained =
+                    nukkitSession.serverTick(remainingPackets, remainingBytes);
+            remainingPackets -= drained.packets();
+            remainingBytes -= drained.bytes();
+            visited++;
+        }
+        this.inboundRoundRobinCursor = (start + (visited < size ? visited : 1)) % size;
     }
 
     public void queueSessionForPlayerCreation(RakNetPlayerSession session) {

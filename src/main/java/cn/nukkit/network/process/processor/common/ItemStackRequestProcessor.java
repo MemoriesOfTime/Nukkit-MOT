@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
@@ -52,8 +53,8 @@ public class ItemStackRequestProcessor extends DataPacketProcessor<ItemStackRequ
     }
 
     @Override
-    public boolean isSupported(int protocol) {
+    public boolean isSupported(GameVersion gameVersion) {
         // Protocols before v419 use the old ItemStackResponse success boolean.
-        return protocol >= ProtocolInfo.v1_16_100;
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_16_100;
     }
 }

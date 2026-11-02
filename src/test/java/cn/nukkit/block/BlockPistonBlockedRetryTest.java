@@ -1,9 +1,11 @@
 package cn.nukkit.block;
 
+import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.utils.serverconfig.ServerConfig;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +25,9 @@ class BlockPistonBlockedRetryTest {
     @Test
     void blockedExtensionDoesNotCommitPoweredStateSoLaterUpdatesCanRetry() {
         Level level = mock(Level.class);
+        Server server = mock(Server.class);
+        when(level.getServer()).thenReturn(server);
+        when(server.getServerConfig()).thenReturn(new ServerConfig());
         BlockEntityPistonArm arm = mock(BlockEntityPistonArm.class);
         arm.state = 0;
         arm.powered = false;

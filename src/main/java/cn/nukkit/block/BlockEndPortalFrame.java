@@ -63,12 +63,17 @@ public class BlockEndPortalFrame extends BlockTransparentMeta implements Faceabl
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
+        // Bedrock parity: the frame is 13/16 tall with or without the eye. Java raises the box to
+        // a full block once the eye is in; Bedrock clients keep standing at 0.8125, so the server
+        // saw every creative player 0.1875 deep inside the block and pushed them back out on each
+        // move. Confirmed against PocketMine-MP EndPortalFrame
+        // (AxisAlignedBB::one()->trim(Facing::UP, 3 / 16), no eye branch).
         return new SimpleAxisAlignedBB(
                 this.x,
                 this.y,
                 this.z,
                 this.x + 1,
-                this.y + ((this.getDamage() & 0x04) > 0 ? 1 : 0.8125),
+                this.y + 0.8125,
                 this.z + 1
         );
     }

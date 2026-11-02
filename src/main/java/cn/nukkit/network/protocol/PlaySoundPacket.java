@@ -21,6 +21,14 @@ public class PlaySoundPacket extends DataPacket {
      * @since v2168 v1_26_40
      */
     public long loopCount;
+    /**
+     * @since v2192 v1_26_50_27
+     */
+    public boolean bypassListenerRangeCheck;
+    /**
+     * @since v2192 v1_26_50_27
+     */
+    public Float playbackPositionSeconds;
 
     @Override
     public byte pid() {
@@ -39,8 +47,13 @@ public class PlaySoundPacket extends DataPacket {
         this.putBlockVector3(this.x << 3, this.y << 3, this.z << 3);
         this.putLFloat(this.volume);
         this.putLFloat(this.pitch);
-        if (protocol >= ProtocolInfo.v1_26_40) {
-            this.putUnsignedVarInt(this.loopCount);
+        if (protocol >= ProtocolInfo.v1_26_50_27) {
+            this.putVarInt((int) this.loopCount);
+            this.putBoolean(this.bypassListenerRangeCheck);
+            this.putOptionalNull(this.serverSoundHandle, this::putLLong);
+            this.putOptionalNull(this.playbackPositionSeconds, this::putLFloat);
+        } else if (protocol >= ProtocolInfo.v1_26_40) {
+            this.putVarInt((int) this.loopCount);
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);
         } else if (protocol >= ProtocolInfo.v1_26_20_26) {
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);

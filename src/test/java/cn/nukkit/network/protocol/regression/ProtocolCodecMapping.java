@@ -3,6 +3,8 @@ package cn.nukkit.network.protocol.regression;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.v1001.Bedrock_v1001;
 import org.cloudburstmc.protocol.bedrock.codec.v2168.Bedrock_v2168;
+import org.cloudburstmc.protocol.bedrock.codec.v2193.Bedrock_v2193;
+import org.cloudburstmc.protocol.bedrock.codec.v2225.Bedrock_v2225;
 import org.cloudburstmc.protocol.bedrock.codec.v291.Bedrock_v291;
 import org.cloudburstmc.protocol.bedrock.codec.v313.Bedrock_v313;
 import org.cloudburstmc.protocol.bedrock.codec.v332.Bedrock_v332;
@@ -128,6 +130,9 @@ public final class ProtocolCodecMapping {
         codecs.put(975, Bedrock_v975.CODEC);   // 1.26.20
         codecs.put(1001, Bedrock_v1001.CODEC); // 1.26.30
         codecs.put(2168, Bedrock_v2168.CODEC); // 1.26.40
+        codecs.put(2192, Bedrock_v2193.CODEC); // 1.26.50.27 preview
+        codecs.put(2193, Bedrock_v2193.CODEC); // 1.26.50 stable, wire-identical to 2192
+        codecs.put(2225, Bedrock_v2225.CODEC); // 1.26.60
         CODECS = Collections.unmodifiableMap(codecs);
     }
 

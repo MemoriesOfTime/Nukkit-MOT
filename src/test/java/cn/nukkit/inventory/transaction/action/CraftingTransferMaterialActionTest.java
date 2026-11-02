@@ -3,6 +3,7 @@ package cn.nukkit.inventory.transaction.action;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.inventory.BaseInventory;
 import cn.nukkit.inventory.transaction.CraftingTransaction;
 import cn.nukkit.item.Item;
 import org.junit.jupiter.api.BeforeAll;
@@ -42,7 +43,7 @@ class CraftingTransferMaterialActionTest {
         Item consumedFromInventory = Item.get(BlockID.LOG);
         TestCraftingTransaction transaction = new TestCraftingTransaction(List.of(
                 new CraftingTransferMaterialAction(source, target, 0),
-                new BalanceAction(consumedFromInventory, Item.get(Item.AIR))
+                new BalanceAction(mockBalanceInventory(), 1, consumedFromInventory)
         ));
 
         assertTrue(transaction.matchesBalance());
@@ -77,10 +78,13 @@ class CraftingTransferMaterialActionTest {
         }
     }
 
-    private static final class BalanceAction extends InventoryAction {
-
-        private BalanceAction(Item sourceItem, Item targetItem) {
-            super(sourceItem, targetItem);
+    /**
+     * Balance action supplying haveItems to cancel needItems. Extends SlotChangeAction to pass the
+     * crafting action whitelist, but keeps isValid trivially true since no real inventory is involved.
+     */
+    private static final class BalanceAction extends SlotChangeAction {
+        private BalanceAction(BaseInventory inventory, int slot, Item sourceItem) {
+            super(inventory, slot, sourceItem, Item.get(Item.AIR));
         }
 
         @Override
@@ -100,6 +104,12 @@ class CraftingTransferMaterialActionTest {
         @Override
         public void onExecuteFail(Player source) {
         }
+    }
+
+    private static BaseInventory mockBalanceInventory() {
+        BaseInventory inventory = Mockito.mock(BaseInventory.class);
+        Mockito.lenient().when(inventory.allowedToAdd(Mockito.any())).thenReturn(true);
+        return inventory;
     }
 
     private static Player mockPlayer() {

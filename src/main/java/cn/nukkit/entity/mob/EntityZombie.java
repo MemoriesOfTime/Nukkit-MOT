@@ -26,7 +26,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -86,19 +86,21 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
         if (this.namedTag.get("Armor") instanceof ListTag) {
             ListTag<CompoundTag> listTag = this.namedTag.getList("Armor", CompoundTag.class);
             Item[] loadedArmor = new Item[4];
-            int count = 0;
+            int index = 0;
+            int discarded = 0;
             for (CompoundTag item : listTag.getAll()) {
-                int slot = item.getByte("Slot");
-                if (slot < 0 || slot > 3) {
-                    this.server.getLogger().error("Failed to load zombie armor: Invalid slot: " + slot);
-                    break;
-                }
-                if (slot < count) {
-                    this.server.getLogger().error("Failed to load zombie armor: Duplicated slot: " + slot);
-                    break;
+                // Older worlds store armor in list order without an explicit Slot tag.
+                int slot = item.contains("Slot") ? item.getByte("Slot") : index;
+                index++;
+                if (slot < 0 || slot >= loadedArmor.length || loadedArmor[slot] != null) {
+                    discarded++;
+                    continue;
                 }
                 loadedArmor[slot] = NBTIO.getItemHelper(item);
-                count++;
+            }
+            if (discarded > 0) {
+                this.server.getLogger().warning("Skipped " + discarded
+                        + " zombie armor entries with invalid or duplicate slots; valid entries retained");
             }
             for (int i = 0; i < 4; i++) {
                 if (loadedArmor[i] == null) {
@@ -128,7 +130,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     public void attackEntity(Entity target) {
         if (this.attackDelay > 23 && target.distanceSquared(this) <= 1) {
             this.attackDelay = 0;
-            HashMap<EntityDamageEvent.DamageModifier, Float> damage = new HashMap<>();
+            EnumMap<EntityDamageEvent.DamageModifier, Float> damage = new EnumMap<>(EntityDamageEvent.DamageModifier.class);
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (target instanceof Player) {

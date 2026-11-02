@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.network.protocol.types.CommandOriginData;
 import lombok.ToString;
 
@@ -29,6 +30,8 @@ public class CommandRequestPacket extends DataPacket {
     public String command;
     public CommandOriginData data;
     public boolean internal;
+    @OnlyNetEase
+    public boolean unlimit;
 
     @Override
     public byte pid() {
@@ -59,12 +62,20 @@ public class CommandRequestPacket extends DataPacket {
 
         this.internal = this.getBoolean();
 
+        if (this.gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_130) {
+            this.unlimit = this.getBoolean();
+        }
+
         if (protocol >= ProtocolInfo.v1_19_60) {
             if (protocol >= ProtocolInfo.v1_21_130_28) {
                 this.getString(); // version
             } else {
                 this.getVarInt(); // version
             }
+        }
+
+        if (this.gameVersion.isNetEase() && protocol < ProtocolInfo.v1_21_130) {
+            this.unlimit = this.getBoolean();
         }
     }
 

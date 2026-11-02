@@ -87,9 +87,17 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
 
         // Recalculate expensive checks periodically, use cached values otherwise
         if (cachedPowerLevel < 0 || cacheCounter >= CACHE_RECALC_INTERVAL) {
-            cacheCounter = 0;
-            cachedPowerLevel = calculatePowerLevel();
-            cachedSkyAccess = hasSkyAccess();
+            int powerLevel = calculatePowerLevel();
+            if (powerLevel >= 0) {
+                cacheCounter = 0;
+                cachedPowerLevel = powerLevel;
+                cachedSkyAccess = hasSkyAccess();
+            } else if (cachedPowerLevel < 0) {
+                // The pyramid reaches a chunk that is not in memory and nothing is known yet:
+                // skip this pulse instead of loading the chunk from disk, try again next pulse.
+                return true;
+            }
+            // Otherwise keep the last known pyramid; the counter stays due, so the next pulse retries.
         }
         cacheCounter++;
 
@@ -186,7 +194,11 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
             for (int queryX = getFloorX() - powerLevel; queryX <= getFloorX() + powerLevel; queryX++) {
                 for (int queryZ = getFloorZ() - powerLevel; queryZ <= getFloorZ() + powerLevel; queryZ++) {
 
-                    int testBlockId = level.getBlockIdAt(queryX, queryY, queryZ);
+                    int testBlockId = this.getBlockIdIfLoaded(queryX, queryY, queryZ);
+                    if (testBlockId == -1) {
+                        // Couldn't calculate due to unloaded chunks
+                        return -1;
+                    }
                     if (
                             testBlockId != Block.IRON_BLOCK &&
                                     testBlockId != Block.GOLD_BLOCK &&

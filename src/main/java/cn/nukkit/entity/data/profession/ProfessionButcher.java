@@ -70,7 +70,7 @@ public class ProfessionButcher extends Profession {
                         .setTier(3)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.DRIED_KELP_BLOCK), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(Item.getBlockItem(Item.DRIED_KELP_BLOCK), Item.get(Item.EMERALD))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(4)

@@ -126,6 +126,7 @@ public class SmithingTransaction extends InventoryTransaction {
         Item equipment = equipmentItem != null? equipmentItem : air;
         Item ingredient = ingredientItem != null? ingredientItem : air;
         Item template = templateItem != null? templateItem : air;
+        Item originalOutput = this.outputItem.clone();
         SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, template, source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
@@ -133,6 +134,13 @@ public class SmithingTransaction extends InventoryTransaction {
             source.setNeedSendInventory(true);
             return true;
         }
+        Item authoritativeOutput = applyEventOutputToActions(originalOutput, event.getResultItem());
+        if (authoritativeOutput == null) {
+            this.sendInventories();
+            source.setNeedSendInventory(true);
+            return true;
+        }
+        this.outputItem = authoritativeOutput;
 
         for (InventoryAction action : this.actions) {
             if (action.execute(this.source)) {

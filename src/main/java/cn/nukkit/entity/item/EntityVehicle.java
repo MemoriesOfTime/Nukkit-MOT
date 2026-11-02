@@ -9,6 +9,10 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.vehicle.VehicleDamageEvent;
 import cn.nukkit.event.vehicle.VehicleDestroyEvent;
+import cn.nukkit.event.vehicle.VehicleMoveEvent;
+import cn.nukkit.event.vehicle.VehicleUpdateEvent;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 
@@ -70,6 +74,36 @@ public abstract class EntityVehicle extends Entity implements EntityRideable, En
         }
 
         return super.entityBaseTick(tickDiff);
+    }
+
+    /** Keeps the pre-update movement snapshot without allocating it for an empty handler list. */
+    final void dispatchVehicleMovementEvents() {
+        double fromX = this.lastX;
+        double fromY = this.lastY;
+        double fromZ = this.lastZ;
+        double fromYaw = this.lastYaw;
+        double fromPitch = this.lastPitch;
+        Level fromLevel = this.level;
+        double toX = this.x;
+        double toY = this.y;
+        double toZ = this.z;
+        double toYaw = this.yaw;
+        double toPitch = this.pitch;
+        Level toLevel = this.level;
+
+        if (VehicleUpdateEvent.getHandlers().getRegisteredListeners().length != 0) {
+            this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
+        }
+
+        // An update listener may move the vehicle or register/unregister a move listener.
+        // Recheck subscriptions after Update, but use the original coordinates and level.
+        if (VehicleMoveEvent.getHandlers().getRegisteredListeners().length != 0) {
+            Location from = new Location(fromX, fromY, fromZ, fromYaw, fromPitch, fromLevel);
+            Location to = new Location(toX, toY, toZ, toYaw, toPitch, toLevel);
+            if (!from.equals(to)) {
+                this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
+            }
+        }
     }
 
     protected boolean rollingDirection = true;

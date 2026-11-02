@@ -61,7 +61,7 @@ public class ProfessionLibrarian extends Profession {
                         .setTier(2)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD), Item.get(Item.LANTERN))
+                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD), Item.getBlockItem(Item.LANTERN))
                         .setMaxUses(16)
                         .setRewardExp((byte) 1)
                         .setTier(2)

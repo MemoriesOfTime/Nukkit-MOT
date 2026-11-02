@@ -148,8 +148,7 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
     @Override
     public double getMaxY() {
-        int height = this.getDamage() & 0x7;
-        return height < 3 ? this.y : height == 7 ? this.y + 1 : this.y + 0.5;
+        return this.y + (this.getDamage() & 0x7) / 8d;
     }
 
     @Override
@@ -193,6 +192,6 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
     @Override
     public boolean canPassThrough() {
-        return (this.getDamage() & 0x7) < 3;
+        return (this.getDamage() & 0x7) == 0;
     }
 }

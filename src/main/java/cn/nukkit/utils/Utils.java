@@ -538,6 +538,9 @@ public class Utils {
             case ProtocolInfo.v1_26_30 -> "1.26.30";
             case ProtocolInfo.v1_26_40 -> "1.26.40";
             case ProtocolInfo.v1_26_45 -> "1.26.45";
+            case ProtocolInfo.v1_26_50_27 -> "1.26.50.27";
+            case ProtocolInfo.v1_26_50 -> "1.26.50";
+            case ProtocolInfo.v1_26_60 -> "1.26.60";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };

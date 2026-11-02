@@ -12,6 +12,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.login.NetworkSessionState;
+import cn.nukkit.network.session.login.SessionLoginContext;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Binary;
@@ -20,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
 import com.nukkitx.natives.util.Natives;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -29,8 +29,8 @@ import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.message.FormattedMessage;
+import org.cloudburstmc.netty.channel.TransportDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
-import org.cloudburstmc.netty.channel.raknet.RakDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
 import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 
@@ -38,12 +38,10 @@ import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Log4j2
@@ -51,18 +49,52 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private static final ThreadLocal<Sha256> HASH_LOCAL = ThreadLocal.withInitial(Natives.SHA_256);
     private static final ThreadLocal<byte[]> CHECKSUM_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
+    // Separate from the received trailer: verification still needs CHECKSUM_LOCAL after hashing.
+    private static final ThreadLocal<byte[]> CHECKSUM_COUNTER_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
+    /** Maximum packet work one player may force onto one server tick. The tail stays queued. */
+    static final int MAX_INBOUND_PACKETS_PER_SERVER_TICK = 120;
+    /** Maximum decoded payload work one player may force onto one server tick. */
+    static final long MAX_INBOUND_BYTES_PER_SERVER_TICK = 6L * 1024L * 1024L;
+    /** One maximum-size legal decoded batch may wait per session. */
+    static final int MAX_QUEUED_INBOUND_PACKETS = 1300;
+    static final long MAX_QUEUED_INBOUND_BYTES = 6L * 1024L * 1024L;
+    static final int INBOUND_LOW_WATER_PACKETS = MAX_QUEUED_INBOUND_PACKETS / 2;
+    static final long INBOUND_LOW_WATER_BYTES = MAX_QUEUED_INBOUND_BYTES / 2;
+    /** 单个 0xfe 帧的硬性线上尺寸上限，超出即关闭会话。 Hard wire cap for one encapsulated frame. */
+    static final int MAX_INBOUND_WIRE_BYTES = 12582912; // 12 MiB
+    /**
+     * Permit short bursts of small movement and interaction batches while bounding sustained
+     * wire traffic. Decode bytes and framed-packet tokens independently limit processing work.
+     */
+    static final double MAX_INGRESS_BATCH_TOKENS = 1200D;
+    static final double INGRESS_BATCH_TOKENS_PER_SECOND = 300D;
+    static final double MAX_INGRESS_COMPRESSED_BYTES = 48D * 1024D * 1024D;
+    static final double INGRESS_COMPRESSED_BYTES_PER_SECOND = 6D * 1024D * 1024D;
+    static final double MAX_INGRESS_DECODE_BYTES = 24D * 1024D * 1024D;
+    static final double INGRESS_DECODE_BYTES_PER_SECOND = 6D * 1024D * 1024D;
+    static final double DECODE_BYTES_RESERVATION = 12D * 1024D * 1024D;
+    static final double MAX_INGRESS_FRAME_TOKENS = 5200D;
+    static final double INGRESS_FRAME_TOKENS_PER_SECOND = 1300D;
+    static final double FRAME_TOKENS_RESERVATION = 2600D;
+    /** How many malformed batches a playing session may send inside the sliding window. */
+    static final int MAX_MALFORMED_BATCHES_WHILE_PLAYING = 32;
+    static final long MALFORMED_BATCH_WINDOW_NANOS = TimeUnit.MINUTES.toNanos(5);
+    static final long DIAGNOSTIC_LOG_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(30);
 
     private final RakNetInterface server;
     private final RakChildChannel channel;
 
     private final Queue<DataPacket> inbound = PlatformDependent.newSpscQueue();
+    private final InboundBatchBacklog inboundBacklog = new InboundBatchBacklog();
+    private final AtomicInteger queuedInboundPackets = new AtomicInteger();
+    private final AtomicLong queuedInboundBytes = new AtomicLong();
     private final Queue<DataPacket> outbound = PlatformDependent.newMpscQueue();
     private final ScheduledFuture<?> tickFuture;
     private final NetworkSessionState state = new NetworkSessionState();
 
     private Player player;
-    private String disconnectReason = null;
-    private RakDisconnectReason transportDisconnectReason = null;
+    private volatile String disconnectReason = null;
+    private TransportDisconnectReason transportDisconnectReason = null;
 
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
@@ -73,6 +105,17 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private Cipher decryptionCipher;
     private final AtomicLong encryptCounter = new AtomicLong();
     private final AtomicLong decryptCounter = new AtomicLong();
+
+    private final ArrayDeque<Long> malformedBatches = new ArrayDeque<>();
+    private long lastMalformedLogNanos;
+    private long lastInboundThrottleLogNanos;
+    private long throttledInboundBatches;
+    private volatile boolean inboundThrottled;
+    private double ingressBatchTokens = MAX_INGRESS_BATCH_TOKENS;
+    private double ingressCompressedBytes = MAX_INGRESS_COMPRESSED_BYTES;
+    private double ingressDecodeBytes = MAX_INGRESS_DECODE_BYTES;
+    private double ingressFrameTokens = MAX_INGRESS_FRAME_TOKENS;
+    private long lastIngressRefillNanos;
 
     public RakNetPlayerSession(RakNetInterface server, RakChildChannel channel) {
         this.server = server;
@@ -89,6 +132,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             this.compressionOut = this.compressionIn;
         }
         long acceptedAt = System.nanoTime();
+        this.lastIngressRefillNanos = acceptedAt;
         this.state.getConnection().setSessionCreatedNanos(acceptedAt);
         this.state.getConnection().setChildChannelAcceptedNanos(acceptedAt);
         this.state.getConnection().setRemoteAddress(String.valueOf(channel.remoteAddress()));
@@ -98,24 +142,34 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         this.state.getSecurity().setCompressionOut(this.compressionOut);
         this.state.getSecurity().setCompressionInitialized(false);
         this.state.getSecurity().setPrefixedCompression(protocolVersion >= 11);
+        // A rejected RakNet handshake may close before channelInactive can be delivered.
+        // Stop the repeating task on terminal close without changing disconnect timing or reasons.
+        this.channel.closeFuture().addListener(future -> this.tickFuture.cancel(false));
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, RakMessage msg) throws Exception {
+        if (this.disconnectReason != null) {
+            return;
+        }
         ByteBuf buffer = msg.content();
         short packetId = buffer.readUnsignedByte();
         if (packetId == 0xfe) {
             int len = buffer.readableBytes();
-            if (len > 12582912) {
-                Server.getInstance().getLogger().error("Received too big packet: " + len);
-                if (this.player != null) {
-                    this.player.close("Too big packet");
-                }
+            if (len > MAX_INBOUND_WIRE_BYTES) {
+                this.rejectOversizedWirePacket(len);
                 return;
             }
 
-            byte[] packetBuffer;
+            long ingressNowNanos = System.nanoTime();
+            boolean wireBudgetReserved = this.reserveWireIngressBudget(len, ingressNowNanos);
+            if (!wireBudgetReserved) {
+                this.rejectWireIngress(len);
+                return;
+            }
+
             boolean ci = this.shouldUsePrefixedCompression();
+            CompressionProvider receivedCompression = this.compressionIn;
 
             if (this.decryptionCipher != null) {
                 try {
@@ -134,7 +188,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     buffer.readerIndex(trailerIndex);
                     buffer.readBytes(checksum);
                 } catch (Exception e) {
-                    this.disconnect("Bad checksum");
+                    this.disconnect("Invalid checksum");
                     log.debug("Unable to verify checksum", e);
                     return;
                 }
@@ -153,30 +207,23 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     this.endLegacyInboundEncryptionGraceWindow();
                 }
                 buffer.resetReaderIndex();
-
-                packetBuffer = new byte[buffer.readableBytes() - 8];
-            } else {
-                packetBuffer = new byte[buffer.readableBytes()];
             }
 
+            // Recovered consumer capacity may free a full retained backlog before admission.
+            this.drainDeferredInbound();
+            if (this.disconnectReason != null) return;
+            int payloadBytes = this.decryptionCipher == null ? buffer.readableBytes() : buffer.readableBytes() - 8;
+            if (!this.inboundBacklog.canOffer(payloadBytes)) {
+                this.rejectInboundBacklog(payloadBytes);
+                return;
+            }
+            byte[] packetBuffer = new byte[payloadBytes];
             buffer.readBytes(packetBuffer);
-
-            if (!this.processInboundBatch(packetBuffer, ci)) {
-                this.disconnect("Sent malformed packet");
-                Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
-                    try {
-                        InetAddress address = this.channel.remoteAddress().getAddress();
-                        this.channel.unsafe().close(this.channel.voidPromise());
-                        if (shouldBlockAddressAfterMalformed(this.state.getLogin().getPhase(), address)) {
-                            this.server.blockAddress(address, 60);
-                        }
-                    } catch (Throwable throwable) {
-                        if (Nukkit.DEBUG > 1) {
-                            log.info("Error while closing channel", throwable);
-                        }
-                    }
-                }, 10);
+            if (!this.inboundBacklog.offer(packetBuffer, ci, receivedCompression)) {
+                // Disconnect may close the backlog while the event loop copies this frame.
+                return;
             }
+            this.drainDeferredInbound();
         } else if (Nukkit.DEBUG > 1) {
             log.info("Unknown EncapsulatedPacket: {}", packetId);
         }
@@ -197,7 +244,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object event) throws Exception {
-        if (event instanceof RakDisconnectReason reason) {
+        if (event instanceof TransportDisconnectReason reason) {
             this.transportDisconnectReason = reason;
         }
         super.userEventTriggered(ctx, event);
@@ -225,6 +272,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             case QUEUE_TOO_LONG -> "transport:queue_too_long";
             case SPLIT_QUEUE_TOO_LONG -> "transport:split_queue_too_long";
             case ORDERING_QUEUE_TOO_LONG -> "transport:ordering_queue_too_long";
+            // 以下三类为共享枚举里 WebRTC 侧新增的值，RakNet 理论不触发，防御性列出
+            // The three below were added to the shared enum for the WebRTC side; RakNet is
+            // not expected to fire them, listed defensively
+            case ABORTED_BY_REMOTE_PEER -> "transport:aborted_by_remote_peer";
+            case CONNECTION_LOST -> "transport:connection_lost";
+            case TRANSPORT_FAILED -> "transport:transport_failed";
         };
     }
 
@@ -235,6 +288,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
 
         this.disconnectReason = reason;
+        this.inboundBacklog.close();
         this.state.getLogin().setDisconnectCauseHint(reason);
         this.state.getLogin().setPhase(SessionLoginPhase.DISCONNECTED);
         if (this.tickFuture != null) {
@@ -312,7 +366,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
 
         try {
-            List<DataPacket> toBatch = new ObjectArrayList<>();
+            this.drainDeferredInbound();
+            List<DataPacket> toBatch = null;
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
                 if (packet instanceof DisconnectPacket) {
@@ -329,18 +384,21 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     }
                     return; // Disconnected
                 } else if (packet instanceof BatchPacket) {
-                    if (!toBatch.isEmpty()) {
+                    if (toBatch != null && !toBatch.isEmpty()) {
                         this.sendPackets(toBatch);
                         toBatch.clear();
                     }
 
                     this.sendPacket(((BatchPacket) packet).payload);
                 } else {
+                    if (toBatch == null) {
+                        toBatch = new ObjectArrayList<>();
+                    }
                     toBatch.add(packet);
                 }
             }
 
-            if (!toBatch.isEmpty()) {
+            if (toBatch != null && !toBatch.isEmpty()) {
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
@@ -348,9 +406,21 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
     }
 
-    public void serverTick() {
+    public InboundDrain serverTick(int packetBudget, long byteBudget) {
         DataPacket packet;
-        while ((packet = this.inbound.poll()) != null) {
+        int handled = 0;
+        long handledBytes = 0L;
+        int allowedPackets = Math.min(MAX_INBOUND_PACKETS_PER_SERVER_TICK, Math.max(packetBudget, 0));
+        long allowedBytes = Math.min(MAX_INBOUND_BYTES_PER_SERVER_TICK, Math.max(byteBudget, 0L));
+        while (handled < allowedPackets
+                && (packet = this.inbound.peek()) != null
+                && handledBytes + packetBytes(packet) <= allowedBytes) {
+            this.inbound.poll();
+            this.queuedInboundPackets.decrementAndGet();
+            int packetBytes = packetBytes(packet);
+            this.queuedInboundBytes.addAndGet(-packetBytes);
+            handled++;
+            handledBytes += packetBytes;
             try {
                 this.player.handleDataPacket(packet);
             } catch (Throwable e) {
@@ -358,9 +428,20 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                         new Object[]{packet.getClass().getSimpleName(), this.player.getName()}, e));
             }
         }
+        if (this.inboundThrottled
+                && this.queuedInboundPackets.get() <= INBOUND_LOW_WATER_PACKETS
+                && this.queuedInboundBytes.get() <= INBOUND_LOW_WATER_BYTES) {
+            this.inboundThrottled = false;
+        }
+        return new InboundDrain(handled, handledBytes);
     }
 
     private void sendPackets(Collection<DataPacket> packets) {
+        if (PacketBatcher.supports(this.compressionOut)) {
+            // Built-in codecs finish reading before returning; sendPacket copies the result into Netty.
+            PacketBatcher.send(packets, batched -> this.sendPackets(batched, true));
+            return;
+        }
         BinaryStream batched = new BinaryStream();
         for (DataPacket packet : packets) {
             if (packet instanceof BatchPacket) {
@@ -381,8 +462,15 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private void sendPackets(BinaryStream batched) {
+        this.sendPackets(batched, false);
+    }
+
+    private void sendPackets(BinaryStream batched, boolean borrowed) {
+        CompressionProvider provider = this.compressionOut;
         try {
-            this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
+            int level = Server.getInstance().networkCompressionLevel;
+            this.sendPacket(borrowed ? PacketBatcher.compressBorrowed(provider, batched, level)
+                    : provider.compress(batched, level));
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }
@@ -403,7 +491,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
 
-        ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
+        ByteBuf finalPayload = Unpooled.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
 
         if (this.encryptionCipher != null) {
@@ -528,7 +616,17 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     public boolean isLoginPhaseTimedOut(long nowNanos, int timeoutMillis) {
-        return isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastActivityNanos(), nowNanos, timeoutMillis);
+        SessionLoginContext login = this.state.getLogin();
+        return isLoginPhaseTimedOut(login.getPhase(), login.getLastActivityNanos(), login.getPhaseStartedNanos(),
+                this.isTransportAlive(), nowNanos, timeoutMillis);
+    }
+
+    /**
+     * Whether RakNet still hears from the client (datagrams within the last five seconds).
+     */
+    private boolean isTransportAlive() {
+        RakSessionCodec codec = channel.rakPipeline().get(RakSessionCodec.class);
+        return codec != null && !codec.isClosed() && !codec.isStale();
     }
 
     @Override
@@ -550,17 +648,19 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private byte[] calculateChecksum(long count, ByteBuf payload) {
         Sha256 hash = HASH_LOCAL.get();
-        ByteBuf counterBuf = ByteBufAllocator.DEFAULT.directBuffer(8);
+        byte[] counter = CHECKSUM_COUNTER_LOCAL.get();
         try {
-            counterBuf.writeLongLE(count);
+            // Bedrock hashes the packet counter as exactly eight little-endian bytes.
+            for (int i = 0; i < Long.BYTES; i++) {
+                counter[i] = (byte) (count >>> (i * Byte.SIZE));
+            }
             ByteBuffer keyBuffer = ByteBuffer.wrap(this.encryptionKey.getEncoded());
-            hash.update(counterBuf.internalNioBuffer(0, 8));
+            hash.update(counter);
             hash.update(payload.internalNioBuffer(payload.readerIndex(), payload.readableBytes()));
             hash.update(keyBuffer);
             byte[] digested = hash.digest();
             return Arrays.copyOf(digested, 8);
         } finally {
-            counterBuf.release();
             hash.reset();
         }
     }
@@ -592,15 +692,22 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         return this.player == null ? String.valueOf(this.channel.remoteAddress()) : this.player.getName();
     }
 
-    private boolean processInboundBatch(byte[] packetBuffer, boolean ci) {
+    private InboundBatchDecodeResult processInboundBatch(byte[] packetBuffer, boolean ci, CompressionProvider receivedCompression) {
         try {
             if (!ci) {
-                if (!this.server.getNetwork().processBatchQuietly(packetBuffer, this.inbound, this.compressionIn, this.channel.config().getProtocolVersion(), this.player)) {
-                    log.warn("[{}] Failed to decode batch packet ({} bytes, non-prefixed, compression={})",
+                List<DataPacket> decoded = new ObjectArrayList<>();
+                Network.BatchProcessResult measured = this.server.getNetwork().processBatchMeasured(
+                        packetBuffer, decoded, receivedCompression,
+                        this.channel.config().getProtocolVersion(), this.player, false);
+                if (!measured.success()) {
+                    this.logMalformedBatch(measured.failure(),
+                            "[{}] Failed to decode batch packet ({} bytes, non-prefixed, compression={})",
                             this.playerLabel(), packetBuffer.length, this.compressionIn);
-                    return false;
+                    return InboundBatchDecodeResult.failed(
+                            measured.decompressedBytes(), measured.framedPackets(), measured.failure());
                 }
-                return true;
+                return InboundBatchDecodeResult.legacy(
+                        receivedCompression, decoded, measured.decompressedBytes(), measured.framedPackets());
             }
 
             InboundBatchDecodeResult result = decodeInboundPrefixedBatch(
@@ -612,10 +719,13 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     this.player
             );
             if (!result.success()) {
-                log.warn("[{}] Failed to decode batch packet ({} bytes, prefixed, raknetProtocol={}, legacyFallback={})",
-                        this.playerLabel(), packetBuffer.length, this.channel.config().getProtocolVersion(),
+                this.logMalformedBatch(result.failure(),
+                        "[{}] Failed to decode batch packet ({} bytes, prefixed, prefix=0x{}, compressionIn={}, raknetProtocol={}, legacyFallback={})",
+                        this.playerLabel(), packetBuffer.length,
+                        packetBuffer.length > 0 ? Integer.toHexString(packetBuffer[0] & 0xFF) : "-",
+                        this.compressionIn, this.channel.config().getProtocolVersion(),
                         this.state.getSecurity().isLegacyInboundGraceWindow());
-                return false;
+                return result;
             }
 
             this.compressionIn = result.compression();
@@ -623,11 +733,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             if (result.prefixed()) {
                 this.endLegacyInboundCompressionGraceWindow();
             }
-            this.inbound.addAll(result.packets());
-            return true;
+            return result;
         } catch (Exception e) {
             log.error("[{}] Unable to process batch packet", this.playerLabel(), e);
-            return false;
+            return InboundBatchDecodeResult.failed(
+                    (int) DECODE_BYTES_RESERVATION, (int) FRAME_TOKENS_RESERVATION, e);
         }
     }
 
@@ -635,16 +745,25 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                                                                boolean allowLegacyFallback, int raknetProtocol, Player player) {
         if (packetBuffer.length == 0) {
             log.debug("Prefixed batch decode failed: empty packet buffer");
-            return InboundBatchDecodeResult.failed();
+            return InboundBatchDecodeResult.failed(0, 0, null);
         }
 
+        int workBytes = 0;
+        int framedPackets = 0;
+        Throwable failure = null;
         CompressionProvider prefixedCompression = tryResolveCompressionByPrefix(packetBuffer[0], raknetProtocol);
         if (prefixedCompression != null && packetBuffer.length > 1) {
             List<DataPacket> prefixedPackets = new ObjectArrayList<>();
             // Skip the 1-byte compression prefix; copy cost is negligible vs decompression
             byte[] prefixedPayload = Arrays.copyOfRange(packetBuffer, 1, packetBuffer.length);
-            if (network.processBatchQuietly(prefixedPayload, prefixedPackets, prefixedCompression, raknetProtocol, player)) {
-                return InboundBatchDecodeResult.prefixed(prefixedCompression, prefixedPackets);
+            Network.BatchProcessResult measured = network.processBatchMeasured(
+                    prefixedPayload, prefixedPackets, prefixedCompression, raknetProtocol, player, false);
+            workBytes += measured.decompressedBytes();
+            framedPackets += measured.framedPackets();
+            failure = measured.failure();
+            if (measured.success()) {
+                return InboundBatchDecodeResult.prefixed(
+                        prefixedCompression, prefixedPackets, workBytes, framedPackets);
             }
             log.debug("Prefixed batch decode failed: processBatch returned false (compression={}, {} bytes, raknetProtocol={})",
                     prefixedCompression, prefixedPayload.length, raknetProtocol);
@@ -657,12 +776,20 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
         if (allowLegacyFallback && legacyCompression != null) {
             List<DataPacket> legacyPackets = new ObjectArrayList<>();
-            if (network.processBatchQuietly(packetBuffer, legacyPackets, legacyCompression, raknetProtocol, player)) {
-                return InboundBatchDecodeResult.legacy(legacyCompression, legacyPackets);
+            Network.BatchProcessResult measured = network.processBatchMeasured(
+                    packetBuffer, legacyPackets, legacyCompression, raknetProtocol, player, false);
+            workBytes += measured.decompressedBytes();
+            framedPackets += measured.framedPackets();
+            if (measured.failure() != null) {
+                failure = measured.failure();
+            }
+            if (measured.success()) {
+                return InboundBatchDecodeResult.legacy(
+                        legacyCompression, legacyPackets, workBytes, framedPackets);
             }
             log.debug("Prefixed batch decode: legacy fallback also failed (compression={})", legacyCompression);
         }
-        return InboundBatchDecodeResult.failed();
+        return InboundBatchDecodeResult.failed(workBytes, framedPackets, failure);
     }
 
     private static CompressionProvider tryResolveCompressionByPrefix(byte prefix, int raknetProtocol) {
@@ -671,6 +798,30 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * Upper bound for a resource pack download that keeps the transport alive.
+     */
+    static final long RESOURCE_PACK_PHASE_MAX_NANOS = TimeUnit.MINUTES.toNanos(10);
+
+    /**
+     * Login phase timeout that does not cut a resource pack download in progress.
+     * <p>
+     * The server queues pack chunks into RakNet much faster than a slow client receives them, and the
+     * client asks for the next pack only after the current one is complete. Measured from the last
+     * request or the last queued chunk, a 6.7 MB pack on a mobile link crossed the login timeout while
+     * the client was still acknowledging data, and the player was dropped in the middle of the download.
+     * PocketMine-MP applies its login timeout only until the login packet and never times out the
+     * download itself. Here the download is allowed while the transport is alive, up to a hard cap.
+     */
+    static boolean isLoginPhaseTimedOut(SessionLoginPhase phase, long lastActivityNanos, long phaseStartedNanos,
+                                        boolean transportAlive, long nowNanos, int timeoutMillis) {
+        if (!isLoginPhaseTimedOut(phase, lastActivityNanos, nowNanos, timeoutMillis)) {
+            return false;
+        }
+        return !(phase == SessionLoginPhase.RESOURCE_PACK && transportAlive
+                && nowNanos - phaseStartedNanos < RESOURCE_PACK_PHASE_MAX_NANOS);
     }
 
     static boolean isLoginPhaseTimedOut(SessionLoginPhase phase, long lastActivityNanos, long nowNanos, int timeoutMillis) {
@@ -691,24 +842,249 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         return nowNanos - childChannelAcceptedNanos >= TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
     }
 
+    /**
+     * 登录后的畸形批次在滑动窗口预算内隔离，超窗则断连；正常流量不清空窗口，登录前保持快速失败。
+     * <p>
+     * Isolate malformed batches after login up to a sliding-window budget; exceeding it disconnects.
+     * Successful traffic does not clear the window. Login stays fail-closed.
+     */
+    boolean keepPlayingSessionAfterMalformedBatch(long nowNanos) {
+        if (this.player == null
+                || this.state.getLogin().getPhase().ordinal() < SessionLoginPhase.LOGGED_IN.ordinal()
+                || this.state.getLogin().getPhase() == SessionLoginPhase.DISCONNECTED) {
+            return false;
+        }
+        long cutoff = nowNanos - MALFORMED_BATCH_WINDOW_NANOS;
+        while (!this.malformedBatches.isEmpty() && this.malformedBatches.peekFirst() <= cutoff) {
+            this.malformedBatches.removeFirst();
+        }
+        this.malformedBatches.addLast(nowNanos);
+        return this.malformedBatches.size() <= MAX_MALFORMED_BATCHES_WHILE_PLAYING;
+    }
+
+    boolean enqueueDecodedBatch(List<DataPacket> packets) {
+        if (packets.isEmpty()) {
+            return true;
+        }
+        long batchBytes = 0L;
+        for (DataPacket packet : packets) {
+            batchBytes += packetBytes(packet);
+        }
+        int queuedPackets = this.queuedInboundPackets.get();
+        long queuedBytes = this.queuedInboundBytes.get();
+        if (queuedPackets + packets.size() > MAX_QUEUED_INBOUND_PACKETS
+                || queuedBytes + batchBytes > MAX_QUEUED_INBOUND_BYTES) {
+            this.inboundThrottled = true;
+            this.logInboundThrottle(queuedPackets, queuedBytes, packets.size(), batchBytes);
+            return false;
+        }
+
+        this.queuedInboundPackets.addAndGet(packets.size());
+        this.queuedInboundBytes.addAndGet(batchBytes);
+        this.inbound.addAll(packets);
+        if (queuedPackets + packets.size() >= MAX_QUEUED_INBOUND_PACKETS
+                || queuedBytes + batchBytes >= MAX_QUEUED_INBOUND_BYTES) {
+            this.inboundThrottled = true;
+        }
+        return true;
+    }
+
+    int queuedInboundPacketCount() {
+        return this.queuedInboundPackets.get();
+    }
+
+    long queuedInboundByteCount() {
+        return this.queuedInboundBytes.get();
+    }
+
+    boolean isInboundThrottled() {
+        return this.inboundThrottled;
+    }
+
+    boolean reserveWireIngressBudget(int wireBytes, long nowNanos) {
+        this.refillIngressBudget(nowNanos);
+        if (this.ingressBatchTokens < 1D
+                || this.ingressCompressedBytes < wireBytes) {
+            return false;
+        }
+        this.ingressBatchTokens -= 1D;
+        this.ingressCompressedBytes -= wireBytes;
+        return true;
+    }
+
+    boolean reserveDecodeIngressBudget(long nowNanos) {
+        this.refillIngressBudget(nowNanos);
+        if (this.ingressDecodeBytes < DECODE_BYTES_RESERVATION
+                || this.ingressFrameTokens < FRAME_TOKENS_RESERVATION) {
+            return false;
+        }
+        this.ingressDecodeBytes -= DECODE_BYTES_RESERVATION;
+        this.ingressFrameTokens -= FRAME_TOKENS_RESERVATION;
+        return true;
+    }
+
+    void settleIngressBudget(int decodedBytes, int framedPackets, long nowNanos) {
+        this.refillIngressBudget(nowNanos);
+        this.ingressDecodeBytes = Math.max(0D, Math.min(MAX_INGRESS_DECODE_BYTES,
+                this.ingressDecodeBytes + DECODE_BYTES_RESERVATION - decodedBytes));
+        this.ingressFrameTokens = Math.max(0D, Math.min(MAX_INGRESS_FRAME_TOKENS,
+                this.ingressFrameTokens + FRAME_TOKENS_RESERVATION - framedPackets));
+    }
+
+    private void refillIngressBudget(long nowNanos) {
+        if (nowNanos <= this.lastIngressRefillNanos) {
+            return;
+        }
+        double elapsedSeconds = (nowNanos - this.lastIngressRefillNanos) / 1_000_000_000D;
+        this.lastIngressRefillNanos = nowNanos;
+        this.ingressBatchTokens = Math.min(MAX_INGRESS_BATCH_TOKENS,
+                this.ingressBatchTokens + elapsedSeconds * INGRESS_BATCH_TOKENS_PER_SECOND);
+        this.ingressCompressedBytes = Math.min(MAX_INGRESS_COMPRESSED_BYTES,
+                this.ingressCompressedBytes + elapsedSeconds * INGRESS_COMPRESSED_BYTES_PER_SECOND);
+        this.ingressDecodeBytes = Math.min(MAX_INGRESS_DECODE_BYTES,
+                this.ingressDecodeBytes + elapsedSeconds * INGRESS_DECODE_BYTES_PER_SECOND);
+        this.ingressFrameTokens = Math.min(MAX_INGRESS_FRAME_TOKENS,
+                this.ingressFrameTokens + elapsedSeconds * INGRESS_FRAME_TOKENS_PER_SECOND);
+    }
+
+    private boolean isPlayingSession() {
+        return this.player != null
+                && this.state.getLogin().getPhase().ordinal() >= SessionLoginPhase.LOGGED_IN.ordinal()
+                && this.state.getLogin().getPhase() != SessionLoginPhase.DISCONNECTED;
+    }
+
+    private void rejectWireIngress(int wireBytes) {
+        log.warn("[{}] Wire ingress budget exhausted (wireBytes={}); closing before decrypt",
+                this.playerLabel(), wireBytes);
+        this.disconnect("Too much inbound data");
+        this.channel.close();
+    }
+
+    private void rejectOversizedWirePacket(int wireBytes) {
+        log.warn("[{}] Closing session: inbound frame of {} bytes exceeds hard limit {}",
+                this.playerLabel(), wireBytes, MAX_INBOUND_WIRE_BYTES);
+        this.disconnect("Too big packet");
+        this.channel.close();
+    }
+
+    private static int packetBytes(DataPacket packet) {
+        return Math.max(packet.getCount(), 1);
+    }
+
+    public record InboundDrain(int packets, long bytes) {
+    }
+
+    /** Called only on the event loop. Never decrypt retained payloads a second time. */
+    void drainDeferredInbound() {
+        while (this.disconnectReason == null) {
+            List<DataPacket> pending = this.inboundBacklog.pendingDecoded();
+            if (pending != null) {
+                if (!this.enqueueDecodedBatch(pending)) return;
+                this.inboundBacklog.clearDecoded();
+            }
+            if (this.inboundThrottled || this.inboundBacklog.isEmpty()) return;
+            long nowNanos = System.nanoTime();
+            if (!this.reserveDecodeIngressBudget(nowNanos)) return;
+            InboundBatchBacklog.EncodedBatch batch = this.inboundBacklog.poll();
+            if (batch == null) return;
+            InboundBatchDecodeResult decoded = this.processInboundBatch(batch.payload(), batch.prefixed(), batch.compression());
+            this.settleIngressBudget(decoded.workBytes(), decoded.framedPackets(), nowNanos);
+            if (decoded.success()) {
+                if (!this.enqueueDecodedBatch(decoded.packets())) {
+                    // At most one legal batch: 1300 packets / 6 MiB. Later batches stay encoded.
+                    this.inboundBacklog.holdDecoded(decoded.packets());
+                    return;
+                }
+            } else {
+                this.handleMalformedInboundBatch(nowNanos);
+            }
+        }
+    }
+
+    private void handleMalformedInboundBatch(long nowNanos) {
+        if (this.isPlayingSession()) {
+            if (!this.keepPlayingSessionAfterMalformedBatch(nowNanos)) {
+                this.disconnect("Sent malformed packet");
+            }
+            return;
+        }
+
+        InetAddress malformedAddress = this.channel.remoteAddress().getAddress();
+        boolean blockMalformedAddress = shouldBlockAddressAfterMalformed(
+                this.state.getLogin().getPhase(), malformedAddress);
+        this.disconnect("Sent malformed packet");
+        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+            try {
+                this.channel.close();
+                if (blockMalformedAddress) {
+                    this.server.blockAddress(malformedAddress, 60);
+                }
+            } catch (Throwable throwable) {
+                if (Nukkit.DEBUG > 1) {
+                    log.info("Error while closing channel", throwable);
+                }
+            }
+        }, 10);
+    }
+
+    private void rejectInboundBacklog(int payloadBytes) {
+        log.warn("[{}] Reliable inbound backlog exhausted (payloadBytes={}, batches={}, bytes={}); closing session",
+                this.playerLabel(), payloadBytes, this.inboundBacklog.batchCount(), this.inboundBacklog.byteCount());
+        this.disconnect("Reliable inbound backlog exhausted");
+        this.channel.close();
+    }
+
+    private void logInboundThrottle(int queuedPackets, long queuedBytes, int batchPackets, long batchBytes) {
+        this.throttledInboundBatches++;
+        long nowNanos = System.nanoTime();
+        if (this.lastInboundThrottleLogNanos != 0L
+                && nowNanos - this.lastInboundThrottleLogNanos < DIAGNOSTIC_LOG_INTERVAL_NANOS) {
+            return;
+        }
+        this.lastInboundThrottleLogNanos = nowNanos;
+        log.warn("[{}] Inbound backpressure deferred decoded batch (queuedPackets={}, queuedBytes={}, batchPackets={}, batchBytes={}, deferredAttempts={})",
+                this.playerLabel(), queuedPackets, queuedBytes, batchPackets, batchBytes,
+                this.throttledInboundBatches);
+    }
+
+    private void logMalformedBatch(Throwable failure, String message, Object... arguments) {
+        long nowNanos = System.nanoTime();
+        if (this.lastMalformedLogNanos != 0L
+                && nowNanos - this.lastMalformedLogNanos < DIAGNOSTIC_LOG_INTERVAL_NANOS) {
+            return;
+        }
+        this.lastMalformedLogNanos = nowNanos;
+        Object[] withCause = Arrays.copyOf(arguments, arguments.length + 1);
+        withCause[arguments.length] = failure == null ? "unknown" : failure.toString();
+        log.warn(message + ", cause={}", withCause);
+    }
+
     static boolean shouldBlockAddressAfterMalformed(SessionLoginPhase phase, InetAddress address) {
         return address != null
                 && !address.isSiteLocalAddress()
-                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal();
+                && phase.ordinal() >= SessionLoginPhase.LOGIN_RECEIVED.ordinal()
+                && phase.ordinal() < SessionLoginPhase.LOGGED_IN.ordinal();
     }
 
-    record InboundBatchDecodeResult(boolean success, CompressionProvider compression, boolean prefixed, List<DataPacket> packets) {
+    record InboundBatchDecodeResult(boolean success, CompressionProvider compression, boolean prefixed,
+                                    List<DataPacket> packets, int workBytes, int framedPackets,
+                                    Throwable failure) {
 
-        static InboundBatchDecodeResult failed() {
-            return new InboundBatchDecodeResult(false, null, false, List.of());
+        static InboundBatchDecodeResult failed(int workBytes, int framedPackets, Throwable failure) {
+            return new InboundBatchDecodeResult(
+                    false, null, false, List.of(), workBytes, framedPackets, failure);
         }
 
-        static InboundBatchDecodeResult prefixed(CompressionProvider compression, List<DataPacket> packets) {
-            return new InboundBatchDecodeResult(true, compression, true, packets);
+        static InboundBatchDecodeResult prefixed(CompressionProvider compression, List<DataPacket> packets,
+                                                 int workBytes, int framedPackets) {
+            return new InboundBatchDecodeResult(
+                    true, compression, true, packets, workBytes, framedPackets, null);
         }
 
-        static InboundBatchDecodeResult legacy(CompressionProvider compression, List<DataPacket> packets) {
-            return new InboundBatchDecodeResult(true, compression, false, packets);
+        static InboundBatchDecodeResult legacy(CompressionProvider compression, List<DataPacket> packets,
+                                               int workBytes, int framedPackets) {
+            return new InboundBatchDecodeResult(
+                    true, compression, false, packets, workBytes, framedPackets, null);
         }
     }
 

@@ -1,30 +1,27 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
-import cn.nukkit.event.player.PlayerKickEvent;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.process.UsingItemReceive;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
-@Log4j2
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacket> {
 
     public static final MobEquipmentProcessor INSTANCE = new MobEquipmentProcessor();
-
-    private static final int MAX_FAILED = 5;
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull MobEquipmentPacket pk) {
@@ -38,11 +35,7 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
 
         if (inv == null) {
             player.getServer().getLogger().debug(player.getName() + " has no open container with window ID " + pk.windowId);
-            playerHandle.setFailedMobEquipmentPacket(playerHandle.getFailedMobEquipmentPacket() + 1);
-            if (playerHandle.getFailedMobEquipmentPacket() > MAX_FAILED) {
-                log.warn("{} Too many failed MobEquipmentPacket", player.getName());
-                player.kick(PlayerKickEvent.Reason.INVALID_PACKET, "Too many failed packets", true, "type=MobEquipmentPacket");
-            }
+            // A reply can arrive after its window closed. It cannot change an inventory.
             return;
         }
 
@@ -59,10 +52,15 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
         }
 
         if (inv instanceof PlayerInventory) {
-            ((PlayerInventory) inv).equipItem(pk.hotbarSlot);
+            PlayerInventory playerInventory = (PlayerInventory) inv;
+            int previousHeldIndex = playerInventory.getHeldItemIndex();
+            playerInventory.equipItem(pk.hotbarSlot);
+            if (UsingItemReceive.shouldClearUsingOnMobEquipment(player.isJavaClient(), player.isUsingItem(), previousHeldIndex, pk.hotbarSlot)) {
+                player.setUsingItem(false);
+            }
+        } else {
+            player.setUsingItem(false);
         }
-
-        player.setUsingItem(false);
     }
 
     @Override
@@ -76,7 +74,7 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_1_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_1_0;
     }
 }

@@ -201,6 +201,9 @@ public class PlayerInventory extends BaseInventory {
         if (index >= this.getSize()) {
             this.sendArmorSlot(index, this.getViewers());
             this.sendArmorSlot(index, this.getHolder().getViewers().values());
+            if (holder instanceof Player player) {
+                player.sendKnockBackResistanceAttribute();
+            }
         } else {
             super.onSlotChange(index, before, send);
         }
@@ -305,9 +308,13 @@ public class PlayerInventory extends BaseInventory {
             ensureUniqueBundleId(index, bundle);
         }
 
+        Item[] parts = splitOverstack(item);
+        item = parts[0];
+
         Item old = this.getItem(index);
         this.slots.put(index, item.clone());
         this.onSlotChange(index, old, send);
+        this.routeOverflow(parts[1]);
         return true;
     }
 

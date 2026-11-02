@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.level.Level;
 import cn.nukkit.utils.BlockColor;
 
 public class BlockStairsCopperCutOxidized extends BlockStairsCopperCut {
@@ -24,7 +25,9 @@ public class BlockStairsCopperCutOxidized extends BlockStairsCopperCut {
 
     @Override
     public int onUpdate(int type) {
-        return 0;
+        // 已完全氧化，但非 RANDOM 更新仍需走父类维护 corner 位
+        // Fully oxidized, but non-RANDOM updates must still reach the parent to maintain corner bits
+        return type == Level.BLOCK_UPDATE_RANDOM ? 0 : super.onUpdate(type);
     }
 
     @Override

@@ -3,7 +3,9 @@ package cn.nukkit.inventory.request;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
+import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBucket;
 import cn.nukkit.network.protocol.DataPacket;
@@ -42,6 +44,7 @@ class CakeCraftingReproTest {
     static CraftingManager manager;
     static int cakeNetworkId;
     static int breadNetworkId;
+    static PluginManager pluginManager;
 
     @BeforeAll
     static void init() {
@@ -67,7 +70,7 @@ class CakeCraftingReproTest {
         ui = new PlayerUIInventory(player);
         inventory = new PlayerInventory(player);
         cn.nukkit.inventory.PlayerOffhandInventory offhand = new cn.nukkit.inventory.PlayerOffhandInventory(player);
-        PluginManager pluginManager = Mockito.mock(PluginManager.class);
+        pluginManager = Mockito.mock(PluginManager.class);
         Mockito.when(player.getUIInventory()).thenReturn(ui);
         Mockito.when(player.getInventory()).thenReturn(inventory);
         Mockito.when(player.getCursorInventory()).thenReturn(ui.getCursorInventory());
@@ -238,6 +241,88 @@ class CakeCraftingReproTest {
 
         assertOk();
         assertEquals(Item.BREAD, inventory.getItem(0).getId(), "bread should reach hotbar 0");
+    }
+
+    @Test
+    void eventAuthoredNbtReachesDeliveredSingleAndMultiOutputCrafts() {
+        authorCraftOutput("example:craft");
+        ui.getBigCraftingGrid().setItem(0, Item.get(Item.WHEAT, 0, 1), false);
+        ui.getBigCraftingGrid().setItem(1, Item.get(Item.WHEAT, 0, 1), false);
+        ui.getBigCraftingGrid().setItem(2, Item.get(Item.WHEAT, 0, 1), false);
+        ItemStackRequest bread = new ItemStackRequest(1, join(
+                new CraftRecipeAction(breadNetworkId, 1),
+                new ConsumeAction(1, gridSlot(0)),
+                new ConsumeAction(1, gridSlot(1)),
+                new ConsumeAction(1, gridSlot(2)),
+                placeCreatedToHotbar(0, 1)
+        ), new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(bread));
+        assertOk();
+        assertEquals("example:craft", inventory.getItem(0).getNamedTag().getString("example:origin"));
+
+        Mockito.clearInvocations(player);
+        fillGrid();
+        ItemStackRequest cake = new ItemStackRequest(2, join(
+                craftAction(), consumeAll(), createAction(0), placeCreatedToHotbar(1, 1)
+        ), new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(cake));
+        assertOk();
+        assertEquals("example:craft", inventory.getItem(1).getNamedTag().getString("example:origin"));
+    }
+
+    @Test
+    void eventAuthoredNbtReachesDeliveredDynamicMultiRecipeOutput() {
+        Mockito.doAnswer(invocation -> {
+            Object called = invocation.getArgument(0);
+            if (called instanceof CraftItemEvent event) {
+                Item output = event.getTransaction().getPrimaryOutput().clone();
+                output.setNamedTag(output.getOrCreateNamedTag()
+                        .putString("example:origin", "example:original").putString("example:audit", "event"));
+                event.getTransaction().setPrimaryOutput(output);
+            }
+            return null;
+        }).when(pluginManager).callEvent(Mockito.any());
+        RepairItemRecipe repair = manager.getMultiRecipes().values().stream()
+                .filter(RepairItemRecipe.class::isInstance)
+                .map(RepairItemRecipe.class::cast)
+                .findFirst()
+                .orElseThrow();
+        Item clean = Item.get(Item.DIAMOND_PICKAXE, 1000, 1);
+        Item tagged = Item.get(Item.DIAMOND_PICKAXE, 1000, 1);
+        tagged.setNamedTag(tagged.getOrCreateNamedTag().putString("example:origin", "example:original"));
+        ui.getBigCraftingGrid().setItem(0, clean, false);
+        ui.getBigCraftingGrid().setItem(1, tagged, false);
+        Item repaired = Item.get(Item.DIAMOND_PICKAXE,
+                repair.calculateDamage(1000, 1000, clean.getMaxDurability()), 1);
+        ItemStackRequest request = new ItemStackRequest(3, join(
+                new CraftRecipeAction(repair.getNetworkId(), 1),
+                new CraftResultsDeprecatedAction(new Item[]{repaired}, 1),
+                new ConsumeAction(1, gridSlot(0)),
+                new ConsumeAction(1, gridSlot(1)),
+                createAction(0),
+                placeCreatedToHotbar(2, 1)
+        ), new String[0]);
+
+        ItemStackRequestHandler.handleRequests(player, List.of(request));
+
+        assertOk();
+        assertEquals("example:original", inventory.getItem(2).getNamedTag().getString("example:origin"));
+        assertEquals("event", inventory.getItem(2).getNamedTag().getString("example:audit"));
+    }
+
+    private static void authorCraftOutput(String origin) {
+        Mockito.doAnswer(invocation -> {
+            Object called = invocation.getArgument(0);
+            if (called instanceof CraftItemEvent event) {
+                Item output = event.getTransaction().getPrimaryOutput().clone();
+                assertNotNull(output, "CraftItemEvent must never expose a null output");
+                output.setNamedTag(output.getOrCreateNamedTag().putString("example:origin", origin));
+                event.getTransaction().setPrimaryOutput(output);
+            }
+            return null;
+        }).when(pluginManager).callEvent(Mockito.any());
     }
 
     // H: 同一输出重复 Create

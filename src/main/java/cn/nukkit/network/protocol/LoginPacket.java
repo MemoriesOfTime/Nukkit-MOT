@@ -248,6 +248,10 @@ public class LoginPacket extends DataPacket {
                 skin.setCapeOnClassic(skinToken.get("CapeOnClassicSkin").getAsBoolean());
             }
 
+            if (skinToken.has("ProfileHash")) {
+                skin.setProfileHash(skinToken.get("ProfileHash").getAsString());
+            }
+
             if (skinToken.has("SkinResourcePatch")) {
                 skin.setSkinResourcePatch(new String(Base64.getDecoder().decode(skinToken.get("SkinResourcePatch").getAsString()), StandardCharsets.UTF_8));
             }

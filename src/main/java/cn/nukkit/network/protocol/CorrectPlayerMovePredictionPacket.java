@@ -88,7 +88,7 @@ public class CorrectPlayerMovePredictionPacket extends DataPacket {
             if (this.predictionType == PredictionType.VEHICLE || this.protocol >= ProtocolInfo.v1_21_100) {
                 this.putVector2f(this.vehicleRotation != null ? this.vehicleRotation : new Vector2f(0, 0));
                 if (this.protocol >= ProtocolInfo.v1_21_20) {
-                    this.putOptionalNull(this.vehicleAngularVelocity, this::putFloat);
+                    this.putOptionalNull(this.vehicleAngularVelocity, this::putLFloat);
                 }
             }
         }

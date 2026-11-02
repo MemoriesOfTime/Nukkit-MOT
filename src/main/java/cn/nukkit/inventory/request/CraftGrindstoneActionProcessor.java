@@ -64,6 +64,11 @@ public class CraftGrindstoneActionProcessor implements ItemStackRequestActionPro
         if (event.isCancelled()) {
             return context.error();
         }
+        Item eventOutput = event.getNewItem();
+        if (eventOutput == null || eventOutput.isNull()) {
+            return context.error();
+        }
+        result = eventOutput.clone();
 
         int experienceDropped = event.getExperienceDropped();
         if (experienceDropped > 0) {
