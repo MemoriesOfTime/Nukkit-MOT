@@ -562,7 +562,14 @@ public class BinaryStream {
     }
 
     private static String intToSkinColor(int argb) {
-        return String.format("#%08X", argb);
+        char[] color = new char[9];
+        color[0] = '#';
+        for (int index = 8; index > 0; index--) {
+            int digit = argb & 0xf;
+            color[index] = (char) (digit < 10 ? '0' + digit : 'A' + digit - 10);
+            argb >>>= 4;
+        }
+        return new String(color);
     }
 
     public SerializedImage getImage() {
