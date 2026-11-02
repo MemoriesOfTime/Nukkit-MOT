@@ -311,6 +311,11 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     private void sendPackets(Collection<DataPacket> packets) {
+        if (PacketBatcher.supports(this.compressionOut)) {
+            // Built-in codecs finish reading before returning; sendPacket copies the result into Netty.
+            PacketBatcher.send(packets, batched -> this.sendPackets(batched, true));
+            return;
+        }
         BinaryStream batched = new BinaryStream();
         for (DataPacket packet : packets) {
             if (packet instanceof BatchPacket) {
@@ -331,8 +336,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     private void sendPackets(BinaryStream batched) {
+        this.sendPackets(batched, false);
+    }
+
+    private void sendPackets(BinaryStream batched, boolean borrowed) {
+        CompressionProvider provider = this.compressionOut;
         try {
-            this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
+            int level = Server.getInstance().networkCompressionLevel;
+            this.sendPacket(borrowed ? PacketBatcher.compressBorrowed(provider, batched, level)
+                    : provider.compress(batched, level));
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }
