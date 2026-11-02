@@ -103,6 +103,17 @@ public class BaseLang {
         return this.translateString(str, new String[0], null);
     }
 
+    /**
+     * 已废弃：恰好三个 String 实参的调用会优先绑定本方法（第二参成为唯一参数、第三参成为 onlyPrefix），
+     * 而非 (key, 参数1, 参数2) 的变参意图；前缀不匹配时会原样回显键名。
+     * <p>
+     * Deprecated: a call with exactly three String arguments resolves here (arg2 becomes
+     * the single param, arg3 the onlyPrefix) instead of the intended two-parameter varargs
+     * form, echoing the raw key on a prefix mismatch. Multi-parameter lookups should pass
+     * an explicit array, e.g. {@code translateString(key, new String[]{p1, p2})}, or use
+     * {@link #translateString(String, String[], String)} when a prefix filter is intended.
+     */
+    @Deprecated
     public String translateString(String str, String param, String onlyPrefix) {
         return this.translateString(str, new String[]{param}, onlyPrefix);
     }

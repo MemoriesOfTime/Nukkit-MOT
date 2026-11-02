@@ -28,6 +28,7 @@ import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -74,6 +75,10 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
     // Serialization byte budget per response packet; larger responses split into multiple
     // packets (entries are self-describing, partial answers are legal)
     private static final int MAX_RESPONSE_PACKET_BYTES = 2 * 1024 * 1024;
+
+    // 14-bit offset index (packet cap 8192); the high bits carry the distance
+    private static final int OFFSET_INDEX_BITS = 14;
+    private static final int OFFSET_INDEX_MASK = (1 << OFFSET_INDEX_BITS) - 1;
 
     // 测试注入同步执行器；生产路径恒为 null（走 level.getAsyncChuckExecutor()）
     // / Test seam for a synchronous executor; always null in production (level.getAsyncChuckExecutor())
@@ -142,7 +147,13 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 (pk, budget) -> submitSubChunkRequest(playerHandle, pk, budget),
                 state.remainingInFlightOffsets(),
                 () -> !state.responseBytesExceeded(tick)
-                        && state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) > 0);
+                        && state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) > 0,
+                // serve the request nearest the player first
+                pk -> {
+                    long dx = pk.subChunkPosition.x - player.getChunkX();
+                    long dz = pk.subChunkPosition.z - player.getChunkZ();
+                    return dx * dx + dz * dz;
+                });
     }
 
     /**
@@ -165,6 +176,47 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
     }
 
     /**
+     * 按到玩家的距离重排 offset，同距保持原序。
+     * <p>
+     * Reorders offsets by distance to the player; equal distances keep their order.
+     */
+    private static List<BlockVector3> nearestFirst(List<BlockVector3> offsets, BlockVector3 center, Player player) {
+        int n = offsets.size();
+        if (n <= 1) {
+            return offsets;
+        }
+        int playerX = player.getChunkX();
+        int playerZ = player.getChunkZ();
+        long[] order = new long[n];
+        for (int i = 0; i < n; i++) {
+            BlockVector3 offset = offsets.get(i);
+            int dx = center.x + offset.x - playerX;
+            int dz = center.z + offset.z - playerZ;
+            // distance high, index low: one sort, nearest-first with stable ties
+            order[i] = (((long) dx * dx + (long) dz * dz) << OFFSET_INDEX_BITS) | i;
+        }
+        Arrays.sort(order);
+        List<BlockVector3> sorted = new ArrayList<>(n);
+        for (long key : order) {
+            sorted.add(offsets.get((int) (key & OFFSET_INDEX_MASK)));
+        }
+        return sorted;
+    }
+
+    private static void accountSubmittedOffsets(PlayerSubChunkRequestState state, SubChunkRequestPacket pk,
+                                                List<BlockVector3> offsets, int count) {
+        for (int i = 0; i < count; i++) {
+            BlockVector3 offset = offsets.get(i);
+            state.addOutstandingOffsets(
+                    Level.chunkHash(pk.subChunkPosition.x + offset.x, pk.subChunkPosition.z + offset.z), 1);
+        }
+    }
+
+    private static long columnHashOf(SubChunkRequestPacket request, BlockVector3 offset) {
+        return Level.chunkHash(request.subChunkPosition.x + offset.x, request.subChunkPosition.z + offset.z);
+    }
+
+    /**
      * 提交至多 {@code maxOffsets} 个 offset 的异步序列化：主线程快照（section 引用/方块
      * 实体列表/高度图克隆），worker 构建条目并回传完成队列；未提交的剩余 offset 重排队尾。
      * 提交批次保守钳制到剩余条目预算，保证执行器不可用时同步序列化也有工作量上限。
@@ -183,7 +235,7 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         PlayerSubChunkRequestState state = playerHandle.getSubChunkRequestState();
         boolean cacheMode = player.isClientBlobCacheActive();
         Level level = player.getLevel();
-        List<BlockVector3> offsets = subChunkRequestOffsets(pk);
+        List<BlockVector3> offsets = nearestFirst(subChunkRequestOffsets(pk), pk.subChunkPosition, player);
         int limit = Math.min(maxOffsets, offsets.size());
 
         if (level == null || pk.dimension != level.getDimension()) {
@@ -205,7 +257,19 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             return 0;
         }
 
-        SubChunkTask task = buildSubChunkTask(playerHandle, state, pk, offsets, granted, cacheMode, level);
+        int requestEpoch = state.epoch();
+        SubChunkTask task;
+        try {
+            task = buildSubChunkTask(playerHandle, state, pk, offsets, granted, cacheMode, level);
+        } catch (RuntimeException | Error failure) {
+            if (state.epoch() == requestEpoch) {
+                state.releaseInFlightOffsets(granted);
+                state.tryDefer(pk);
+            }
+            throw failure;
+        }
+        // account only after a successful snapshot
+        accountSubmittedOffsets(state, pk, offsets, granted);
         ExecutorService executor = executorOverride != null ? executorOverride : level.getAsyncChuckExecutor();
         if (executor == null) {
             // async-chunks=false：该 level 无异步执行器，同步兜底（与执行器关停同路径）
@@ -265,30 +329,32 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                     ? chunks.containsKey(chunkHash) : player.usedChunks.containsKey(chunkHash);
             BaseFullChunk chunk = inView
                     ? level.getChunkIfLoaded(chunkX, chunkZ) : null;
-            if (!(chunk instanceof BaseChunk)) {
+            if (!(chunk instanceof BaseChunk baseChunk)) {
                 data[i] = SubChunkOffsetData.cheap(offset, subIndex, SubChunkRequestResult.CHUNK_NOT_FOUND);
                 continue;
             }
             short[] heights = chunk.getHeightMapArray().clone();
-            ChunkSection[] sections = ((BaseChunk) chunk).getSections();
-            if (subIndex >= sections.length || sections[subIndex] == null || sections[subIndex].isEmpty()) {
+            ChunkSection[] sections = baseChunk.getSections();
+            // sections[worldSectionY + getSectionOffset()] — resolve through the chunk's own offset
+            int worldSectionY = subIndex + minSectionY;
+            int storageIndex = worldSectionY + baseChunk.getSectionOffset();
+            if (storageIndex < 0 || storageIndex >= sections.length
+                    || sections[storageIndex] == null || sections[storageIndex].isEmpty()) {
                 data[i] = SubChunkOffsetData.allAir(offset, subIndex, heights);
                 continue;
             }
-            data[i] = SubChunkOffsetData.serialize(offset, subIndex, sections[subIndex], heights,
-                    chunk.getBlockEntitiesOfSection(subIndex + minSectionY));
+            data[i] = SubChunkOffsetData.serialize(offset, subIndex, sections[storageIndex], heights,
+                    chunk.getBlockEntitiesOfSection(worldSectionY));
         }
         return new SubChunkTask(state, state.epoch(), pk, cacheMode, gameVersion, antiXray, minSectionY,
                 player.getName() + "(" + player.getId() + ")", data);
     }
 
     /**
-     * worker 入口：构建完成应答并入队回主线程；任何异常都收敛为空条目应答（额度照常归还，
-     * 不楔死该玩家的管线）。
+     * worker 入口：构建应答并入队；循环外失败收敛为空条目应答。
      * <p>
-     * Worker entry: builds the completion and queues it back to the main thread; any
-     * failure collapses into an empty-entry answer (the credit is still released, so the
-     * player's pipeline cannot wedge).
+     * Worker entry: builds and queues the answer; failures outside the loop collapse
+     * into an empty answer.
      */
     private static void runSerializationTask(SubChunkTask task) {
         task.state.offerCompletion(buildAnswerSafely(task));
@@ -298,7 +364,10 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         try {
             return buildAnswer(task);
         } catch (Throwable t) {
-            Server.getInstance().getLogger().error("Sub-chunk serialization failed for " + task.playerName, t);
+            Server server = Server.getInstance();
+            if (server != null) {
+                server.getLogger().error("Sub-chunk serialization failed for " + task.playerName, t);
+            }
             return new PlayerSubChunkRequestState.CompletedSubChunkAnswer(task.epoch, task.request,
                     task.cacheMode, new ArrayList<>(), null, null, null, task.offsets.length);
         }
@@ -326,25 +395,30 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 SubChunkOffsetData od = task.offsets[i];
                 SubChunkPacket.SubChunkData entry = new SubChunkPacket.SubChunkData();
                 entry.offset = od.offset;
-                if (od.preset != null) {
-                    entry.result = od.preset;
-                    if (od.preset == SubChunkRequestResult.SUCCESS_ALL_AIR) {
+                try {
+                    if (od.preset != null) {
+                        entry.result = od.preset;
+                        if (od.preset == SubChunkRequestResult.SUCCESS_ALL_AIR) {
+                            computeHeightMap(entry, od.heights, od.subIndex, task.minSectionY);
+                        }
+                    } else {
+                        stream.reset();
+                        od.section.writeTo(task.gameVersion, stream, task.antiXray);
+                        byte[] sectionBytes = task.cacheMode ? stream.getBuffer() : null;
+                        byte[] entityBytes = NetworkChunkSerializer.serializeBlockEntities(od.blockEntities, task.gameVersion.getProtocol());
                         computeHeightMap(entry, od.heights, od.subIndex, task.minSectionY);
+                        entry.result = SubChunkRequestResult.SUCCESS;
+                        stream.put(entityBytes);
+                        entry.data = stream.getBuffer();
+                        if (task.cacheMode) {
+                            hashes[i] = XXHash64.hash(sectionBytes);
+                            sections[i] = sectionBytes;
+                            entities[i] = entityBytes;
+                        }
                     }
-                } else {
-                    stream.reset();
-                    od.section.writeTo(task.gameVersion, stream, task.antiXray);
-                    byte[] sectionBytes = task.cacheMode ? stream.getBuffer() : null;
-                    byte[] entityBytes = NetworkChunkSerializer.serializeBlockEntities(od.blockEntities, task.gameVersion.getProtocol());
-                    computeHeightMap(entry, od.heights, od.subIndex, task.minSectionY);
-                    entry.result = SubChunkRequestResult.SUCCESS;
-                    stream.put(entityBytes);
-                    entry.data = stream.getBuffer();
-                    if (task.cacheMode) {
-                        hashes[i] = XXHash64.hash(sectionBytes);
-                        sections[i] = sectionBytes;
-                        entities[i] = entityBytes;
-                    }
+                } catch (Throwable t) {
+                    // degrade only this entry, keep the rest of the batch
+                    degradeEntry(entry, hashes, sections, entities, i, task, t);
                 }
                 entries.add(entry);
             }
@@ -353,6 +427,33 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         }
         return new PlayerSubChunkRequestState.CompletedSubChunkAnswer(task.epoch, task.request,
                 task.cacheMode, entries, hashes, sections, entities, n);
+    }
+
+    /**
+     * 把失败条目降级为 CHUNK_NOT_FOUND 并清掉写了一半的缓存材料。
+     * <p>
+     * Degrades a failed entry to CHUNK_NOT_FOUND and clears half-written cache material.
+     */
+    private static void degradeEntry(SubChunkPacket.SubChunkData entry, long[] hashes, byte[][] sections,
+                                     byte[][] entities, int index, SubChunkTask task, Throwable failure) {
+        entry.result = SubChunkRequestResult.CHUNK_NOT_FOUND;
+        entry.data = null;
+        entry.heightMapType = SubChunkPacket.HeightMapDataType.NO_DATA;
+        entry.heightMapData = null;
+        entry.renderHeightMapType = SubChunkPacket.HeightMapDataType.NO_DATA;
+        entry.renderHeightMapData = null;
+        entry.hasBlobId = false;
+        entry.blobId = 0;
+        if (hashes != null) {
+            hashes[index] = 0;
+            sections[index] = null;
+            entities[index] = null;
+        }
+        Server server = Server.getInstance();
+        if (server != null) {
+            server.getLogger().error("Sub-chunk serialization failed for " + task.playerName
+                    + " at " + entry.offset, failure);
+        }
     }
 
     /**
@@ -430,6 +531,8 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 }
             }
             state.accountResponseBytes(tick, buffer.add(entry));
+            // only shipped entries count as delivered
+            state.completeOutstandingOffsets(columnHashOf(answer.request, entry.offset), 1);
         }
         buffer.flush();
         state.accountSpentEntries(tick, spent);

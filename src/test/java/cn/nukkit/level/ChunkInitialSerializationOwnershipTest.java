@@ -399,10 +399,9 @@ class ChunkInitialSerializationOwnershipTest {
             doAnswer(call -> { work.add(call.getArgument(0)); return null; })
                     .when(executor).execute(any(Runnable.class));
             set(level, Level.class, "asyncChuckExecutor", executor);
-            for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests"})
+            for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests", "chunkRequestEpochs"})
                 set(level, Level.class, name, new Object2ObjectOpenHashMap<>());
             set(level, Level.class, "chunkSendTaskStartTick", new Long2LongOpenHashMap());
-            set(level, Level.class, "chunkSendGeneration", new Long2LongOpenHashMap());
             for (String name : new String[]{"asyncChunkRequestCallbackQueue", "asyncChunkRequestFailedQueue",
                     "normalUpdateQueue", "updateBlockEntities", "completedChunkLoads"})
                 set(level, Level.class, name, new ConcurrentLinkedQueue<>());

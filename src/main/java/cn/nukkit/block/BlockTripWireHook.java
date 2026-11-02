@@ -170,17 +170,24 @@ public class BlockTripWireHook extends BlockFlowable {
         }
 
         boolean recalculatePower = false;
-        if (attached != canConnect) {
+        boolean attachmentChanged = attached != canConnect;
+        if (attachmentChanged || powered != nextPowered) {
             for (int i = 1; i < distance; i++) {
                 Vector3 vc = v.getSide(facing, i);
                 block = blocks[i];
 
                 // Redstone callbacks may replace the wire or change its other state bits.
-                if (block instanceof BlockTripWire cached && this.level.getBlock(vc) instanceof BlockTripWire wire) {
-                    recalculatePower |= cached.isPowered() != wire.isPowered()
-                            || cached.isDisarmed() != wire.isDisarmed();
-                    wire.setAttached(canConnect);
-                    this.level.setBlock(vc, wire, true, true);
+                if (block instanceof BlockTripWire cached) {
+                    if (this.level.getBlock(vc) instanceof BlockTripWire wire) {
+                        recalculatePower |= cached.isPowered() != wire.isPowered()
+                                || cached.isDisarmed() != wire.isDisarmed();
+                        if (attachmentChanged) {
+                            wire.setAttached(canConnect);
+                            this.level.setBlock(vc, wire, true, true);
+                        }
+                    } else {
+                        recalculatePower = true;
+                    }
                 }
             }
         }

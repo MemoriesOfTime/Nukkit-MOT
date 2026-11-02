@@ -152,7 +152,7 @@ class ChunkSerializationFailureGenerationTest {
         final Player player = mock(Player.class);
         final Queue<Runnable> work = new ConcurrentLinkedQueue<>();
         final Long2LongOpenHashMap starts = new Long2LongOpenHashMap();
-        final Long2LongOpenHashMap generations = new Long2LongOpenHashMap();
+        final Long2LongOpenHashMap generations;
 
         Fixture(ProviderKind kind, Mode mode, Level level) throws Exception {
             this.level = level;
@@ -193,10 +193,12 @@ class ChunkSerializationFailureGenerationTest {
                         .when(executor).execute(any(Runnable.class));
             }
             set(level, Level.class, "asyncChuckExecutor", mode == Mode.NO_EXECUTOR ? null : executor);
-            for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests"})
+            for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests", "chunkRequestEpochs"})
                 set(level, Level.class, name, new Object2ObjectOpenHashMap<>());
             set(level, Level.class, "chunkSendTaskStartTick", starts);
-            set(level, Level.class, "chunkSendGeneration", generations);
+            var epochs = Level.class.getDeclaredMethod("getChunkRequestEpochs", GameVersion.class);
+            epochs.setAccessible(true);
+            generations = (Long2LongOpenHashMap) epochs.invoke(level, VERSION);
             for (String name : new String[]{"asyncChunkRequestCallbackQueue", "asyncChunkRequestFailedQueue",
                     "normalUpdateQueue", "updateBlockEntities", "completedChunkLoads"})
                 set(level, Level.class, name, new ConcurrentLinkedQueue<>());
@@ -204,8 +206,10 @@ class ChunkSerializationFailureGenerationTest {
             set(level, Level.class, "players", new PlayerRangeMap());
             set(level, Level.class, "chunkTickList", new Long2IntOpenHashMap());
             set(level, Level.class, "changedBlocks", new Long2ObjectOpenHashMap<>());
+            set(level, Level.class, "dimensionData", DimensionData.LEGACY_DIMENSION);
             set(level, Level.class, "lightQueue", new ConcurrentHashMap<>());
             set(level, Level.class, "updateQueue", new BlockUpdateScheduler(level, 0));
+            set(level, Level.class, "normalUpdateQueueSize", new AtomicInteger());
             set(level, Level.class, "chunkPackets", new ConcurrentHashMap<>());
             level.gameRules = GameRules.getDefault();
             level.gameRules.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
@@ -229,8 +233,10 @@ class ChunkSerializationFailureGenerationTest {
 
         void acceptTimeoutRetry() throws Exception {
             requestAt(1);
+            long firstEpoch = generations.get(INDEX);
+            assertTrue(firstEpoch > 0L, "upstream assigns a positive id to the initial submission");
             requestAt(201);
-            assertEquals(0L, generations.get(INDEX), "the exact 200-tick boundary is not expired");
+            assertEquals(firstEpoch, generations.get(INDEX), "the exact 200-tick boundary is not expired");
             requestAt(202);
             assertTrue(tasks().contains(INDEX));
             assertEquals(2L, generations.get(INDEX));

@@ -670,17 +670,22 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             return null;
         }
         Channel channel = netherNetSession.getChannel();
-        if (!this.server.xboxAuth) {
-            // 离线模式本就不证明身份，没有可比对的密钥
-            // Offline mode has given up on proving identity, no key worth comparing
-            return TransportIdentityBinding.acceptForwardedIdentity(channel);
-        }
-
         PublicKey identityKey = parseIdentityKey(identityPublicKeyBase64);
-        if (identityKey == null) {
-            return "the login chain carries no usable identity key";
+        String mismatch = identityKey == null
+                ? "the login chain carries no usable identity key"
+                : TransportIdentityBinding.mismatch(channel, identityKey);
+        netherNetSession.setIdentityKeyBound(mismatch == null);
+        if (!this.server.xboxAuth) {
+            // Offline mode does not refuse an unbound chain, but it must not trust one either: the
+            // session reports the binding (Player#isLoginKeyProven) so whatever authenticates the
+            // player instead can tell a replayed chain from its holder, exactly as RakNet's
+            // encryption handshake lets it.
+            if (mismatch != null) {
+                log.debug("NetherNet login from {} is not bound to its chain: {}", channel.remoteAddress(), mismatch);
+            }
+            return null;
         }
-        return TransportIdentityBinding.mismatch(channel, identityKey);
+        return mismatch;
     }
 
     private static PublicKey parseIdentityKey(String base64) {

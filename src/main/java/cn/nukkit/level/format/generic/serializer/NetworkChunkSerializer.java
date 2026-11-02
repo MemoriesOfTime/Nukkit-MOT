@@ -176,12 +176,12 @@ public class NetworkChunkSerializer {
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
-        int start = stream.getOffset();
+        int start = stream.getCount();
         for (int i = 0; i < subChunkCount; i++) {
             sections[i].writeTo(chunkData.getGameVersion(), stream, chunkData.isAntiXray());
             if (blobSink != null) {
-                blobSink.add(Arrays.copyOfRange(stream.getBufferUnsafe(), start, stream.getOffset()));
-                start = stream.getOffset();
+                blobSink.add(Arrays.copyOfRange(stream.getBufferUnsafe(), start, stream.getCount()));
+                start = stream.getCount();
             }
         }
 
@@ -210,12 +210,12 @@ public class NetworkChunkSerializer {
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
-        int start = stream.getOffset();
+        int start = stream.getCount();
         for (int i = 0; i < subChunkCount; i++) {
             sections[i].writeTo(chunkData.getGameVersion(), stream, chunkData.isAntiXray());
             if (blobSink != null) {
-                blobSink.add(Arrays.copyOfRange(stream.getBufferUnsafe(), start, stream.getOffset()));
-                start = stream.getOffset();
+                blobSink.add(Arrays.copyOfRange(stream.getBufferUnsafe(), start, stream.getCount()));
+                start = stream.getCount();
             }
         }
 

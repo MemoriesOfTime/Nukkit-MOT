@@ -180,7 +180,7 @@ public class Anvil extends BaseLevelProvider {
                         networkChunkSerializerCallback.getStream().getBuffer(),
                         networkChunkSerializerCallback.getSubChunkBlobs(),
                         networkChunkSerializerCallback.getBiomes(),
-                        networkChunkSerializerCallback.getBlockEntities(), owner
+                        networkChunkSerializerCallback.getBlockEntities(), sequence, owner
                 );
             }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
         } catch (Throwable t) {

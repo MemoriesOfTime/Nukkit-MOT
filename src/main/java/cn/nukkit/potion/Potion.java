@@ -185,10 +185,13 @@ public class Potion implements Cloneable {
     }
 
     public void applyPotion(Entity entity) {
-        applyPotion(entity, 0.5);
+        applyPotion(entity, 1);
     }
 
-    public void applyPotion(Entity entity, double health) {
+    /**
+     * @param distanceFactor splash strength at the impact point; ignored when drinking
+     */
+    public void applyPotion(Entity entity, double distanceFactor) {
         if (!(entity instanceof EntityLiving)) {
             return;
         }
@@ -219,6 +222,10 @@ public class Potion implements Cloneable {
 
         applyEffect = event.getApplyEffect();
 
+        // Drinking always applies full strength; only a splash scales with the distance
+        // factor supplied by the caller (1.0 on a direct hit down to 0 at the rim).
+        double intensity = this.splash ? distanceFactor : 1;
+
         switch (this.id) {
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
@@ -226,9 +233,9 @@ public class Potion implements Cloneable {
                     break;
                 }
                 if (entity instanceof EntitySmite) {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << (applyEffect.getAmplifier() + 1)))));
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (intensity * (6 << applyEffect.getAmplifier()))));
                 } else {
-                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
+                    entity.heal(new EntityRegainHealthEvent(entity, (float) (intensity * (4 << applyEffect.getAmplifier())), EntityRegainHealthEvent.CAUSE_MAGIC));
                 }
                 break;
             case HARMING:
@@ -237,24 +244,24 @@ public class Potion implements Cloneable {
                     break;
                 }
                 if (entity instanceof EntitySmite) {
-                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
+                    entity.heal(new EntityRegainHealthEvent(entity, (float) (intensity * (4 << applyEffect.getAmplifier())), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << applyEffect.getAmplifier()))));
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (intensity * (6 << applyEffect.getAmplifier()))));
                 }
                 break;
             case TURTLE_MASTER:
             case TURTLE_MASTER_LONG:
             case TURTLE_MASTER_II:
-                applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
+                applyEffect.setDuration((int) (intensity * (double) applyEffect.getDuration() + 0.5));
                 entity.addEffect(applyEffect, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
                 Effect resistance = Effect.getEffect(Effect.DAMAGE_RESISTANCE);
                 resistance.setAmplifier(this.id == TURTLE_MASTER_II ? 3 : 2);
                 int resDuration = 20 * (this.id == TURTLE_MASTER_LONG ? 40 : 20);
-                resistance.setDuration((int) ((splash ? health : 1) * resDuration + 0.5));
+                resistance.setDuration((int) (intensity * resDuration + 0.5));
                 entity.addEffect(resistance, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
                 break;
             default:
-                applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
+                applyEffect.setDuration((int) (intensity * (double) applyEffect.getDuration() + 0.5));
                 entity.addEffect(applyEffect, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
         }
     }
