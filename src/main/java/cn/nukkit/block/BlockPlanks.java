@@ -21,7 +21,7 @@ public class BlockPlanks extends BlockSolidMeta {
     }
 
     public BlockPlanks(int meta) {
-        super(meta % 6);
+        super(meta);
     }
 
     @Override
@@ -60,7 +60,8 @@ public class BlockPlanks extends BlockSolidMeta {
                 "Dark Oak Wood Planks",
         };
 
-        return names[this.getDamage() & 0x07];
+        // palette carries junk stateless metas 6/7; normalize like the old % 6 ctor did
+        return names[this.getDamage() % 6];
     }
 
     @Override

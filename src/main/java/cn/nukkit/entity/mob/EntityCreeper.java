@@ -86,6 +86,12 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
     }
 
     @Override
+    protected boolean canSleepOutOfRange() {
+        // A manually lit fuse advances on every update, even after players leave.
+        return this.explodeTimer <= 0 && super.canSleepOutOfRange();
+    }
+
+    @Override
     public boolean onUpdate(int currentTick) {
         if (this.closed) {
             return false;
@@ -121,6 +127,11 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
         }
 
         Vector3 target = this.updateMove(tickDiff);
+        // Losing a creature cancels a proximity fuse, never a manually lit one.
+        if (this.explodeTimer <= 0 && !(target instanceof EntityCreature)) {
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, false);
+            this.bombTime = 0;
+        }
         if (target != null) {
             double distance = target.distanceSquared(this);
             if (distance <= 16) { // 4 blocks
