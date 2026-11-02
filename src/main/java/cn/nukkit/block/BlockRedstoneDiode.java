@@ -103,10 +103,13 @@ public abstract class BlockRedstoneDiode extends BlockFlowable implements Faceab
     }
 
     public void updateState() {
+        if (this.level.isBlockTickPending(this, this) || this.level.isUpdateScheduled(this, this)) {
+            return;
+        }
         if (!this.isLocked()) {
             boolean shouldPowered = this.shouldBePowered();
 
-            if ((this.isPowered && !shouldPowered || !this.isPowered && shouldPowered) && !this.level.isBlockTickPending(this, this)) {
+            if (this.isPowered && !shouldPowered || !this.isPowered && shouldPowered) {
                 /*int priority = -1;
 
                 if (this.isFacingTowardsRepeater()) {

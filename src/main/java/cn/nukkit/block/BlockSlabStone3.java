@@ -71,6 +71,18 @@ public class BlockSlabStone3 extends BlockSlab {
     }
 
     @Override
+    public double getHardness() {
+        switch (this.getDamage() & 0x07) {
+            case END_STONE_BRICKS:
+                return 3;
+            case SMOOTH_RED_SANDSTONE:
+                return 2;
+            default:
+                return 1.5;
+        }
+    }
+
+    @Override
     public int getToolTier() {
         return ItemTool.TIER_WOODEN;
     }
