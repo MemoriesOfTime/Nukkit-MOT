@@ -57,7 +57,7 @@ class NativeArrowEffectAcceptanceP14Test {
         verify(f.arrow).close();
     }
 
-    @ParameterizedTest @CsvSource({"6,false,4", "6,true,6", "7,false,6", "7,true,4"})
+    @ParameterizedTest @CsvSource({"6,false,8", "6,true,12", "7,false,12", "7,true,8"})
     void acceptedInstantArrowsKeepLivingAndUndeadSemantics(int id, boolean undead, int amount)
             throws Exception {
         Fixture f = new Fixture(id);

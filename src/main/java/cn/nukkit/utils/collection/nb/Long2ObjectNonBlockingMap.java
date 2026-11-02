@@ -4,6 +4,7 @@ import cn.nukkit.api.NonComputationAtomic;
 import it.unimi.dsi.fastutil.longs.AbstractLongSet;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.Serial;
@@ -449,7 +450,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * Auto-boxing version of {@link #remove(long, Object)}.
      */
     @Override
-    public boolean remove(Object key, Object Val) {
+    public boolean remove(@NonNull Object key, Object Val) {
         return (key instanceof Long) && remove(((Long) key).longValue(), Val);
     }
 
@@ -473,7 +474,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * Auto-boxing version of {@link #replace}.
      */
     @Override
-    public TypeV replace(Long key, TypeV Val) {
+    public TypeV replace(Long key, @NonNull TypeV Val) {
         return replace(key.longValue(), Val);
     }
 
@@ -489,7 +490,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * Auto-boxing version of {@link #replace}.
      */
     @Override
-    public boolean replace(Long key, TypeV oldValue, TypeV newValue) {
+    public boolean replace(Long key, @NonNull TypeV oldValue, @NonNull TypeV newValue) {
         return replace(key.longValue(), oldValue, newValue);
     }
 
@@ -610,6 +611,18 @@ public class Long2ObjectNonBlockingMap<TypeV>
             _slots = new ConcurrentAutoLongTable();
             Arrays.fill(_keys, 0);
             Arrays.fill(_vals, null);
+        }
+
+        /**
+         * 按快照槽位取值，并处理清空换表和扩容迁移。
+         * <p>
+         * Reads a snapshot slot, following table replacement and slot migration.
+         */
+        private Object get_slot(final int idx, final long key) {
+            if (_nbhml._chm != this) return _nbhml.get(key);
+            final Object value = _OHandler.getAcquire(_vals, idx);
+            if (value instanceof Prime) return copy_slot_and_check(idx, key).get_impl(key);
+            return value == TOMBSTONE ? null : value;
         }
 
         // --- get_impl ----------------------------------------------------------
@@ -1107,25 +1120,26 @@ public class Long2ObjectNonBlockingMap<TypeV>
 
 
     // --- Snapshot ------------------------------------------------------------
+    private CHM snapshotTable() {
+        while (true) {
+            CHM topchm = _chm;
+            if (topchm._newchm == null) return topchm;
+            // 迭代开始前完成已有迁移，后续仍可能再次扩容。
+            // Finish an existing copy before iterating; later resizes remain possible.
+            topchm.help_copy_impl(true);
+        }
+    }
+
     // The main class for iterating over the NBHM.  It "snapshots" a clean
     // view of the K/V array.
     private class SnapshotV implements Iterator<TypeV>, Enumeration<TypeV> {
         final CHM _sschm;
 
         public SnapshotV() {
-            CHM topchm;
-            while (true) {           // Verify no table-copy-in-progress
-                topchm = _chm;
-                if (topchm._newchm == null) // No table-copy-in-progress
-                    break;
-                // Table copy in-progress - so we cannot get a clean iteration.  We
-                // must help finish the table copy before we can start iterating.
-                topchm.help_copy_impl(true);
-            }
             // The "linearization point" for the iteration.  Every key in this table
             // will be visited, but keys added later might be skipped or even be
             // added to a following table (also not iterated over).
-            _sschm = topchm;
+            _sschm = snapshotTable();
             // Warm-up the iterator
             _idx = -1;
             next();
@@ -1149,6 +1163,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public TypeV next() {
             // 'next' actually knows what the next value will be - it had to
             // figure that out last go 'round lest 'hasNext' report true and
@@ -1167,9 +1182,10 @@ public class Long2ObjectNonBlockingMap<TypeV>
                 if ((_nextV = get(_nextK)) != null) return _prevV;
             }
             while (_idx < length()) {  // Scan array
-                _nextK = key(_idx++); // Get a key that definitely is in the set (for the moment!)
+                final int slot = _idx++;
+                _nextK = key(slot);
                 if (_nextK != NO_KEY && // Found something?
-                        (_nextV = get(_nextK)) != null)
+                        (_nextV = (TypeV) _sschm.get_slot(slot, _nextK)) != null)
                     break;                // Got it!  _nextK is a valid Key
             }                         // Else keep scanning
             return _prevV;            // Return current value.
@@ -1228,7 +1244,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * to construction.
      */
     @Override
-    public Collection<TypeV> values() {
+    public @NonNull Collection<TypeV> values() {
         return new AbstractCollection<>() {
             @Override
             public void clear() {
@@ -1246,7 +1262,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
             }
 
             @Override
-            public Iterator<TypeV> iterator() {
+            public @NonNull Iterator<TypeV> iterator() {
                 return new SnapshotV();
             }
         };
@@ -1260,13 +1276,36 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * <strong>non-auto-boxing</strong> {@link #nextLong} function.
      */
     public class IteratorLong implements Iterator<Long>, Enumeration<Long>, LongIterator {
-        private final SnapshotV _ss;
+        private final CHM _sschm;
+        private int _idx = -1;
+        private long _nextK, _prevK;
+        private boolean _hasNext, _canRemove;
 
         /**
          * A new IteratorLong
          */
         public IteratorLong() {
-            _ss = new SnapshotV();
+            _sschm = snapshotTable();
+            _hasNext = advance();
+        }
+
+        private boolean advance() {
+            if (_idx == -1) {
+                _idx = 0;
+                _nextK = NO_KEY;
+                if (get(NO_KEY) != null) {
+                    return true;
+                }
+            }
+            while (_idx < _sschm._keys.length) {
+                final int slot = _idx++;
+                final long key = _sschm._keys[slot];
+                if (key != NO_KEY && _sschm.get_slot(slot, key) != null) {
+                    _nextK = key;
+                    return true;
+                }
+            }
+            return false;
         }
 
         /**
@@ -1274,7 +1313,9 @@ public class Long2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public void remove() {
-            _ss.removeKey();
+            if (!_canRemove) throw new IllegalStateException();
+            Long2ObjectNonBlockingMap.this.putIfMatch(_prevK, TOMBSTONE, NO_MATCH_OLD);
+            _canRemove = false;
         }
 
         /**
@@ -1282,8 +1323,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public Long next() {
-            _ss.next();
-            return _ss._prevK;
+            return nextLong();
         }
 
         /**
@@ -1291,8 +1331,11 @@ public class Long2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public long nextLong() {
-            _ss.next();
-            return _ss._prevK;
+            if (!_hasNext) throw new NoSuchElementException();
+            _prevK = _nextK;
+            _canRemove = true;
+            _hasNext = advance();
+            return _prevK;
         }
 
         /**
@@ -1300,7 +1343,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public boolean hasNext() {
-            return _ss.hasNext();
+            return _hasNext;
         }
 
         /**
@@ -1352,10 +1395,10 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * to construction.
      */
     @Override
-    public LongSet keySet() {
+    public @NonNull LongSet keySet() {
         return new AbstractLongSet() {
             @Override
-            public LongIterator iterator() {
+            public @NonNull LongIterator iterator() {
                 return new IteratorLong();
             }
 
@@ -1501,7 +1544,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * this version requires <strong>auto-boxing</strong> the keys.
      */
     @Override
-    public Set<Entry<Long, TypeV>> entrySet() {
+    public @NonNull Set<Entry<Long, TypeV>> entrySet() {
         return new AbstractSet<>() {
             @Override
             public void clear() {
@@ -1527,7 +1570,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
             }
 
             @Override
-            public Iterator<Entry<Long, TypeV>> iterator() {
+            public @NonNull Iterator<Entry<Long, TypeV>> iterator() {
                 return new SnapshotESlow();
             }
         };
@@ -1559,7 +1602,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
             }
 
             @Override
-            public Iterator<LongObjectEntry<TypeV>> iterator() {
+            public @NonNull Iterator<LongObjectEntry<TypeV>> iterator() {
                 return new SnapshotE();
             }
         };
@@ -1629,7 +1672,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      */
     @Override
     @Deprecated
-    public TypeV computeIfAbsent(Long key, Function<? super Long, ? extends TypeV> mappingFunction) {
+    public TypeV computeIfAbsent(Long key, @NonNull Function<? super Long, ? extends TypeV> mappingFunction) {
         return ConcurrentMap.super.computeIfAbsent(key, mappingFunction);
     }
 
@@ -1638,7 +1681,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      */
     @Override
     @Deprecated
-    public TypeV computeIfPresent(Long key, BiFunction<? super Long, ? super TypeV, ? extends TypeV> remappingFunction) {
+    public TypeV computeIfPresent(Long key, @NonNull BiFunction<? super Long, ? super TypeV, ? extends TypeV> remappingFunction) {
         return ConcurrentMap.super.computeIfPresent(key, remappingFunction);
     }
 
@@ -1647,7 +1690,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      */
     @Override
     @Deprecated
-    public TypeV compute(Long key, BiFunction<? super Long, ? super TypeV, ? extends TypeV> remappingFunction) {
+    public TypeV compute(Long key, @NonNull BiFunction<? super Long, ? super TypeV, ? extends TypeV> remappingFunction) {
         return ConcurrentMap.super.compute(key, remappingFunction);
     }
 
@@ -1656,7 +1699,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      */
     @Override
     @Deprecated
-    public TypeV merge(Long key, TypeV value, BiFunction<? super TypeV, ? super TypeV, ? extends TypeV> remappingFunction) {
+    public TypeV merge(Long key, @NonNull TypeV value, @NonNull BiFunction<? super TypeV, ? super TypeV, ? extends TypeV> remappingFunction) {
         return ConcurrentMap.super.merge(key, value, remappingFunction);
     }
 }  // End Long2ObjectNonBlockingMap class
