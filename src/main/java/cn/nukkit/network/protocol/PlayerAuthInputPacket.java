@@ -9,12 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @ToString
 @Setter
@@ -44,6 +39,33 @@ public class PlayerAuthInputPacket extends DataPacket {
      */
     @OnlyNetEase
     private boolean cameraDeparted;
+    /**
+     * 网易尾部块（v1_21_50 起追加于 rawMoveVector 之后）。
+     * <p>
+     * NetEase tail block, appended after rawMoveVector since v1_21_50.
+     */
+    @OnlyNetEase
+    private boolean thirdPersonPerspective;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private Vector2f playerRotationToCamera;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private boolean readyPosDeltaDirty;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private boolean onGround;
+    /**
+     * netease only, see {@link #thirdPersonPerspective}
+     */
+    @OnlyNetEase
+    private byte resetPosition;
     private InventoryTransactionPacket itemUseTransaction;
     private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
@@ -218,6 +240,15 @@ public class PlayerAuthInputPacket extends DataPacket {
                 this.rawMoveVector = this.getVector2f();
             }
         }
+
+        if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_21_50 && !v2168) {
+            // fixed NetEase tail block; skipping it desynchronizes the stream
+            this.thirdPersonPerspective = this.getBoolean();
+            this.playerRotationToCamera = this.getVector2f();
+            this.readyPosDeltaDirty = this.getBoolean();
+            this.onGround = this.getBoolean();
+            this.resetPosition = (byte) this.getByte();
+        }
     }
 
     /**
@@ -279,6 +310,9 @@ public class PlayerAuthInputPacket extends DataPacket {
      * to filter or replace actions.
      */
     public List<PlayerBlockActionData> getDecodedBlockActions() {
+        if (this.decodedBlockActions.isEmpty()) {
+            return List.of();
+        }
         return this.blockActionData.equals(this.decodedBlockActionSnapshot)
                 ? this.decodedBlockActions.stream().map(PlayerAuthInputPacket::copyBlockAction).toList()
                 : List.of();

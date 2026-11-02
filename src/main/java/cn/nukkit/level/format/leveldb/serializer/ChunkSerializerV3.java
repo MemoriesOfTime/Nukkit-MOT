@@ -8,11 +8,11 @@ import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.format.leveldb.LevelDBKey;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
+import java.util.function.Consumer;
 import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
 import cn.nukkit.utils.ChunkException;
 import cn.nukkit.utils.Utils;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
 import org.iq80.leveldb.DB;
@@ -26,6 +26,11 @@ public class ChunkSerializerV3 implements ChunkSerializer {
 
     @Override
     public void serializer(WriteBatch writeBatch, Chunk chunk) {
+        serializer(writeBatch, chunk, ignored -> { });
+    }
+
+    @Override
+    public void serializer(WriteBatch writeBatch, Chunk chunk, Consumer<LevelDBChunkSection.SaveToken> snapshots) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
         for (int ySection = dimensionData.getMinSectionY(); ySection <= dimensionData.getMaxSectionY(); ++ySection) {
             byte[] key = LevelDBKey.SUB_CHUNK_PREFIX.getKey(
@@ -41,18 +46,18 @@ public class ChunkSerializerV3 implements ChunkSerializer {
             }
             LevelDBChunkSection section = (LevelDBChunkSection) section0;
 
-            if (!section.isDirty()) {
-                continue;
-            }
-
-            ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
-            try {
-                byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
-                ChunkSectionSerializers.serializer(byteBuf, section.getStorages(), ySection, CURRENT_LEVEL_SUBCHUNK_VERSION);
-                writeBatch.put(key, Utils.convertByteBuf2Array(byteBuf));
-            } finally {
-                byteBuf.release();
-            }
+            final int capturedSectionY = ySection;
+            LevelDBChunkSection.SaveToken token = section.captureSave(chunk, ySection, storages -> {
+                ByteBuf byteBuf = Unpooled.buffer();
+                try {
+                    byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
+                    ChunkSectionSerializers.serializer(byteBuf, storages, capturedSectionY, CURRENT_LEVEL_SUBCHUNK_VERSION);
+                    writeBatch.put(key, Utils.convertByteBuf2Array(byteBuf));
+                } finally {
+                    byteBuf.release();
+                }
+            });
+            if (token != null) snapshots.accept(token);
         }
     }
 

@@ -101,12 +101,17 @@ public class GlobalBlockPalette {
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_30, GameVersion.V1_26_30);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_40, GameVersion.V1_26_40);
         STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_50_27, GameVersion.V1_26_50);
+        STANDARD_PALETTE_THRESHOLDS.put(ProtocolInfo.v1_26_60, GameVersion.V1_26_60);
 
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_20_50_NETEASE.getProtocol(), GameVersion.V1_20_50_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_2_NETEASE.getProtocol(), GameVersion.V1_21_2_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_50_NETEASE.getProtocol(), GameVersion.V1_21_50_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_93_NETEASE.getProtocol(), GameVersion.V1_21_93_NETEASE);
         NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_124_NETEASE.getProtocol(), GameVersion.V1_21_124_NETEASE);
+        // NetEase 898 has no dedicated dat: block network ids go through hash ids (on by default),
+        // so rid ordering never hits the wire; reuse the standard 898 anchor (floors to 844),
+        // switch to V1_21_130_NETEASE once netease_898.dat lands
+        NETEASE_PALETTE_THRESHOLDS.put(GameVersion.V1_21_130_NETEASE.getProtocol(), GameVersion.V1_21_111);
     }
 
     private static byte[] compiledTable282;

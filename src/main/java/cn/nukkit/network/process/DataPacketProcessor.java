@@ -1,6 +1,8 @@
 package cn.nukkit.network.process;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.PlayerHandle;
+import cn.nukkit.Server;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
@@ -22,7 +24,12 @@ public abstract class DataPacketProcessor<T extends DataPacket> {
 
     public abstract Class<? extends DataPacket> getPacketClass();
 
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_2_0;
+    }
+
+    @Deprecated(forRemoval = true)
     public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_2_0;
+        return isSupported(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
     }
 }

@@ -88,7 +88,7 @@ class CustomBlockDefinitionSerializerTest {
 
     @Test
     void netEaseProtocolsKeepLegacyBooleanAmbientOcclusion() {
-        for (GameVersion version : new GameVersion[]{GameVersion.V1_20_50_NETEASE, GameVersion.V1_21_124_NETEASE}) {
+        for (GameVersion version : new GameVersion[]{GameVersion.V1_20_50_NETEASE, GameVersion.V1_21_124_NETEASE, GameVersion.V1_21_130_NETEASE}) {
             CompoundTag out = CustomBlockDefinitionSerializer.serialize(buildNbt(), version.getProtocol());
             CompoundTag star = material(out, "components", "*");
             assertInstanceOf(ByteTag.class, star.get("ambient_occlusion"), version.toString());

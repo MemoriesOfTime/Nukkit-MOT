@@ -67,6 +67,8 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
     }
 
     public void show(Player player) {
+        if (player.protocol < ProtocolInfo.v1_26_0) return;
+
         // Cancel any pending delayed show for this player
         TaskHandler pending = PENDING_SHOW_TASKS.asMap().remove(player);
         if (pending != null) {
@@ -101,6 +103,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
 
     private void doShow(Player player) {
         if (!player.isConnected()) return;
+        if (player.protocol < ProtocolInfo.v1_26_0) return;
 
         // Allocate a new unique formId for this screen on this player
         int formId = DDUI_FORM_ID_COUNTER.updateAndGet(v -> (v == Integer.MAX_VALUE) ? 0 : v + 1);
@@ -137,6 +140,7 @@ public abstract class DataDrivenScreen extends ObjectProperty<Object> {
     public void close(Player player) {
         Integer formId = playerFormIds.get(player);
         if (formId == null) return;
+        if (player.protocol < ProtocolInfo.v1_26_0) return;
 
         removeViewer(player);
 

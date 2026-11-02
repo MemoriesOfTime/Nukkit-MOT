@@ -343,7 +343,7 @@ public class Binary {
     }
 
     public static boolean readBool(byte b) {
-        return b == 0;
+        return b != 0;
     }
 
     public static byte writeBool(boolean b) {
@@ -351,7 +351,7 @@ public class Binary {
     }
 
     public static int readSignedByte(byte b) {
-        return b & 0xFF;
+        return b;
     }
 
     public static byte writeByte(byte b) {

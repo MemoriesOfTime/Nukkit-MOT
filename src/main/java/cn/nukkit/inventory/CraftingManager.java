@@ -11,6 +11,9 @@ import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import io.netty.util.collection.CharObjectHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
@@ -18,6 +21,9 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
+import java.io.*;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.Deflater;
 
@@ -27,6 +33,42 @@ import java.util.zip.Deflater;
  */
 @Log4j2
 public class CraftingManager {
+
+    // Keep the number types produced by the previous YAML loader: recipe consumers cast to Integer.
+    private static final Gson RECIPE_JSON = new GsonBuilder().setObjectToNumberStrategy(reader -> {
+        String value = reader.nextString();
+        if (value.indexOf('.') >= 0 || value.indexOf('e') >= 0 || value.indexOf('E') >= 0) {
+            return Double.valueOf(value);
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException ignored) {
+            try {
+                return Long.valueOf(value);
+            } catch (NumberFormatException alsoIgnored) {
+                return new BigInteger(value);
+            }
+        }
+    }).create();
+
+    static Config readRecipeJson(Reader reader) {
+        LinkedHashMap<String, Object> root = RECIPE_JSON.fromJson(reader, new TypeToken<LinkedHashMap<String, Object>>() {});
+        Config config = new Config(Config.JSON);
+        config.setAll(root);
+        return config;
+    }
+
+    private static Config loadRecipeJson(String resource) {
+        InputStream stream = Server.class.getClassLoader().getResourceAsStream(resource);
+        if (stream == null) {
+            throw new IllegalStateException("Missing recipe resource: " + resource);
+        }
+        try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+            return readRecipeJson(reader);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read recipe resource: " + resource, e);
+        }
+    }
 
     public final Collection<Recipe> recipes = new ArrayDeque<>();
 
@@ -77,12 +119,14 @@ public class CraftingManager {
     private static BatchPacket packet1001;
     private static BatchPacket packet2168;
     private static BatchPacket packet2193;
+    private static BatchPacket packet2225;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
     private static BatchPacket packet_netease_766;
     private static BatchPacket packet_netease_819;
     private static BatchPacket packet_netease_860;
+    private static BatchPacket packet_netease_898;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes = new Int2ObjectOpenHashMap<>();
 
@@ -145,9 +189,9 @@ public class CraftingManager {
         this.registerMultiRecipe(new FireworkRecipe());
         this.registerMultiRecipe(new DecoratedPotRecipe());
 
-        Map<String, Object> root = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes.json")).getRootSection();
+        Map<String, Object> root = loadRecipeJson("recipes.json").getRootSection();
         RuntimeItemMapping itemMapping = selectRecipeItemMapping(root);
-        Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
+        Config furnaceXpConfig = loadRecipeJson("recipes/furnace_xp.json");
 
         for (Map recipe : (List<Map>) root.get("recipes")) {
             try {
@@ -240,7 +284,7 @@ public class CraftingManager {
         }
 
         // Smithing recipes
-        ConfigSection smithing = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("smithing.json")).getRootSection();
+        ConfigSection smithing = loadRecipeJson("smithing.json").getRootSection();
         top:
         for (Map<String, Object> recipe : (List<Map<String, Object>>) smithing.get((Object) "smithing")) {
             String recipeId = (String) recipe.get("id");
@@ -963,6 +1007,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet2225 = null;
         packet2193 = null;
         packet2168 = null;
         packet1001 = null;
@@ -1016,6 +1061,7 @@ public class CraftingManager {
         packet_netease_766 = null;
         packet_netease_819 = null;
         packet_netease_860 = null;
+        packet_netease_898 = null;
 
         this.getCachedPacket(GameVersion.getLastVersion()); // 缓存当前协议版本的数据包
         this.getCachedPacket(GameVersion.getLastNetEaseVersion());
@@ -1042,7 +1088,12 @@ public class CraftingManager {
         int protocol = gameVersion.getProtocol();
 
         if (gameVersion.isNetEase()) {
-            if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
+            if (protocol >= GameVersion.V1_21_130_NETEASE.getProtocol()) {
+                if (packet_netease_898 == null) {
+                    packet_netease_898 = this.packetFor(GameVersion.V1_21_130_NETEASE);
+                }
+                return packet_netease_898;
+            } else if (protocol >= GameVersion.V1_21_124_NETEASE.getProtocol()) {
                 if (packet_netease_860 == null) {
                     packet_netease_860 = this.packetFor(GameVersion.V1_21_124_NETEASE);
                 }
@@ -1070,7 +1121,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_60.getProtocol()) {
+            if (packet2225 == null) {
+                packet2225 = packetFor(GameVersion.V1_26_60);
+            }
+            return packet2225;
+        } else if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
             if (packet2193 == null) {
                 packet2193 = packetFor(GameVersion.V1_26_50);
             }

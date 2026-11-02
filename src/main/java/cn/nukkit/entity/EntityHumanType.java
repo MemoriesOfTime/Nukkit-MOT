@@ -299,6 +299,8 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             return false;
         }
 
+        PlayerInventory inv = this.inventory;
+
         boolean vanillaArmor = Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction();
         if (vanillaArmor) {
             this.applyCriticalHitModifier(source);
@@ -312,14 +314,14 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             int armorPoints = 0;
             int epf = 0;
 
-            for (Item armor : inventory.getArmorContents()) {
+            for (Item armor : inv != null ? inv.getArmorContents() : Item.EMPTY_ARRAY) {
                 armorPoints += armor.getArmorPoints();
                 epf += calculateEnchantmentProtectionFactor(armor, source);
             }
 
             if (vanillaArmor) {
                 int toughness = 0;
-                for (Item armor : inventory.getArmorContents()) {
+                for (Item armor : inv != null ? inv.getArmorContents() : Item.EMPTY_ARRAY) {
                     toughness += armor.getToughness();
                 }
 
@@ -373,10 +375,12 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
                 damager = ((EntityDamageByEntityEvent) source).getDamager();
             }
 
-            for (int slot = 0; slot < 4; slot++) {
-                Item armor = damageArmor(this.inventory.getArmorItem(slot), damager, source.getDamage(), false, source.getCause());
+            if (inv != null) {
+                for (int slot = 0; slot < 4; slot++) {
+                    Item armor = damageArmor(inv.getArmorItem(slot), damager, source.getDamage(), false, source.getCause());
 
-                inventory.setArmorItem(slot, armor, armor.getId() != BlockID.AIR);
+                    inv.setArmorItem(slot, armor, armor.getId() != BlockID.AIR);
+                }
             }
 
             return true;
@@ -467,7 +471,10 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
     public void setOnFire(int seconds) {
         int level = 0;
 
-        for (Item armor : this.inventory.getArmorContents()) {
+        // 攻击链（攻击者着火/火焰附加）可在 inventory 为 null 的窗口内进入
+        // The attack chain (burning attacker / fire aspect) can enter while inventory is null
+        PlayerInventory inv = this.inventory;
+        for (Item armor : inv != null ? inv.getArmorContents() : Item.EMPTY_ARRAY) {
             Enchantment fireProtection = armor.getEnchantment(Enchantment.ID_PROTECTION_FIRE);
 
             if (fireProtection != null && fireProtection.getLevel() > 0) {

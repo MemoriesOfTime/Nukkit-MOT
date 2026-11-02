@@ -17,6 +17,7 @@ import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
@@ -184,9 +185,14 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CRITICAL, value);
     }
 
+    /**
+     * A fixed 8 whatever the throw speed, as the vanilla {@code minecraft:thrown_trident}
+     * ({@code impact_damage} 8, no {@code power_multiplier}), PocketMine-MP and EaseCation. Speed
+     * times damage struck for 19 after a full throw. Impaling is added on hit.
+     */
     @Override
     public int getResultDamage() {
-        int base = super.getResultDamage();
+        int base = NukkitMath.ceilDouble(this.getDamage());
 
         if (this.isCritical()) {
             base += ThreadLocalRandom.current().nextInt(base / 2 + 2);
