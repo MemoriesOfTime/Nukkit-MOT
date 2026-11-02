@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class PlayerChunkUnloadReadTest {
@@ -31,7 +31,7 @@ class PlayerChunkUnloadReadTest {
         when(player.getLoaderId()).thenReturn(7);
         set(Player.class, player, "usedChunks", new Long2ObjectOpenHashMap<>());
         set(Player.class, player, "loadQueue", new LongLinkedOpenHashSet());
-        player.usedChunks.put(hash, true);
+        player.usedChunks.put(hash, Boolean.TRUE);
         player.loadQueue.add(hash);
         doCallRealMethod().when(player).unloadChunk(anyInt(), anyInt(), nullable(Level.class));
     }
@@ -90,7 +90,7 @@ class PlayerChunkUnloadReadTest {
     @Test
     void worldSwitchAndDisconnectNeverReadColdChunks() throws Exception {
         for (boolean online : new boolean[]{true, false}) {
-            player.usedChunks.put(hash, true);
+            player.usedChunks.put(hash, Boolean.TRUE);
             player.loadQueue.add(hash);
             unloadAll(online);
             assertTrue(player.usedChunks.isEmpty());
@@ -114,7 +114,7 @@ class PlayerChunkUnloadReadTest {
         for (int protocol : ProtocolInfo.SUPPORTED_PROTOCOLS) {
             if (protocol < ProtocolInfo.v1_20_0 || protocol > ProtocolInfo.v1_26_50) continue;
             player.protocol = protocol;
-            player.usedChunks.put(hash, true);
+            player.usedChunks.put(hash, Boolean.TRUE);
             entity.hasSpawned.put(7, player);
             unloadAll(true);
             assertFalse(entity.hasSpawned.containsKey(7));
@@ -123,7 +123,7 @@ class PlayerChunkUnloadReadTest {
         verify(player, times(protocols)).dataPacket(argThat(packet ->
                 packet instanceof RemoveEntityPacket remove && remove.eid == 123L));
         clearInvocations(player, entity, level);
-        player.usedChunks.put(hash, true);
+        player.usedChunks.put(hash, Boolean.TRUE);
         entity.hasSpawned.put(7, player);
         unloadAll(false);
         assertFalse(entity.hasSpawned.containsKey(7));

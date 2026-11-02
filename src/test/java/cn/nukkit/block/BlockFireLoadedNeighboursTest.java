@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.event.block.BlockBurnEvent;
+import cn.nukkit.event.block.BlockEvent;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
@@ -118,7 +119,10 @@ class BlockFireLoadedNeighboursTest {
         Fixture f = new Fixture(8, 8, new BlockPlanks());
         f.put(new Fuel(), 9, 64, 8);
         f.fire.onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
-        verify(f.plugins).callEvent(argThat(event -> event instanceof BlockIgniteEvent || event instanceof BlockBurnEvent));
+        // 下方 planks 燃烧能力 20 也可能随机（20/250）收到事件，只认燃料方块的那一次
+        // The planks below (burn ability 20) may also roll an event (20/250); only count the fuel's
+        verify(f.plugins).callEvent(argThat(event -> (event instanceof BlockIgniteEvent || event instanceof BlockBurnEvent)
+                && key(((BlockEvent) event).getBlock()).equals("9:64:8")));
         assertFalse(f.removed);
         assertInstanceOf(Fuel.class, f.at(9, 64, 8, true));
     }

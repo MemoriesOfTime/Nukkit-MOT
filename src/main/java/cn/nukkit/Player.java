@@ -3,10 +3,7 @@ package cn.nukkit;
 import cn.nukkit.AdventureSettings.Type;
 import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.block.*;
-import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.blockentity.BlockEntityCampfire;
-import cn.nukkit.blockentity.BlockEntityItemFrame;
-import cn.nukkit.blockentity.BlockEntitySpawnable;
+import cn.nukkit.blockentity.*;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
@@ -86,6 +83,7 @@ import cn.nukkit.network.protocol.types.debugshape.DebugShape;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
+import cn.nukkit.network.session.NetherNetPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode;
 import cn.nukkit.network.session.login.SessionLoginPhase;
@@ -317,7 +315,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private final int loaderId;
 
-    public final Map<Long, Boolean> usedChunks = new Long2ObjectOpenHashMap<>();
+    public final Map<Long, Boolean> usedChunks = new ConcurrentHashMap<>();
 
     private int chunksSent = 0;
     private long chunkDeliveryEpoch;
@@ -433,6 +431,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private static final int NO_SHIELD_DELAY = 10;
     private static final int TELEPORT_CHUNK_READY_OFFSET = 1;
+    // 出生/传送额外等待列方块数据的上限(tick)，超时即放行
+    // Upper bound (ticks) spawn/teleport waits for column block data before releasing
+    private static final int DATA_WAIT_TICKS = 40;
     private int noShieldTicks;
 
     public int pickedXPOrb = 0;
@@ -1278,6 +1279,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             this.usedChunks.remove(index);
+            this.forgetColumnData(index);
         }
         level.unregisterChunkLoader(this, x, z);
         this.loadQueue.remove(index);
@@ -1364,6 +1366,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         this.usedChunks.put(index, Boolean.TRUE);
         this.chunksSent++;
+
+        boolean pullShell = packet instanceof LevelChunkPacket levelChunk && levelChunk.requestSubChunks;
+        this.trackColumnSent(index, pullShell);
 
         if (this.spawned) {
             for (Entity entity : this.level.getChunkEntities(x, z).values()) {
@@ -1527,7 +1532,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 ++count;
 
                 try {
-                    this.usedChunks.put(index, false);
+                    this.usedChunks.put(index, Boolean.FALSE);
                     this.level.registerChunkLoader(this, chunkX, chunkZ, false);
 
                     // 异步区块加载:读取+解码在异步线程完成,区块由主线程 doTick 挂载后下一 tick 再发送,避免主线程同步读取磁盘
@@ -1587,7 +1592,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold) {
+        if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold && this.isSpawnAreaDataReady()) {
             this.hasSpawnChunks = true;
 
             if (this.protocol <= ProtocolInfo.v1_5_0) {
@@ -2849,6 +2854,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendRotation = true;
                     }
                 } else {
+                    // Seed the rollback position when the first input only changes rotation.
+                    this.lastX = this.x;
+                    this.lastY = this.y;
+                    this.lastZ = this.z;
                     this.lastYaw = this.yaw;
                     this.lastPitch = this.pitch;
                     this.needSendRotation = true;
@@ -2932,6 +2941,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             // Ground check
             if (!this.isSpectator() && (!this.onGround || dy != 0)) {
                 AxisAlignedBB bb = this.boundingBox.clone();
+                // Only exposed faces below the feet support a player; wall/head contacts do not.
+                bb.setMaxY(bb.getMinY() + 1.0E-4);
                 bb.setMinY(bb.getMinY() - 0.75);
 
                 // Hack: fix fall damage from walls while falling
@@ -2942,7 +2953,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     bb.setMaxZ(bb.getMaxZ() - 0.1);
                 }
 
-                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+                this.onGround = CollisionHelper.hasExposedBlockSupport(this.level, this, bb);
             }
 
             this.isCollided = this.onGround;
@@ -3694,12 +3705,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            // miss 补发先排空：兑现的是已发出的哈希引用，子区块队列可多等一 tick
+            // miss 补发先排空：兑现的是已发出的哈希引用，子区块队列可多等一 tick；
+            // 随后子区块：先发送异步已完成的应答（预算/字节账本内），再按 in-flight 余量提交延期请求
             // / Miss backlog drains first: it fulfills already-sent hash references,
-            // while the sub-chunk queue can wait another tick
+            // while the sub-chunk queue can wait another tick; then sub-chunks: async
+            // completions are sent first (within the entry/byte ledgers), then deferred
+            // requests are submitted with the remaining in-flight credit
             ClientCacheBlobStatusProcessor.drainDeferredMissResponses(this.playerHandle);
 
-            SubChunkRequestProcessor.drainDeferredRequests(this.playerHandle);
+            SubChunkRequestProcessor.tickRequests(this.playerHandle);
 
             if (!this.loadQueue.isEmpty() || !this.spawned) {
                 this.sendNextChunk();
@@ -5985,6 +5999,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     switch (useItemData.actionType) {
                         case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
+                            Level clickLevel = this.level;
                             boolean spamming = !server.doNotLimitInteractions
                                     && lastRightClickPos != null
                                     && System.currentTimeMillis() - lastRightClickTime < 100.0
@@ -6049,24 +6064,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
                             }
 
-                            if (blockVector.distanceSquared(this) > 10000) {
+                            if (this.level != clickLevel || blockVector.distanceSquared(this) > 10000) {
                                 break;
                             }
 
                             Block target = this.level.getBlock(blockVector.asVector3());
                             block = target.getSide(face);
 
-                            this.level.sendBlocks(new Player[]{this}, new Block[]{target, block}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-                            this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1), block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
+                            if (!this.sendRefusedBlockLayers(clickLevel, target)
+                                    || !this.sendRefusedBlockLayers(clickLevel, block)
+                                    || this.level != clickLevel) {
+                                break;
+                            }
 
                             if (target instanceof BlockDoor door && (door.getDamage() & 0x08) > 0) {
                                 Block part = target.down();
                                 if (part.getId() == target.getId()) {
                                     target = part;
-                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-                                    this.level.sendBlocks(new Player[]{this}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
+                                    if (!this.sendRefusedBlockLayers(clickLevel, target)) {
+                                        break;
+                                    }
                                 }
                             }
+                            this.resendRefusedBlockActors(clickLevel, blockVector.asVector3(), blockVector.getSide(face).asVector3());
                             break;
                         case InventoryTransactionPacket.USE_ITEM_ACTION_BREAK_BLOCK:
                             if (!this.spawned || !this.isAlive()) {
@@ -6077,6 +6097,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             Item i = this.getInventory().getItemInHand();
                             Item oldItem = i.clone();
+                            Level breakLevel = this.level;
 
                             if (this.canInteract(blockVector.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7)
                                     && (i = this.level.useBreakOn(blockVector.asVector3(), face, i, this, true)) != null) {
@@ -6099,12 +6120,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             inventory.sendHeldItem(this);
 
                             if (blockVector.distanceSquared(this) < 10000) {
-                                target = this.level.getBlock(blockVector.asVector3());
-                                this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-                                BlockEntity blockEntity = this.level.getBlockEntity(blockVector.asVector3());
-                                if (blockEntity instanceof BlockEntitySpawnable) {
-                                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                                if (this.sendRefusedBlockLayers(breakLevel, blockVector.asVector3())) {
+                                    this.resendRefusedBlockActors(breakLevel, blockVector.asVector3());
                                 }
                             }
                             break;
@@ -6586,12 +6603,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        Block target = this.level.getBlock(pos);
+        Level interactionLevel = this.level;
+        Block target = interactionLevel.getBlock(pos);
         PlayerInteractEvent playerInteractEvent = new PlayerInteractEvent(this, this.inventory.getItemInHand(), target, face,
                 target.getId() == 0 ? Action.LEFT_CLICK_AIR : Action.LEFT_CLICK_BLOCK);
         this.getServer().getPluginManager().callEvent(playerInteractEvent);
         if (playerInteractEvent.isCancelled()) {
             this.needSendHeldItem = true;
+            if (this.sendRefusedBlockLayers(interactionLevel, pos)) {
+                this.resendRefusedBlockActors(interactionLevel, pos);
+            }
             return;
         }
 
@@ -6668,17 +6689,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Item handItem = this.getInventory().getItemInHand();
         Item clone = handItem.clone();
+        Level breakLevel = this.level;
 
         boolean canInteract = this.canInteract(blockPos.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7);
         if (canInteract) {
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
                 this.armDeniedCreativeBreakCorrection(blockPos);
-                this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-                BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
-                if (blockEntity instanceof BlockEntitySpawnable) {
-                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                if (this.sendRefusedBlockLayers(breakLevel, blockPos.asVector3())) {
+                    this.resendRefusedBlockActors(breakLevel, blockPos.asVector3());
                 }
             } else if (this.isSurvival()) {
                 this.getFoodData().updateFoodExpLevel(0.005);
@@ -6702,13 +6721,87 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.armDeniedCreativeBreakCorrection(blockPos);
 
         if (blockPos.distanceSquared(this) < 10000) {
-            Vector3 pos = blockPos.asVector3();
-            this.level.sendBlocks(this, new Block[]{this.level.getBlock(pos, false)}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-            BlockEntity blockEntity = this.level.getBlockEntityIfLoaded(this.chunk, pos);
-            if (blockEntity instanceof BlockEntitySpawnable) {
-                ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+            if (this.sendRefusedBlockLayers(breakLevel, blockPos.asVector3())) {
+                this.resendRefusedBlockActors(breakLevel, blockPos.asVector3());
             }
         }
+    }
+
+    /**
+     * 拒绝的预测交互后，仅从已加载区块的权威存储按层重发方块，不触发同步区块加载。
+     * <p>
+     * Restores both block layers from still-loaded authoritative storage after a refused prediction,
+     * never triggering a synchronous chunk load. Returns false when the world or chunk became invalid.
+     */
+    private boolean sendRefusedBlockLayers(Level origin, Vector3 pos) {
+        if (this.level != origin || !origin.isYInRange(pos.getFloorY())) {
+            return false;
+        }
+        FullChunk loaded = origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4);
+        if (loaded == null) {
+            return false;
+        }
+        for (int layer = 0; layer <= 1; layer++) {
+            // Packet listeners may teleport the player or replace/unload the chunk synchronously.
+            if (this.level != origin || origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4) != loaded) {
+                return false;
+            }
+            Block block = origin.getBlock(loaded, pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), layer, false);
+            origin.sendBlocks(new Player[]{this}, new Block[]{block}, UpdateBlockPacket.FLAG_ALL_PRIORITY, layer);
+        }
+        return this.level == origin && origin.getChunkIfLoaded(pos.getFloorX() >> 4, pos.getFloorZ() >> 4) == loaded;
+    }
+
+    /**
+     * 方块层全部重发后，补发公开的方块实体数据，含互惠相邻的双箱另一半。
+     * <p>
+     * Resends public block-actor data after the block layers, including the second half of a live,
+     * adjacent, reciprocal double chest; never opens or mutates a container.
+     */
+    private void resendRefusedBlockActors(Level origin, Vector3... positions) {
+        if (this.level != origin) {
+            return;
+        }
+        List<BlockEntitySpawnable> actors = new ArrayList<>();
+        for (Vector3 pos : positions) {
+            BlockEntity actor = origin.getBlockEntityIfLoaded(pos);
+            if (actor instanceof BlockEntitySpawnable spawnable && !spawnable.closed
+                    && spawnable.getLevel() == origin) {
+                actors.add(spawnable);
+            }
+        }
+        // A refused prediction can flip or remove both halves; only a live reciprocal pair is relevant.
+        for (int i = 0; i < actors.size(); i++) {
+            if (actors.get(i) instanceof BlockEntityChest chest) {
+                BlockEntityChest pair = chest.getPair();
+                if (pair != null && !pair.closed && pair.getLevel() == origin
+                        && pair.getFloorY() == chest.getFloorY()
+                        && Math.abs(pair.getFloorX() - chest.getFloorX())
+                        + Math.abs(pair.getFloorZ() - chest.getFloorZ()) == 1
+                        && pair.getPair() == chest && origin.getBlockEntityIfLoaded(pair) == pair
+                        && !containsIdentity(actors, pair)) {
+                    actors.add(pair);
+                    if (!this.sendRefusedBlockLayers(origin, pair)) {
+                        actors.remove(actors.size() - 1);
+                    }
+                }
+            }
+        }
+        for (BlockEntitySpawnable actor : actors) {
+            if (this.level == origin && !actor.closed && actor.getLevel() == origin
+                    && origin.getBlockEntityIfLoaded(actor) == actor) {
+                actor.spawnTo(this);
+            }
+        }
+    }
+
+    private static boolean containsIdentity(List<BlockEntitySpawnable> actors, BlockEntitySpawnable actor) {
+        for (BlockEntitySpawnable present : actors) {
+            if (present == actor) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -8125,6 +8218,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /**
+     * 传送目标 3×3 就绪判定：拉取模式下还要求各列已派发方块数据。
+     * <p>
+     * Readiness for the 3×3 around the teleport target: in pull mode each column
+     * must also have dispatched its block data.
+     */
     protected boolean checkTeleportPosition() {
         if (this.teleportPosition != null) {
             int chunkX = (int) this.teleportPosition.x >> 4;
@@ -8133,6 +8232,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkSendRadius = Math.max(0, this.spawned ? this.chunkRadius : Math.max(this.chunkRadius, this.server.c_s_spawnThreshold));
             int maxChunkOffset = Math.min(TELEPORT_CHUNK_READY_OFFSET, chunkSendRadius);
             long chunkSendRadiusSqr = (long) chunkSendRadius * chunkSendRadius;
+            int tick = this.server.getTick();
             for (int X = -maxChunkOffset; X <= maxChunkOffset; ++X) {
                 for (int Z = -maxChunkOffset; Z <= maxChunkOffset; ++Z) {
                     if ((long) X * X + (long) Z * Z > chunkSendRadiusSqr) {
@@ -8140,6 +8240,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     long index = Level.chunkHash(chunkX + X, chunkZ + Z);
                     if (!this.usedChunks.containsKey(index) || !this.usedChunks.get(index)) {
+                        return false;
+                    }
+                    if (!this.isColumnDataReady(index, tick)) {
                         return false;
                     }
                 }
@@ -8151,6 +8254,53 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return false;
+    }
+
+    /**
+     * 出生点 3×3 是否有地形数据：非拉取模式恒为 true。
+     * <p>
+     * Whether spawn's 3×3 has terrain data: always true outside pull mode.
+     */
+    private boolean isSpawnAreaDataReady() {
+        if (!this.isSubChunkPullMode()) {
+            return true;
+        }
+        int centerX = this.getChunkX();
+        int centerZ = this.getChunkZ();
+        int tick = this.server.getTick();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!this.isColumnDataReady(Level.chunkHash(centerX + dx, centerZ + dz), tick)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 该列数据是否就绪；状态对象缺失(mock)时视为就绪。
+     * <p>
+     * Whether the column's data is ready; a missing state object (mocks) counts as ready.
+     */
+    private boolean isColumnDataReady(long index, int tick) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        return state == null || state.isColumnDataReady(index, tick, DATA_WAIT_TICKS);
+    }
+
+    private void trackColumnSent(long index, boolean pullShell) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        if (state == null) {
+            return;
+        }
+        state.onColumnSent(index, this.server == null ? 0 : this.server.getTick(), pullShell);
+    }
+
+    private void forgetColumnData(long index) {
+        PlayerSubChunkRequestState state = this.subChunkRequestState;
+        if (state != null) {
+            state.forgetColumn(index);
+        }
     }
 
     protected void sendPlayStatus(int status) {
@@ -8709,7 +8859,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void onChunkChanged(FullChunk chunk) {
-        this.usedChunks.remove(Level.chunkHash(chunk.getX(), chunk.getZ()));
+        long index = Level.chunkHash(chunk.getX(), chunk.getZ());
+        this.usedChunks.remove(index);
+        this.forgetColumnData(index);
     }
 
     @Override
@@ -9884,6 +10036,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
         return this.isInventoryServerAuthoritative();
+    }
+
+    /**
+     * Whether this connection proved it holds the private key of its login chain's identity: RakNet
+     * through the Bedrock encryption handshake, NetherNet through the signaling assertion signed over
+     * the DTLS fingerprints of the same connection. A well-signed chain without this proof may be a
+     * replay of one the player sent to another server.
+     */
+    public boolean isLoginKeyProven() {
+        if (this.networkSession instanceof NetherNetPlayerSession netherNet) {
+            return netherNet.isIdentityKeyBound();
+        }
+        return this.isEnableNetworkEncryption();
     }
 
     public boolean isEnableNetworkEncryption() {

@@ -13,6 +13,10 @@ public class UseItemOnEntityData implements TransactionData {
     public long entityRuntimeId;
     public int actionType;
     public int hotbarSlot;
+    /**
+     * @since v2225
+     */
+    public int hand;
     public Item itemInHand;
     public Vector3 playerPos;
     public Vector3 clickPos;

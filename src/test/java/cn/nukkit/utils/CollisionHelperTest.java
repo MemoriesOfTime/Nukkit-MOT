@@ -344,6 +344,16 @@ class CollisionHelperTest {
         }
 
         @Test
+        void insideBlockKeepsMaterializedIdFromLevelOverride() {
+            Fixture f = new Fixture(CustomLevel.class);
+            f.put(0, 0, 0, Block.STONE, 0);
+            Block lava = Block.get(Block.LAVA, 0, f.level, 0, 0, 0);
+            doReturn(lava).when(f.level).getBlock(f.chunk, 0, 0, 0, 0, false);
+
+            assertTrue(f.helper.isInsideBlock(new SimpleAxisAlignedBB(0.1, 0.1, 0.1, 0.9, 0.9, 0.9), Block.LAVA));
+        }
+
+        @Test
         void nullAndAirFromLevelOverrideStayExcluded() {
             Fixture f = new Fixture(CustomLevel.class);
             f.put(0, 0, 0, Block.STONE, 0);
