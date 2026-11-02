@@ -6,11 +6,8 @@ import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
-import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
-import cn.nukkit.level.format.leveldb.structure.ChunkState;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
-import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
+import cn.nukkit.level.format.leveldb.structure.*;
+import cn.nukkit.math.Vector3;
 import com.sun.management.ThreadMXBean;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -138,6 +135,26 @@ class LevelPackedBlockReadTest {
         assertEquals(2, level.lookupCalls);
     }
 
+    @Test void coordinateAndVectorOverloadsKeepVirtualBlockOverride() throws Exception {
+        OverrideLevel level = level(OverrideLevel.class);
+        Vector3 position = new Vector3(-16.5, 2.9, 33.5);
+        Block normal = Block.get(Block.WATER, 9001, level, -17, 2, 33, 0);
+        Block secondary = Block.get(Block.WATER, 9001, level, -17, 2, 33, 1);
+
+        sameBlock(normal, level.getBlock(-17, 2, 33));
+        assertTrue(level.lastLoad);
+        sameBlock(normal, level.getBlock(position));
+        assertTrue(level.lastLoad);
+        sameBlock(secondary, level.getBlock(-17, 2, 33, 1, false));
+        assertFalse(level.lastLoad);
+        sameBlock(secondary, level.getBlock(position, 1, false));
+        assertFalse(level.lastLoad);
+        assertNull(level.lastHint);
+        assertEquals(4, level.blockCalls);
+        assertEquals(0, level.lookupCalls);
+        assertEquals(0, level.loadCalls);
+    }
+
     @Test void expandedDimensionReadsNegativeWorldHeightAndUpperSection() throws Exception {
         TestLevel level = level();
         level.minY = -64;
@@ -237,9 +254,13 @@ class LevelPackedBlockReadTest {
     }
 
     private static TestLevel level() throws Exception {
+        return level(TestLevel.class);
+    }
+
+    private static <T extends TestLevel> T level(Class<T> type) throws Exception {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);
-        TestLevel result = (TestLevel)((Unsafe)field.get(null)).allocateInstance(TestLevel.class);
+        T result = type.cast(((Unsafe)field.get(null)).allocateInstance(type));
         result.maxY = 255;
         return result;
     }
@@ -252,6 +273,18 @@ class LevelPackedBlockReadTest {
         @Override public int getMaxBlockY() { return maxY; }
         @Override public BaseFullChunk getChunk(int x, int z) { loadCalls++; return loaded; }
         @Override public BaseFullChunk getChunkIfLoaded(int x, int z) { lookupCalls++; return loaded; }
+    }
+
+    static class OverrideLevel extends TestLevel {
+        FullChunk lastHint;
+        boolean lastLoad;
+        int blockCalls;
+        @Override public Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
+            lastHint = chunk;
+            lastLoad = load;
+            blockCalls++;
+            return Block.get(Block.WATER, 9001, this, x, y, z, layer);
+        }
     }
 
     static class NoArrayChunk extends LevelDBChunk {

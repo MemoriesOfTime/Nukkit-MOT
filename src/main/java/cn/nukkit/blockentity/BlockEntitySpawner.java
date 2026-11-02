@@ -150,7 +150,7 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
 
                     Entity entity = Entity.createEntity(this.entityId, pos);
                     if (entity != null) {
-                        if (entity instanceof EntityMob && this.level.getBlockLightAt((int) x, (int) y, (int) z) > 3) {
+                        if (entity instanceof EntityMob && pos.getLevel().getBlockLightAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) > 3) {
                             entity.close();
                             continue;
                         }
