@@ -130,7 +130,11 @@ class LevelIdleChunkRequestAllocationTest {
         assertTrue(pending.isEmpty(), "Rejected requests must not remain pending after the drain");
         assertFalse(queue.containsKey(hash), "Empty or disconnected recipient owners must be removed");
         assertTrue(tasks(fixture.level, VERSION).isEmpty());
-        assertEquals(99L, fixture.buckets.started.get(hash), "Recipient rejection precedes timeout handling");
+        if (kind.equals("missing")) {
+            assertEquals(99L, fixture.buckets.started.get(hash), "a missing cohort has no accepted owner to release");
+        } else {
+            assertFalse(fixture.buckets.started.containsKey(hash), "retiring the last empty or disconnected cohort clears its timestamp");
+        }
         fixture.assertNoRequestSubmission();
     }
 
@@ -179,7 +183,11 @@ class LevelIdleChunkRequestAllocationTest {
 
         assertTrue(pending(fixture.level, VERSION).isEmpty());
         assertTrue(tasks.contains(hash));
-        assertSame(owner, queue(fixture.level, VERSION).get(hash));
+        Int2ObjectMap<Player> retryOwner = queue(fixture.level, VERSION).get(hash);
+        assertNotSame(owner, retryOwner, "an accepted retry needs a fresh cohort identity against late callbacks");
+        assertEquals(owner, retryOwner, "retry membership must stay unchanged");
+        assertIterableEquals(owner.values(), retryOwner.values(), "retain native recipient iteration order");
+        assertSame(player, retryOwner.get(1));
         assertEquals(300L, fixture.buckets.started.get(hash));
         ArgumentCaptor<Long> submission = ArgumentCaptor.forClass(Long.class);
         verify(fixture.level).getChunk(3, 5);
