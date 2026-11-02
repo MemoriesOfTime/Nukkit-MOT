@@ -26,7 +26,7 @@ public class NetherNetSettings extends OkaeriConfig {
     @CustomKey("enabled")
     private boolean enabled = true;
 
-    @Comment("Extra ICE STUN/TURN servers, e.g. stun:stun.l.google.com:19302. TURN credentials go in the URL: turn:user:pass@host:port?transport=udp")
+    @Comment("Extra ICE STUN servers, e.g. stun:stun.l.google.com:19302. TURN is no longer supported upstream")
     @CustomKey("ice-servers")
     private List<String> iceServers = new ArrayList<>();
 
