@@ -418,6 +418,10 @@ public class Level implements ChunkManager, Metadatable {
 
     private final int chunkTickRadius;
     private final Long2IntMap chunkTickList = new Long2IntOpenHashMap();
+    private final LongSet blockEntityTickingChunks = new LongOpenHashSet();
+    private LongSet blockEntityTickingLoaderChunks;
+    private LongSet blockEntityTickingLoaderScratch;
+    private int cachedBlockEntityTickRange;
     private final int chunksPerTicks;
     private final boolean clearChunksOnTick;
 
@@ -1403,17 +1407,7 @@ public class Level implements ChunkManager, Metadatable {
 
         this.tickEntities(currentTick);
 
-        var updateBlockEntities = this.updateBlockEntities.iterator();
-        while (updateBlockEntities.hasNext()) {
-            BlockEntity be = updateBlockEntities.next();
-            if (!be.isValid()) {
-                be.scheduledForBlockEntityUpdate.set(false);
-                updateBlockEntities.remove();
-            } else if (!be.onUpdate()) {
-                be.scheduledForBlockEntityUpdate.set(false);
-                updateBlockEntities.remove();
-            }
-        }
+        this.tickBlockEntities();
 
         this.tickChunks();
 
@@ -1802,6 +1796,71 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    void tickBlockEntities() {
+        if (this.updateBlockEntities.isEmpty()) {
+            return;
+        }
+
+        boolean limitToTickingChunks = this.server.blockEntityTickingRange;
+        if (limitToTickingChunks) this.refreshBlockEntityTickingChunks();
+
+        var updateBlockEntities = this.updateBlockEntities.iterator();
+        while (updateBlockEntities.hasNext()) {
+            BlockEntity be = updateBlockEntities.next();
+            if (be.closed || !be.isValid()) {
+                be.scheduledForBlockEntityUpdate.set(false);
+                updateBlockEntities.remove();
+            } else if (limitToTickingChunks && !be.alwaysTick()
+                    && !this.blockEntityTickingChunks.contains(chunkHash(be.getChunkX(), be.getChunkZ()))) {
+                // Keep both the queue entry and the scheduled flag for resumption.
+                continue;
+            } else if (!be.onUpdate()) {
+                be.scheduledForBlockEntityUpdate.set(false);
+                updateBlockEntities.remove();
+            }
+        }
+    }
+
+    private void refreshBlockEntityTickingChunks() {
+        if (this.blockEntityTickingLoaderScratch == null) {
+            this.blockEntityTickingLoaderScratch = new LongOpenHashSet();
+        }
+        LongSet centres = this.blockEntityTickingLoaderScratch;
+        centres.clear();
+        int range = 0;
+        if (this.chunksPerTicks > 0 && !this.loaders.isEmpty()) {
+            range = this.getChunkTickRange(this.getChunksPerLoader());
+            for (ChunkLoader loader : this.loaders.values()) {
+                // Preserve tickChunks' cast-before-shift conversion at negative fractions.
+                centres.add(chunkHash((int) loader.getX() >> 4, (int) loader.getZ() >> 4));
+            }
+        }
+        if (this.blockEntityTickingLoaderChunks != null && range == this.cachedBlockEntityTickRange
+                && centres.equals(this.blockEntityTickingLoaderChunks)) return;
+
+        this.blockEntityTickingChunks.clear();
+        for (var iterator = centres.iterator(); iterator.hasNext();) {
+            long centre = iterator.nextLong();
+            int chunkX = getHashX(centre), chunkZ = getHashZ(centre);
+            for (int dx = -range; dx < range; ++dx) {
+                for (int dz = -range; dz < range; ++dz) {
+                    this.blockEntityTickingChunks.add(chunkHash(chunkX + dx, chunkZ + dz));
+                }
+            }
+        }
+        this.blockEntityTickingLoaderScratch = this.blockEntityTickingLoaderChunks;
+        this.blockEntityTickingLoaderChunks = centres;
+        this.cachedBlockEntityTickRange = range;
+    }
+
+    private int getChunksPerLoader() {
+        return Math.min(200, Math.max(1, (int) ((double) (this.chunksPerTicks - this.loaders.size()) / this.loaders.size() + 0.5)));
+    }
+
+    private int getChunkTickRange(int chunksPerLoader) {
+        return Math.min(3 + chunksPerLoader / 30, this.chunkTickRadius);
+    }
+
     public static boolean isRandomTickBlock(int blockId) {
         return blockId >= 0 && blockId < randomTickBlocks.length && randomTickBlocks[blockId];
     }
@@ -1812,9 +1871,8 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        int chunksPerLoader = Math.min(200, Math.max(1, (int) ((double) (this.chunksPerTicks - this.loaders.size()) / this.loaders.size() + 0.5)));
-        int randRange = 3 + chunksPerLoader / 30;
-        randRange = Math.min(randRange, this.chunkTickRadius);
+        int chunksPerLoader = this.getChunksPerLoader();
+        int randRange = this.getChunkTickRange(chunksPerLoader);
 
         for (ChunkLoader loader : this.loaders.values()) {
             int chunkX = (int) loader.getX() >> 4;
