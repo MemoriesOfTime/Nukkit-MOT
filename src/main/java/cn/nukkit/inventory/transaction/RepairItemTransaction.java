@@ -35,6 +35,8 @@ public class RepairItemTransaction extends InventoryTransaction {
 
     private int cost;
 
+    private boolean executionInProgress;
+
     public RepairItemTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
 
@@ -78,46 +80,59 @@ public class RepairItemTransaction extends InventoryTransaction {
 
     @Override
     public boolean execute() {
-        if (this.hasExecuted() || !this.canExecute()) {
-            this.source.removeAllWindows(false);
-            this.sendInventories();
-            return false;
-        }
-        AnvilInventory inventory = (AnvilInventory) getSource().getWindowById(Player.ANVIL_WINDOW_ID);
-
-        if (inventory.getCost() != this.cost && !this.source.isCreative()) {
-            this.source.getServer().getLogger().debug("Got unexpected cost " + inventory.getCost() + " from " + this.source.getName() + " (expected " + this.cost + ')');
-        }
-
-        Item originalOutput = this.outputItem.clone();
-        RepairItemEvent event = new RepairItemEvent(inventory, this.inputItem, this.outputItem, this.materialItem, this.cost, this.source);
-        this.source.getServer().getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            this.sendInventories();
-            source.setNeedSendInventory(true);
-            return true;
-        }
-        Item authoritativeOutput = applyEventOutputToActions(originalOutput, event.getNewItem());
-        if (authoritativeOutput == null) {
-            this.sendInventories();
-            source.setNeedSendInventory(true);
-            return true;
-        }
-        this.outputItem = authoritativeOutput;
-
-        for (InventoryAction action : this.actions) {
-            if (action.execute(this.source)) {
-                action.onExecuteSuccess(this.source);
-            } else {
-                action.onExecuteFail(this.source);
+        if (executionInProgress || this.hasExecuted() || !NativeRecipeTransaction.supports(this)) return false;
+        executionInProgress = true;
+        try {
+            if (!this.canExecute()) {
+                this.sendInventories();
+                return false;
             }
+            AnvilInventory inventory = (AnvilInventory) getSource().getWindowById(Player.ANVIL_WINDOW_ID);
+            Item input = this.inputItem.clone();
+            Item material = this.materialItem == null ? null : this.materialItem.clone();
+            Item originalOutput = this.outputItem.clone();
+            int originalCost = this.cost;
+            boolean chargeExperience = !this.source.isCreative();
+            cn.nukkit.level.Level originalLevel = this.source.getLevel();
+            RepairItemEvent event = new RepairItemEvent(inventory, input.clone(), originalOutput.clone(),
+                    material == null ? null : material.clone(), originalCost, this.source);
+            boolean committed = NativeRecipeTransaction.execute(this, originalOutput, this::getOutputItem, () -> {
+                this.source.getServer().getPluginManager().callEvent(event);
+                if (event.isCancelled() || event.getCost() < 0
+                        || !this.source.isCreative() && event.getCost() > this.source.getExperienceLevel()) return false;
+                Item approved = applyEventOutputToActions(originalOutput, event.getNewItem());
+                if (approved == null) return false;
+                this.outputItem = approved;
+                return true;
+            }, () -> this.inputItem.equalsExact(input) && sameNullableItem(this.materialItem, material)
+                    && this.cost == originalCost && this.source.getWindowById(Player.ANVIL_WINDOW_ID) == inventory,
+                    () -> {
+                        // Pay the already accepted recipe before anvil-event/network callbacks can throw or reenter.
+                        if (chargeExperience) {
+                            this.source.setExperience(this.source.getExperience(), this.source.getExperienceLevel() - event.getCost());
+                        }
+                        applyAnvilWear(inventory, originalLevel, !chargeExperience);
+                    });
+            if (!committed) {
+                this.sendInventories();
+                source.setNeedSendInventory(true);
+            }
+            return committed;
+        } finally {
+            executionInProgress = false;
         }
+    }
 
+    private static boolean sameNullableItem(Item actual, Item expected) {
+        return actual == null ? expected == null : expected != null && actual.equalsExact(expected);
+    }
+
+    private void applyAnvilWear(AnvilInventory inventory, cn.nukkit.level.Level originalLevel, boolean creative) {
         FakeBlockMenu holder = inventory.getHolder();
-        Block block = this.source.level.getBlock(holder.getFloorX(), holder.getFloorY(), holder.getFloorZ());
+        Block block = originalLevel.getBlock(holder.getFloorX(), holder.getFloorY(), holder.getFloorZ());
         if (block.getId() == Block.ANVIL) {
             int oldDamage = block.getDamage() >= 8 ? 2 : block.getDamage() >= 4 ? 1 : 0;
-            int newDamage = !this.source.isCreative() && ThreadLocalRandom.current().nextInt(100) < 12 ? oldDamage + 1 : oldDamage;
+            int newDamage = !creative && ThreadLocalRandom.current().nextInt(100) < 12 ? oldDamage + 1 : oldDamage;
 
             AnvilDamageEvent ev = new AnvilDamageEvent(block, oldDamage, newDamage, DamageCause.USE, this.source);
             ev.setCancelled(oldDamage == newDamage);
@@ -125,27 +140,23 @@ public class RepairItemTransaction extends InventoryTransaction {
             if (!ev.isCancelled()) {
                 newDamage = ev.getNewDamage();
                 if (newDamage > 2) {
-                    this.source.level.setBlock(block, Block.get(Block.AIR), true);
-                    this.source.level.addLevelEvent(block, LevelEventPacket.EVENT_SOUND_ANVIL_BREAK);
+                    originalLevel.setBlock(block, Block.get(Block.AIR), true);
+                    originalLevel.addLevelEvent(block, LevelEventPacket.EVENT_SOUND_ANVIL_BREAK);
                 } else {
                     if (newDamage < 0) {
                         newDamage = 0;
                     }
                     if (newDamage != oldDamage) {
                         block.setDamage((newDamage << 2) | (block.getDamage() & 0x3));
-                        this.source.level.setBlock(block, block, true);
+                        originalLevel.setBlock(block, block, true);
                     }
-                    this.source.level.addLevelEvent(block, LevelEventPacket.EVENT_SOUND_ANVIL_USE);
+                    originalLevel.addLevelEvent(block, LevelEventPacket.EVENT_SOUND_ANVIL_USE);
                 }
             } else {
-                this.source.level.addLevelEvent(block, LevelEventPacket.EVENT_SOUND_ANVIL_USE);
+                originalLevel.addLevelEvent(block, LevelEventPacket.EVENT_SOUND_ANVIL_USE);
             }
         }
 
-        if (!this.source.isCreative()) {
-            this.source.setExperience(this.source.getExperience(), this.source.getExperienceLevel() - event.getCost());
-        }
-        return true;
     }
 
     @Override

@@ -251,9 +251,15 @@ public class ByteArrayStagingTest {
             when(chunk.getState()).thenReturn(ChunkState.FINISHED); when(chunk.getX()).thenReturn(X); when(chunk.getZ()).thenReturn(Z);
             when(level.getPendingBlockUpdates(chunk)).thenReturn(nonempty ? Set.of(mock(BlockUpdateEntry.class)) : Set.of());
             field(provider.getClass(), "db").set(provider, database);
-            append = LevelDBProvider.class.getDeclaredMethod("save0", int.class, int.class, LevelDBChunk.class); append.setAccessible(true);
+            append = LevelDBProvider.class.getDeclaredMethod("save0", int.class, int.class, LevelDBChunk.class, boolean.class); append.setAccessible(true);
         }
-        void append(CapturingBatch batch) throws Exception { when(database.createWriteBatch()).thenReturn(batch); append.invoke(provider, X, Z, chunk); }
+        void append(CapturingBatch batch) throws Exception {
+            when(database.createWriteBatch()).thenReturn(batch);
+            Object captured = append.invoke(provider, X, Z, chunk, false);
+            Method capturedBatch = captured.getClass().getDeclaredMethod("batch");
+            capturedBatch.setAccessible(true);
+            assertSame(batch, capturedBatch.invoke(captured), "ungrouped capture must retain the native DB batch");
+        }
     }
     private static void withoutGlobalAdaptiveWait(String name, Runnable operation) throws Exception {
         Assumptions.assumeTrue(ByteBufAllocator.DEFAULT instanceof AdaptiveByteBufAllocator, "selected default must be Adaptive");

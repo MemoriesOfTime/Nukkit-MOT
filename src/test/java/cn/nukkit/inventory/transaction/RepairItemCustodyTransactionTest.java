@@ -116,8 +116,8 @@ class RepairItemCustodyTransactionTest {
                     new SlotChangeAction(f.grid, 1, second.clone(), Item.AIR_ITEM.clone()),
                     new SlotChangeAction(f.main, 0, Item.AIR_ITEM.clone(), requestedOutput.clone())));
             assertTrue(tx.canExecute(), "provisional recipe validates before the event");
-            // Legacy execute() reports handled cancellations as true; hasExecuted tracks the commit.
-            assertTrue(tx.execute());
+            // Native atomic execute() reports whether the inventory mutation committed.
+            assertEquals(accepted, tx.execute());
             assertEquals(accepted, tx.hasExecuted());
             if (accepted) {
                 assertTrue(f.grid.getItem(0).isNull());

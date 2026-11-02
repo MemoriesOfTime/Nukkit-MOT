@@ -39,6 +39,7 @@ class CraftingEvent_v113AdapterTest {
     void setUp() {
         MockServer.reset();
         craftingManager = Mockito.mock(CraftingManager.class);
+        Mockito.when(MockServer.get().isPrimaryThread()).thenReturn(true);
         Mockito.lenient().when(MockServer.get().getCraftingManager()).thenReturn(craftingManager);
     }
 
@@ -131,6 +132,7 @@ class CraftingEvent_v113AdapterTest {
             this.protocol = ProtocolInfo.v1_1_0;
             this.gameVersion = GameVersion.V1_1_0;
             this.spawned = true;
+            this.loggedIn = true;
         }
 
         @Override

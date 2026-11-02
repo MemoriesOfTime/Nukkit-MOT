@@ -127,7 +127,30 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected AtomicLong changes = new AtomicLong();
 
-    protected boolean isInit;
+    protected volatile boolean isInit;
+    private volatile Throwable chunkLoadFailure;
+    private volatile boolean readFailurePlaceholder;
+
+    /** A failed mount must not later be reported as a successful cached load. */
+    public Throwable getChunkLoadFailure() {
+        return this.chunkLoadFailure;
+    }
+
+    /** Lifecycle errors are diagnostic only: decoded terrain and live entities remain writable. */
+    public void markChunkLoadFailure(Throwable failure) {
+        if (this.chunkLoadFailure == null) this.chunkLoadFailure = failure;
+    }
+
+    /** Only an empty stand-in for an unreadable chunk may discard changes on unload. */
+    public void markChunkReadFailure(Throwable failure) {
+        this.markChunkLoadFailure(failure);
+        this.readFailurePlaceholder = true;
+        this.setGenerated(false);
+    }
+
+    public boolean isReadFailurePlaceholder() {
+        return this.readFailurePlaceholder;
+    }
 
     protected boolean lightPopulated;
 
@@ -964,6 +987,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (provider == null) {
             return true;
         }
+        if (provider instanceof cn.nukkit.level.format.leveldb.LevelDBProvider leveldb
+                && leveldb.deferContainerChunkDetach(this.x, this.z)) return false;
+        try (cn.nukkit.level.format.leveldb.LevelDBProvider.ContainerLifecycleScope lifecycle =
+                     provider instanceof cn.nukkit.level.format.leveldb.LevelDBProvider leveldb
+                             ? leveldb.reserveContainerDetach(this.x,this.z) : null) {
         if (save && this.changes.get() != 0) {
             provider.saveChunk(this.x, this.z);
         }
@@ -986,6 +1014,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         }
         this.provider = null;
         return true;
+        }
     }
 
     @Override
