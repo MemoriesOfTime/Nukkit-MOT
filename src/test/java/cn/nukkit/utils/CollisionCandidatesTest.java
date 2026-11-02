@@ -10,11 +10,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
-import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
-import cn.nukkit.level.format.leveldb.structure.ChunkState;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
-import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
+import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
@@ -22,11 +18,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -263,6 +259,132 @@ class CollisionCandidatesTest {
         assertNotEquals(0, flags[BlockID.FENCE_GATE_OAK] & CollisionHelper.SHAPE_OVERHANG);
         assertEquals(0, flags[BlockID.STONE]);
         assertEquals(0, flags[BlockID.WATER]);
+    }
+
+    private void compareCellBounds(double low, double high) {
+        World world = World.flat(Block.NETHER_PORTAL, 64);
+        CollisionHelper helper = world.helperAt((low + high) / 2, .5);
+        AxisAlignedBB box = new SimpleAxisAlignedBB(low, 64.1, .1, high, 64.9, .9);
+        List<String> expected = Arrays.stream(helper.getBlocksInBoundingBox(box)).map(b -> b.getFloorX() + ":" + b.getFloorY() + ":" + b.getFloorZ()).toList();
+        List<String> actual = Arrays.stream(helper.getCollisionCandidates(box, box)).map(b -> b.getFloorX() + ":" + b.getFloorY() + ":" + b.getFloorZ()).toList();
+        assertFalse(expected.isEmpty());
+        assertEquals(expected, actual, "Dynamic candidates use the same occupied cell range as the native full scan");
+    }
+
+    @Test
+    void positiveFractionalUpperBoundaryKeepsNativeCellRange() {
+        compareCellBounds(.1, .9);
+    }
+
+    @Test
+    void negativeFractionalUpperBoundaryKeepsNativeCellRange() {
+        compareCellBounds(-.9, -.1);
+    }
+
+    // Dynamic portals exercise the candidate mask even when the neighboring cell has no collision box.
+    private void compareCellBoundsZ(double low, double high) {
+        World world = World.flat(Block.NETHER_PORTAL, 64);
+        CollisionHelper helper = world.helperAt(.5, (low + high) / 2);
+        AxisAlignedBB box = new SimpleAxisAlignedBB(.1, 64.1, low, .9, 64.9, high);
+        List<String> expected = Arrays.stream(helper.getBlocksInBoundingBox(box)).map(b -> b.getFloorX() + ":" + b.getFloorY() + ":" + b.getFloorZ()).toList();
+        List<String> actual = Arrays.stream(helper.getCollisionCandidates(box, box)).map(b -> b.getFloorX() + ":" + b.getFloorY() + ":" + b.getFloorZ()).toList();
+        assertFalse(expected.isEmpty());
+        assertEquals(expected, actual, "Z candidate bounds match the occupied cells of the native full scan");
+    }
+
+    @Test
+    void positiveFractionalZUpperBoundaryKeepsNativeCellRange() {
+        compareCellBoundsZ(.1, .9);
+    }
+
+    @Test
+    void negativeFractionalZUpperBoundaryKeepsNativeCellRange() {
+        compareCellBoundsZ(-.9, -.1);
+    }
+
+    @Test
+    void fractionalYUpperBoundaryDoesNotAdmitThePortalAboveTheBox() {
+        World world = World.flat(Block.NETHER_PORTAL, 64);
+        world.set(0, 65, 0, Block.NETHER_PORTAL);
+        CollisionHelper helper = world.helperAt(.5, .5);
+        AxisAlignedBB box = new SimpleAxisAlignedBB(.1, 64.1, .1, .9, 64.9, .9);
+        List<String> expected = Arrays.stream(helper.getBlocksInBoundingBox(box)).map(b -> b.getFloorX() + ":" + b.getFloorY() + ":" + b.getFloorZ()).toList();
+        List<String> actual = Arrays.stream(helper.getCollisionCandidates(box, box)).map(b -> b.getFloorX() + ":" + b.getFloorY() + ":" + b.getFloorZ()).toList();
+        assertEquals(List.of("0:64:0"), expected);
+        assertEquals(expected, actual, "A dynamic portal at Y65 is outside the native full scan ending at Y64.9");
+    }
+
+    @Test
+    void emptyMissCommitsCacheAndKeepsEmptyResultOnHitAndMovedRescan() {
+        World world = World.flat(BlockID.STONE, 63);
+        CollisionHelper helper = world.helperAt(5.5, 5.5);
+        AxisAlignedBB box = new SimpleAxisAlignedBB(5.2, 64, 5.2, 5.8, 65.8, 5.8);
+        AxisAlignedBB scan = box.grow(0.5, 0.5, 0.5);
+        assertSame(Block.EMPTY_ARRAY, helper.getCollisionCandidates(scan, box));
+        assertTrue(helper.scanCache().holds(world.level, world.chunk(0, 0), scan, box));
+        assertSame(Block.EMPTY_ARRAY, helper.getCollisionCandidates(scan, box));
+        AxisAlignedBB moved = box.getOffsetBoundingBox(0.125, 0, 0);
+        AxisAlignedBB movedScan = moved.grow(0.5, 0.5, 0.5);
+        assertSame(Block.EMPTY_ARRAY, helper.getCollisionCandidates(movedScan, moved));
+        assertTrue(helper.scanCache().holds(world.level, world.chunk(0, 0), movedScan, moved));
+        assertFalse(helper.scanCache().holds(world.level, world.chunk(0, 0), scan, box));
+    }
+
+    @Test
+    void fullAndGrowingResultsAreFreshAndKeepEveryBlockInOrder() {
+        World world = World.flat(BlockID.STONE, 64);
+        for (int count : new int[]{1, 4, 16, 17, 33}) {
+            CollisionHelper helper = world.helperAt(0.5, 0.5);
+            AxisAlignedBB box = new SimpleAxisAlignedBB(0.2, 64.2, 0.2, count - 0.2, 64.8, 0.8);
+            Block[] first = helper.getCollisionCandidates(box, box);
+            assertEquals(count, first.length);
+            for (int i = 0; i < count; i++) {
+                assertEquals(BlockID.STONE, first[i].getId());
+                assertEquals(i, first[i].getFloorX());
+                assertEquals(64, first[i].getFloorY());
+                assertEquals(0, first[i].getFloorZ());
+            }
+            Block[] second = helper.getCollisionCandidates(box, box);
+            assertNotSame(first, second);
+            assertNotSame(first[0], second[0]);
+            first[0] = null;
+            assertNotNull(second[0]);
+            second[0].x = 99;
+            Block[] third = helper.getCollisionCandidates(box, box);
+            assertEquals(0, third[0].getFloorX());
+        }
+    }
+
+    @Test
+    void partialResultIsTrimmedWithoutExposingCapacityOrCacheStorage() {
+        World world = World.flat(BlockID.STONE, 64);
+        CollisionHelper helper = world.helperAt(5.5, 5.5);
+        AxisAlignedBB box = new SimpleAxisAlignedBB(5.2, 64.2, 5.2, 5.8, 64.8, 5.8);
+        AxisAlignedBB scan = box.grow(0.5, 0.5, 0.5);
+        Block[] first = helper.getCollisionCandidates(scan, box);
+        assertEquals(1, first.length);
+        assertEquals(5, first[0].getFloorX());
+        Block[] second = helper.getCollisionCandidates(scan, box);
+        assertEquals(1, second.length);
+        assertNotSame(first, second);
+        first[0] = null;
+        assertNotNull(second[0]);
+    }
+
+    @Test
+    void versionedBlockEditsInvalidateZeroAndNonzeroCandidateSnapshots() {
+        World world = World.flat(BlockID.AIR, 64);
+        CollisionHelper helper = world.helperAt(5.5, 5.5);
+        AxisAlignedBB box = new SimpleAxisAlignedBB(5.2, 64.2, 5.2, 5.8, 64.8, 5.8);
+        AxisAlignedBB scan = box.grow(0.5, 0.5, 0.5);
+        assertSame(Block.EMPTY_ARRAY, helper.getCollisionCandidates(scan, box));
+        world.set(5, 64, 5, BlockID.STONE);
+        Block[] stone = helper.getCollisionCandidates(scan, box);
+        assertEquals(1, stone.length);
+        assertEquals(BlockID.STONE, stone[0].getId());
+        world.set(5, 64, 5, BlockID.AIR);
+        assertSame(Block.EMPTY_ARRAY, helper.getCollisionCandidates(scan, box));
+        assertEquals(BlockID.STONE, stone[0].getId());
     }
 
     private static void assertSameBlocks(Block[] expected, Block[] actual, AxisAlignedBB box, AxisAlignedBB scan) {

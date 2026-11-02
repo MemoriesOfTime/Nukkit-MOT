@@ -7,26 +7,31 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
-import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ConsumeAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftRecipeAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+
 import java.util.List;
-import static cn.nukkit.inventory.request.CakeCraftingReproTest.*;
+
+import static cn.nukkit.inventory.request.CakeCraftingRequestTest.*;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 
 class RepairItemMetadataRequestTest {
     @BeforeAll
     static void init() {
-        CakeCraftingReproTest.init();
+        CakeCraftingRequestTest.init();
     }
     @BeforeEach
     void setUp() {
-        new CakeCraftingReproTest().setUp();
+        new CakeCraftingRequestTest().setUp();
     }
 
     @ParameterizedTest
