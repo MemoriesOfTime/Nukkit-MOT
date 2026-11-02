@@ -110,6 +110,8 @@ public class Level implements ChunkManager, Metadatable {
     public static final int BLOCK_UPDATE_REDSTONE = 6;
     public static final int BLOCK_UPDATE_TICK = 7;
 
+    private static final BlockFace[] REDSTONE_UPDATE_FACES = BlockFace.values();
+
     public static final int TIME_DAY = 1000;
     public static final int TIME_NOON = 6000;
     public static final int TIME_SUNSET = 12000;
@@ -1966,7 +1968,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void updateAroundRedstone(@NotNull Vector3 pos, @Nullable BlockFace ignoredFace) {
-        for (BlockFace side : BlockFace.values()) {
+        for (BlockFace side : REDSTONE_UPDATE_FACES) {
             if (ignoredFace != null && side == ignoredFace) {
                 continue;
             }
