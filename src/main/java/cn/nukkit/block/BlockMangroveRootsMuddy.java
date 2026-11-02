@@ -6,6 +6,15 @@ import cn.nukkit.item.ItemTool;
 
 public class BlockMangroveRootsMuddy extends BlockMangroveRoots {
 
+    public BlockMangroveRootsMuddy() {
+        this(0);
+    }
+
+    public BlockMangroveRootsMuddy(int meta) {
+        super(meta);
+    }
+
+
     @Override
     public String getName() {
         return "Muddy Mangrove Roots";
