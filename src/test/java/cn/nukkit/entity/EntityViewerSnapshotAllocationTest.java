@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
@@ -241,6 +242,9 @@ class EntityViewerSnapshotAllocationTest {
             if (failure == 3) throw new IllegalStateException("destination unavailable");
             return chunks[x];
         }
+        @Override public BaseFullChunk getChunkIfLoaded(int x, int z) {
+            return x >= 0 && x < chunks.length && z == 0 ? chunks[x] : null;
+        }
         @Override public Map<Integer, Player> getChunkPlayers(int x, int z) {
             trace.add(400 + x);
             if (failure == 2) throw new IllegalStateException("viewers unavailable");
@@ -256,6 +260,7 @@ class EntityViewerSnapshotAllocationTest {
         final Viewer[] viewers;
         Fixture(int count) throws Exception {
             actor.trace = trace; actor.level = world;
+            set(Entity.class, actor, "server", allocate(Server.class));
             set(Entity.class, actor, "hasSpawned", new ConcurrentHashMap<Integer, Player>());
             actor.boundingBox = new SimpleAxisAlignedBB(0,64,0,1,65,1); actor.scale = 1;
             actor.x = 1; actor.y = 64; actor.z = 1;
@@ -287,7 +292,7 @@ class EntityViewerSnapshotAllocationTest {
         Field f=owner.getDeclaredField(name);f.setAccessible(true);f.set(target,value);
     }
 
-    /** Standalone child: real inherited methods, counter callbacks, no server, Mockito or packet delivery. */
+    /** Standalone child: real inherited methods, counter callbacks, detached server flags, no server lifecycle, Mockito or packet delivery. */
     public static final class AllocationProbe {
         private static volatile long blackhole;
         private static void invoke(Fixture f,String mode,int count) {
