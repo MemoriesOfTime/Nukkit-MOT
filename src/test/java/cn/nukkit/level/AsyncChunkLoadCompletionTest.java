@@ -73,6 +73,8 @@ class AsyncChunkLoadCompletionTest {
         field(this.level, "server", this.server);
         field(this.level, "provider", this.provider);
         field(this.level, "asyncChunkLoadExecutor", this.executor);
+        field(this.level, "asyncChunkLoadSlots", new java.util.concurrent.Semaphore(16));
+        field(this.level, "runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
         field(this.level, "asyncChuckExecutor", this.executor);
         field(this.level, "pendingChunkLoads", new ConcurrentHashMap<>());
         field(this.level, "completedChunkLoads", new ConcurrentLinkedQueue<>());

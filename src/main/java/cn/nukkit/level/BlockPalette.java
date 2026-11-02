@@ -191,6 +191,48 @@ public class BlockPalette {
         this.legacyToRuntimeIdCache.invalidateAll();
     }
 
+    public synchronized void remapRuntimeIds(Int2IntMap runtimeIdMapping, int vanillaStateCount) {
+        if (vanillaStateCount < 0) {
+            throw new IllegalArgumentException("Vanilla state count must be nonnegative");
+        }
+        Int2IntOpenHashMap remappedLegacyToRuntime = new Int2IntOpenHashMap(this.legacyToRuntimeId.size());
+        for (Int2IntMap.Entry entry : this.legacyToRuntimeId.int2IntEntrySet()) {
+            int runtimeId = entry.getIntValue();
+            if (runtimeId >= 0 && runtimeId < vanillaStateCount) {
+                remappedLegacyToRuntime.put(entry.getIntKey(), remapRuntimeId(runtimeIdMapping, runtimeId));
+            }
+        }
+        Int2IntOpenHashMap remappedRuntimeToLegacy = new Int2IntOpenHashMap(this.runtimeIdToLegacy.size());
+        for (Int2IntMap.Entry entry : this.runtimeIdToLegacy.int2IntEntrySet()) {
+            if (entry.getIntKey() < 0 || entry.getIntKey() >= vanillaStateCount) {
+                continue;
+            }
+            int replacement = remapRuntimeId(runtimeIdMapping, entry.getIntKey());
+            if (remappedRuntimeToLegacy.containsKey(replacement)) {
+                throw new IllegalArgumentException("Duplicate replacement for runtime ID " + replacement
+                        + " in palette for " + this.gameVersion + " (protocol " + this.protocol + ")");
+            }
+            remappedRuntimeToLegacy.put(replacement, entry.getIntValue());
+        }
+
+        this.networkMappingReady = false;
+        this.locked = false;
+        this.legacyToRuntimeId.clear();
+        this.legacyToRuntimeId.putAll(remappedLegacyToRuntime);
+        this.runtimeIdToLegacy.clear();
+        this.runtimeIdToLegacy.putAll(remappedRuntimeToLegacy);
+        this.legacyToRuntimeIdCache.invalidateAll();
+    }
+
+    private int remapRuntimeId(Int2IntMap mapping, int runtimeId) {
+        int replacement = mapping.getOrDefault(runtimeId, -1);
+        if (replacement < 0) {
+            throw new IllegalArgumentException("Missing replacement for runtime ID " + runtimeId
+                    + " in palette for " + this.gameVersion + " (protocol " + this.protocol + ")");
+        }
+        return replacement;
+    }
+
     public synchronized void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
         if (this.locked) {
             throw new IllegalStateException("Block palette is already locked!");

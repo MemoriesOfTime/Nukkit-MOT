@@ -22,7 +22,10 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
-import org.cloudburstmc.netty.channel.nethernet.signaling.*;
+import org.cloudburstmc.netty.channel.nethernet.signaling.JoinRefusal;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.cloudburstmc.netty.util.nethernet.NetherNetLogging;
 import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 import org.cloudburstmc.netty.util.nethernet.TokenTrust;
@@ -159,7 +162,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 // RakNet and relayed to a system-assigned loopback port; 0 still means
                 // system-assigned). A mapping (19132:19134) pins the internal port instead
                 .setIceOnLocalPort(false)
-                .setIceServers(iceServers(settings))
+                .setStunServers(stunServers(settings))
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
                 .setTokenTrust(TokenTrust.ANY)
                 .setMotdProvider((host, remoteAddress, client) -> this.buildPong())
@@ -263,12 +266,17 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         return expiry != null && expiry >= System.currentTimeMillis();
     }
 
-    private static List<IceServerInfo> iceServers(NetherNetSettings settings) {
+    /**
+     * CR6 起 ICE 配置只剩 STUN 发现（TURN 支持随上游移除），URL 原样交给信令层。
+     * Since CR6 the ICE configuration is STUN discovery only (upstream dropped TURN);
+     * URLs pass through to the signaling layer as-is.
+     */
+    private static List<String> stunServers(NetherNetSettings settings) {
         List<String> urls = settings.iceServers();
         if (urls == null || urls.isEmpty()) {
             return List.of();
         }
-        return List.of(new IceServerInfo.Builder().setUrls(List.copyOf(urls)).build());
+        return List.copyOf(urls);
     }
 
     /**
@@ -662,17 +670,22 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             return null;
         }
         Channel channel = netherNetSession.getChannel();
-        if (!this.server.xboxAuth) {
-            // 离线模式本就不证明身份，没有可比对的密钥
-            // Offline mode has given up on proving identity, no key worth comparing
-            return TransportIdentityBinding.acceptForwardedIdentity(channel);
-        }
-
         PublicKey identityKey = parseIdentityKey(identityPublicKeyBase64);
-        if (identityKey == null) {
-            return "the login chain carries no usable identity key";
+        String mismatch = identityKey == null
+                ? "the login chain carries no usable identity key"
+                : TransportIdentityBinding.mismatch(channel, identityKey);
+        netherNetSession.setIdentityKeyBound(mismatch == null);
+        if (!this.server.xboxAuth) {
+            // Offline mode does not refuse an unbound chain, but it must not trust one either: the
+            // session reports the binding (Player#isLoginKeyProven) so whatever authenticates the
+            // player instead can tell a replayed chain from its holder, exactly as RakNet's
+            // encryption handshake lets it.
+            if (mismatch != null) {
+                log.debug("NetherNet login from {} is not bound to its chain: {}", channel.remoteAddress(), mismatch);
+            }
+            return null;
         }
-        return TransportIdentityBinding.mismatch(channel, identityKey);
+        return mismatch;
     }
 
     private static PublicKey parseIdentityKey(String base64) {

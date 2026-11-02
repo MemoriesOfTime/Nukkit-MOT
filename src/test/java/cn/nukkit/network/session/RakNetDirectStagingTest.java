@@ -5,38 +5,50 @@ import cn.nukkit.Server;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import io.netty.buffer.*;
+import io.netty.buffer.AdaptiveByteBufAllocator;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.nio.NioIoHandler;
-import io.netty.util.collection.IntObjectHashMap;
-import io.netty.util.collection.IntObjectMap;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import io.netty.util.internal.ThreadExecutorMap;
-import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.cloudburstmc.netty.channel.raknet.RakChannel;
+import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.cloudburstmc.netty.channel.raknet.RakSlidingWindow;
-import org.cloudburstmc.netty.channel.raknet.packet.*;
-import org.cloudburstmc.netty.handler.codec.raknet.common.*;
+import org.cloudburstmc.netty.channel.raknet.packet.EncapsulatedPacket;
+import org.cloudburstmc.netty.channel.raknet.packet.RakDatagramPacket;
+import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
+import org.cloudburstmc.netty.handler.codec.raknet.common.RakDatagramCodec;
+import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
+import org.cloudburstmc.netty.util.BitQueue;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.Isolated;
+
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayOutputStream;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @Isolated("Temporarily substitutes Server.instance and the default adaptive direct pool")
@@ -44,7 +56,7 @@ import static org.mockito.Mockito.*;
 public class RakNetDirectStagingTest {
     private static final Method SEND=method(RakNetPlayerSession.class,"sendPacket",byte[].class);
     private static final Method SPLIT=method(RakSessionCodec.class,"createEncapsulated",RakMessage.class);
-    private static final Method SEND_DG=method(RakSessionCodec.class,"sendDatagram",ChannelHandlerContext.class,RakDatagramPacket.class,long.class,IntObjectMap.class);
+    private static final Method SEND_DG=method(RakSessionCodec.class,"sendDatagram",ChannelHandlerContext.class,RakDatagramPacket.class,long.class,Map.class);
     private static final Method ACK=method(RakSessionCodec.class,"onIncomingAck",RakDatagramPacket.class,long.class);
     private static final Method NACK=method(RakSessionCodec.class,"onIncomingNack",ChannelHandlerContext.class,RakDatagramPacket.class,long.class);
     private static final GameVersion[] VERSIONS={GameVersion.V1_20_0,GameVersion.V1_20_60,GameVersion.V1_26_20_26,GameVersion.V1_26_40,GameVersion.V1_26_50};
@@ -86,7 +98,7 @@ public class RakNetDirectStagingTest {
     }
     /** Native fragments/datagrams/ACK; embedded encoder replaces physical UDP write only. */
     private static final class Transit implements AutoCloseable {
-        final RakSessionCodec codec;final IntObjectMap<RakDatagramPacket> sent=new IntObjectHashMap<>();
+        final RakSessionCodec codec;final NavigableMap<Integer,RakDatagramPacket> sent=new TreeMap<>();
         final ChannelHandlerContext ctx=mock(ChannelHandlerContext.class);final EmbeddedChannel encoder=new EmbeddedChannel(new RakDatagramCodec());
         final List<ByteBuf> carriers=new ArrayList<>();final ByteBuf backing;final byte[] rebuilt;
         Transit(ByteBuf frame)throws Exception{
@@ -94,6 +106,11 @@ public class RakNetDirectStagingTest {
             when(channel.config().getMtu()).thenReturn(1492);when(channel.remoteAddress()).thenReturn(new InetSocketAddress(InetAddress.getLoopbackAddress(),0));
             codec=new RakSessionCodec(channel);field(RakSessionCodec.class,"orderWriteIndex").set(codec,new int[16]);
             field(RakSessionCodec.class,"slidingWindow").set(codec,new RakSlidingWindow(codec.getMtu()));field(RakSessionCodec.class,"sentDatagrams").set(codec,sent);
+            // CR4 起真实路径在 handlerAdded 里建的可靠窗口，绕过构造的测试须自带
+            // Since CR4 the reliability windows are built in handlerAdded; a fixture that
+            // skips it must supply its own
+            field(RakSessionCodec.class,"reliableWindow").set(codec,new BitQueue());field(RakSessionCodec.class,"reliableDatagramQueue").set(codec,new BitQueue());
+            field(RakSessionCodec.class,"splitsInFlight").set(codec,new io.netty.util.collection.IntObjectHashMap<>());
             ChannelFuture future=mock(ChannelFuture.class);
             doAnswer(call->{assertTrue(encoder.writeOutbound((Object)call.getArgument(0)));ByteBuf carrier=encoder.readOutbound();assertNotNull(carrier);carriers.add(carrier);return future;}).when(ctx).write(any());
             RakMessage message=new RakMessage(frame);EncapsulatedPacket[] fragments;

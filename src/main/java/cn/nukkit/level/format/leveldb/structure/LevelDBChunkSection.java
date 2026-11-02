@@ -208,9 +208,15 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     private int incomingBlockLight(StateBlockStorage storage, int x, int y, int z) {
+        int light = -1;
+        // Custom storage retains its virtual read before sampling the light.
+        if (storage == null || storage.getClass() == StateBlockStorage.class) {
+            light = getBlockLight(x, y, z);
+            if (light <= 1) return 0; // Every filter attenuates by at least one.
+        }
         int id = storage == null ? BlockID.AIR : storage.getBlockState(x, y, z).getLegacyId();
         int filter = id < 0 || id >= Block.MAX_BLOCK_ID ? 15 : Block.lightFilter[id];
-        return Math.max(0, getBlockLight(x, y, z) - Math.max(1, filter));
+        return Math.max(0, (light < 0 ? getBlockLight(x, y, z) : light) - Math.max(1, filter));
     }
 
     @Override

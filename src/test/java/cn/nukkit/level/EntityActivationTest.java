@@ -304,8 +304,6 @@ class EntityActivationTest {
         EntityPig pig = spy(spawn(EntityPig::new, 200, 0));
         doReturn(true).when(pig).onUpdate(anyInt());
         doCallRealMethod().when(level).updateEntity(any(), anyInt());
-        doCallRealMethod().when(level).getActivationSkippedUpdates();
-        doCallRealMethod().when(level).getActivationRunUpdates();
         for (int tick = 1000; tick < 1100; tick++) {
             assertTrue(level.updateEntity(pig, tick), "a sleeping mob must stay in the update list");
         }
@@ -313,8 +311,6 @@ class EntityActivationTest {
         int firstPhase = 1000 + Math.floorMod(-(1000 + (int) (pig.getId() % 20)), 20);
         int expected = firstPhase - 1000 + 1 + (1099 - firstPhase) / 20;
         verify(pig, times(expected)).onUpdate(anyInt());
-        assertEquals(100 - expected, level.getActivationSkippedUpdates());
-        assertEquals(expected, level.getActivationRunUpdates());
 
         pig.close();
         assertFalse(level.updateEntity(pig, 2000), "a closed entity still leaves the list");

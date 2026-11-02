@@ -592,6 +592,11 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ) {
+        this.requestChunkTask(protocols, chunkX, chunkZ, 0L);
+    }
+
+    @Override
+    public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ, long sequence) {
         LevelDBChunk chunk = (LevelDBChunk) this.getChunk(chunkX, chunkZ, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -599,9 +604,18 @@ public class LevelDBProvider implements LevelProvider {
 
         long timestamp = chunk.getChanges();
 
-        if (this.getServer().asyncChunkSending) {
-            final BaseChunk chunkClone = chunk.cloneForChunkSending();
-            this.level.getAsyncChuckExecutor().execute(() -> {
+        // 池可能为 null（配置关，或世界早于热重载打开开关而创建）：回退同步序列化，与 SubChunkRequestProcessor 一致
+        // The executor can be null (config off, or the world predates a hot reload turning it on):
+        // serialize synchronously, same fallback as SubChunkRequestProcessor
+        ExecutorService executor = this.getServer().asyncChunkSending ? this.level.getAsyncChuckExecutor() : null;
+        if (executor == null) {
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
+            return;
+        }
+
+        final BaseChunk chunkClone = chunk.cloneForChunkSending();
+        try {
+            executor.execute(() -> {
                 try {
                     NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
                         getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
@@ -612,35 +626,47 @@ public class LevelDBProvider implements LevelProvider {
                                 networkChunkSerializerCallback.getStream().getBuffer(),
                                 networkChunkSerializerCallback.getSubChunkBlobs(),
                                 networkChunkSerializerCallback.getBiomes(),
-                                networkChunkSerializerCallback.getBlockEntities()
+                                networkChunkSerializerCallback.getBlockEntities(),
+                                sequence
                         );
                     }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                     for (GameVersion gv : protocols) {
-                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
+                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
                     }
                 }
             });
-        }else {
-            try {
-                NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                    this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
-                            timestamp,
-                            chunkX,
-                            chunkZ,
-                            networkChunkSerializerCallback.getSubchunks(),
-                            networkChunkSerializerCallback.getStream().getBuffer(),
-                            networkChunkSerializerCallback.getSubChunkBlobs(),
-                            networkChunkSerializerCallback.getBiomes(),
-                            networkChunkSerializerCallback.getBlockEntities()
-                    );
-                }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
-            } catch (Throwable t) {
-                getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
-                for (GameVersion gv : protocols) {
-                    getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ);
-                }
+        } catch (RejectedExecutionException e) {
+            // 关服中池已停：同步兜底，不让请求丢失 / pool already down during shutdown: sync fallback
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
+        }
+    }
+
+    /**
+     * 主线程同步序列化（async-chunks 关闭 / 世界早于开关创建 / 执行器已关停）
+     * <p>
+     * Main-thread serialization (async-chunks off / world predates the setting / executor shut down)
+     */
+    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, BaseChunk chunk, long timestamp, int chunkX, int chunkZ, long sequence) {
+        try {
+            NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
+                        timestamp,
+                        chunkX,
+                        chunkZ,
+                        networkChunkSerializerCallback.getSubchunks(),
+                        networkChunkSerializerCallback.getStream().getBuffer(),
+                        networkChunkSerializerCallback.getSubChunkBlobs(),
+                        networkChunkSerializerCallback.getBiomes(),
+                        networkChunkSerializerCallback.getBlockEntities(),
+                        sequence
+                );
+            }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
+        } catch (Throwable t) {
+            getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
+            for (GameVersion gv : protocols) {
+                getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
             }
         }
     }
@@ -1392,6 +1418,7 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void unloadChunksUnsafe(boolean wait) {
+        int failedCaptures = 0;
         Iterator<BaseFullChunk> iterator = this.chunks.values().iterator();
         while (iterator.hasNext()) {
             LevelDBChunk chunk = (LevelDBChunk) iterator.next();
@@ -1402,10 +1429,27 @@ public class LevelDBProvider implements LevelProvider {
                     // The close path only stages snapshots; writes go to the single-thread executor,
                     // since a synchronous db.write on the main thread hangs on write stalls.
                     long hash = Level.chunkHash(chunk.getX(), chunk.getZ());
-                    if (!chunk.isReadFailurePlaceholder() && chunk.isGenerated() && chunk.hasChanged()
-                            && !this.isPendingWriteCurrent(hash, chunk)) {
-                        this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
-                        this.executor.execute(() -> this.commitPendingWrite(hash));
+                    if (!chunk.isReadFailurePlaceholder() && chunk.isGenerated() && chunk.hasChanged() && !this.isPendingWriteCurrent(hash, chunk)) {
+                        boolean staged = false;
+                        for (int attempt = 1; attempt <= 2; attempt++) {
+                            try {
+                                this.stagePendingWrite(hash, chunk.getX(), chunk.getZ(), chunk, true);
+                                staged = true;
+                                break;
+                            } catch (Exception failure) {
+                                if (attempt == 2) {
+                                    failedCaptures++;
+                                    log.error("Unsaved chunk {}, {} after {} close capture attempts for: {}",
+                                            chunk.getX(), chunk.getZ(), attempt, this.getName(), failure);
+                                } else {
+                                    log.warn("Retrying close capture for chunk {}, {} in: {}",
+                                            chunk.getX(), chunk.getZ(), this.getName(), failure);
+                                }
+                            }
+                        }
+                        // A rejected submission leaves a registered slot for the final sweep;
+                        // only a failed capture needs to serialize the live chunk again.
+                        if (staged) this.executor.execute(() -> this.commitPendingWrite(hash));
                     }
                 } catch (Exception e) {
                     log.error("Failed to stage chunk {}, {} during close for: {}", chunk.getX(), chunk.getZ(), this.getName(), e);
@@ -1416,6 +1460,10 @@ public class LevelDBProvider implements LevelProvider {
                 chunk.unload(level.isSaveOnUnloadEnabled(), false);
             }
             iterator.remove();
+        }
+        if (failedCaptures != 0) {
+            log.error("Close could not capture {} dirty chunks for: {}; latest revisions were not saved",
+                    failedCaptures, this.getName());
         }
     }
 

@@ -391,6 +391,8 @@ class BlockLightReadRetryTest {
                 pool = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16), threads);
             }
             executor = pool; field(level, "asyncChunkLoadExecutor", executor);
+            field(level, "asyncChunkLoadSlots", new java.util.concurrent.Semaphore(16));
+            field(level, "runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
             boundary = new BlockLightBoundary(level); field(level, "blockLightBoundary", boundary);
             for (int x = -1; x <= 2; x++) for (int z = -1; z <= 1; z++) {
                 long hash = Level.chunkHash(x, z);

@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.event.block.BlockBurnEvent;
+import cn.nukkit.event.block.BlockEvent;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;

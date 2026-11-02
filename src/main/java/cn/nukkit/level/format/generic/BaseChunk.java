@@ -95,6 +95,36 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         removeInvalidUnknownTile(x, y, z);
     }
 
+    /** An initialized native empty section cannot change when a primitive setter writes air. */
+    private boolean canSkipEmptyAirWrite(int sectionY) {
+        if (getClass() != cn.nukkit.level.format.leveldb.structure.LevelDBChunk.class || !this.isInit) {
+            return false;
+        }
+        // Retain the acquire used by setChanged before observing a published section replacement.
+        long revision = getMutationRevision();
+        if (this.tiles != null || this.tileList != null || this.unknownTiles != null) {
+            return false;
+        }
+        var chunk = (cn.nukkit.level.format.leveldb.structure.LevelDBChunk) this;
+        if (!chunk.hasStableSectionOffset()) {
+            return false;
+        }
+        ChunkSection[] captured = this.sections;
+        // Match getSection(float), including its conversion before adding the offset.
+        int index = (int) (chunk.getSectionOffset() + (float) sectionY);
+        if (captured == null || index < 0 || index >= captured.length
+                || captured[index] == null || captured[index].getClass() != EmptyChunkSection.class) {
+            return false;
+        }
+        // The same monitor orders first-writer materialization. Release it before tile cleanup.
+        synchronized (captured) {
+            return this.sections == captured && this.isInit
+                    && this.tiles == null && this.tileList == null && this.unknownTiles == null
+                    && captured[index] != null && captured[index].getClass() == EmptyChunkSection.class
+                    && getMutationRevision() == revision;
+        }
+    }
+
     @Override
     public int getFullBlock(int x, int y, int z) {
         return getFullBlock(x, y, z, 0);
@@ -150,6 +180,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     public boolean setFullBlockId(int x, int y, int z, int layer, int fullId) {
         int Y = y >> 4;
         try {
+            if (fullId == 0 && canSkipEmptyAirWrite(Y)) return false;
             setChanged();
             return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
         } catch (ChunkException e) {
@@ -171,6 +202,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId, int meta) {
         int Y = y >> 4;
         try {
+            if (blockId == 0 && canSkipEmptyAirWrite(Y)) return false;
             setChanged();
             return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
         } catch (ChunkException e) {
