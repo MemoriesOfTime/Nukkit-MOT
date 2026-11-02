@@ -182,7 +182,7 @@ class ChunkInitialSerializationOwnershipTest {
             assertFalse(f.tasks().contains(INDEX));
             LongSet otherTasks = (LongSet) f.bucket("getChunkSendTasks", GameVersion.V1_20_0);
             assertFalse(otherTasks.contains(INDEX));
-            assertFalse(((Long2LongMap) field(f.level, "chunkSendTaskStartTick")).containsKey(INDEX));
+            assertFalse(hasAnyStartTick(f.level, INDEX));
             assertTrue(((Queue<?>) field(f.level, "asyncChunkRequestCallbackQueue")).isEmpty());
             assertTrue(((Queue<?>) field(f.level, "asyncChunkRequestFailedQueue")).isEmpty());
 
@@ -280,7 +280,8 @@ class ChunkInitialSerializationOwnershipTest {
             f.assertPacket(f.sent.get(0), false);
             assertFalse(f.tasks().contains(INDEX));
             assertTrue(((LongSet) f.bucket("getChunkSendTasks", GameVersion.V1_20_0)).contains(INDEX));
-            assertEquals(301L, ((Long2LongMap) field(f.level, "chunkSendTaskStartTick")).get(INDEX));
+            assertEquals(301L, startTick(f.level, GameVersion.V1_20_0, INDEX), "the retried sibling keeps its own timer");
+            assertEquals(0L, startTick(f.level, VERSION, INDEX), "the completed protocol retires only its own timer");
         }
     }
 
@@ -401,7 +402,7 @@ class ChunkInitialSerializationOwnershipTest {
             set(level, Level.class, "asyncChuckExecutor", executor);
             for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests", "chunkRequestEpochs"})
                 set(level, Level.class, name, new Object2ObjectOpenHashMap<>());
-            set(level, Level.class, "chunkSendTaskStartTick", new Long2LongOpenHashMap());
+            set(level, Level.class, "chunkSendTaskStartTick", new Object2ObjectOpenHashMap<>());
             for (String name : new String[]{"asyncChunkRequestCallbackQueue", "asyncChunkRequestFailedQueue",
                     "normalUpdateQueue", "updateBlockEntities", "completedChunkLoads"})
                 set(level, Level.class, name, new ConcurrentLinkedQueue<>());
@@ -533,7 +534,7 @@ class ChunkInitialSerializationOwnershipTest {
                     () -> assertFalse(tasks().contains(INDEX)),
                     () -> assertFalse(owners().containsKey(INDEX)),
                     () -> assertFalse(((LongSet) bucket("getPendingChunkRequests")).contains(INDEX)),
-                    () -> assertFalse(((Long2LongMap) field(level, "chunkSendTaskStartTick")).containsKey(INDEX)),
+                    () -> assertFalse(hasAnyStartTick(level, INDEX)),
                     () -> assertTrue(((Queue<?>) field(level, "asyncChunkRequestCallbackQueue")).isEmpty()),
                     () -> assertTrue(((Queue<?>) field(level, "asyncChunkRequestFailedQueue")).isEmpty()));
         }
@@ -567,6 +568,23 @@ class ChunkInitialSerializationOwnershipTest {
         Field field = Level.class.getDeclaredField(name);
         field.setAccessible(true);
         return field.get(level);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<GameVersion, Long2LongOpenHashMap> startTicks(Level level) throws Exception {
+        return (Map<GameVersion, Long2LongOpenHashMap>) field(level, "chunkSendTaskStartTick");
+    }
+
+    private static long startTick(Level level, GameVersion version, long index) throws Exception {
+        Long2LongOpenHashMap bucket = startTicks(level).get(version);
+        return bucket == null ? 0L : bucket.get(index);
+    }
+
+    private static boolean hasAnyStartTick(Level level, long index) throws Exception {
+        for (Long2LongOpenHashMap bucket : startTicks(level).values()) {
+            if (bucket.containsKey(index)) return true;
+        }
+        return false;
     }
 
     private static void set(Object target, Class<?> owner, String name, Object value) throws Exception {

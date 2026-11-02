@@ -66,13 +66,13 @@ class ChunkSerializationFailureGenerationTest {
             f.work.remove().run();
             f.level.doTick(203);
             assertTrue(f.tasks().contains(INDEX), "old failure must leave the accepted retry active");
-            assertEquals(202L, f.starts.get(INDEX), "old failure must preserve the retry timer");
+            assertEquals(202L, f.starts().get(INDEX), "old failure must preserve the retry timer");
             assertEquals(2L, f.generations.get(INDEX));
 
             f.work.remove().run();
             f.level.doTick(204);
             assertFalse(f.tasks().contains(INDEX), "current failure still permits a fresh request");
-            assertFalse(f.starts.containsKey(INDEX));
+            assertFalse(f.starts().containsKey(INDEX));
             f.requestAt(205);
             assertEquals(1, f.work.size(), "the failed current request can be resubmitted");
         }
@@ -94,7 +94,7 @@ class ChunkSerializationFailureGenerationTest {
             assertEquals(2, serializations.get());
             f.level.doTick(203);
             assertTrue(f.tasks().contains(INDEX));
-            assertEquals(202L, f.starts.get(INDEX));
+            assertEquals(202L, f.starts().get(INDEX));
         }
     }
 
@@ -110,7 +110,7 @@ class ChunkSerializationFailureGenerationTest {
             assertTrue(f.tasks().contains(INDEX), "worker must only enqueue failure");
             f.level.doTick(2);
             assertFalse(f.tasks().contains(INDEX));
-            assertFalse(f.starts.containsKey(INDEX));
+            assertFalse(f.starts().containsKey(INDEX));
         }
     }
 
@@ -137,7 +137,7 @@ class ChunkSerializationFailureGenerationTest {
         f.level.onAsyncChunkRequestFailed(VERSION, X, Z);
         f.level.doTick(203);
         assertFalse(f.tasks().contains(INDEX));
-        assertFalse(f.starts.containsKey(INDEX));
+        assertFalse(f.starts().containsKey(INDEX));
     }
 
     private static void failSerialization(MockedStatic<NetworkChunkSerializer> serializer) {
@@ -151,7 +151,7 @@ class ChunkSerializationFailureGenerationTest {
         final Server server = mock(Server.class);
         final Player player = mock(Player.class);
         final Queue<Runnable> work = new ConcurrentLinkedQueue<>();
-        final Long2LongOpenHashMap starts = new Long2LongOpenHashMap();
+        final Object2ObjectOpenHashMap<GameVersion, Long2LongOpenHashMap> startBuckets = new Object2ObjectOpenHashMap<>();
         final Long2LongOpenHashMap generations;
 
         Fixture(ProviderKind kind, Mode mode, Level level) throws Exception {
@@ -195,7 +195,7 @@ class ChunkSerializationFailureGenerationTest {
             set(level, Level.class, "asyncChuckExecutor", mode == Mode.NO_EXECUTOR ? null : executor);
             for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests", "chunkRequestEpochs"})
                 set(level, Level.class, name, new Object2ObjectOpenHashMap<>());
-            set(level, Level.class, "chunkSendTaskStartTick", starts);
+            set(level, Level.class, "chunkSendTaskStartTick", startBuckets);
             var epochs = Level.class.getDeclaredMethod("getChunkRequestEpochs", GameVersion.class);
             epochs.setAccessible(true);
             generations = (Long2LongOpenHashMap) epochs.invoke(level, VERSION);
@@ -240,7 +240,12 @@ class ChunkSerializationFailureGenerationTest {
             requestAt(202);
             assertTrue(tasks().contains(INDEX));
             assertEquals(2L, generations.get(INDEX));
-            assertEquals(202L, starts.get(INDEX));
+            assertEquals(202L, starts().get(INDEX));
+        }
+
+        Long2LongOpenHashMap starts() {
+            Long2LongOpenHashMap starts = startBuckets.get(VERSION);
+            return starts == null ? new Long2LongOpenHashMap() : starts;
         }
 
         LongSet tasks() throws Exception {

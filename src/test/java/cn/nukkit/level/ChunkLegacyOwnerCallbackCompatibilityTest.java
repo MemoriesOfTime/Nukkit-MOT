@@ -8,7 +8,6 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer.NetworkChunkSerializerCallbackData;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import org.junit.jupiter.api.BeforeAll;
@@ -107,7 +106,7 @@ class ChunkLegacyOwnerCallbackCompatibilityTest {
             set(level, "provider", mock(LevelProvider.class));
             for (String field : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests", "chunkRequestEpochs"})
                 set(level, field, new Object2ObjectOpenHashMap<>());
-            set(level, "chunkSendTaskStartTick", new Long2LongOpenHashMap());
+            set(level, "chunkSendTaskStartTick", new Object2ObjectOpenHashMap<>());
             set(level, "asyncChunkRequestCallbackQueue", new ConcurrentLinkedQueue<>());
             BaseFullChunk source = mock(BaseFullChunk.class);
             doReturn(source).when(level).getChunk(3, 5);

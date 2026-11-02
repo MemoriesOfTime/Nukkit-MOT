@@ -191,7 +191,7 @@ class ChunkRequestReentryOwnershipTest {
             set(level, Level.class, "asyncChuckExecutor", executor);
             for (String name : new String[]{"chunkSendQueues", "chunkSendTasks", "pendingChunkRequests", "chunkRequestEpochs"})
                 set(level, Level.class, name, new Object2ObjectOpenHashMap<>());
-            set(level, Level.class, "chunkSendTaskStartTick", new Long2LongOpenHashMap());
+            set(level, Level.class, "chunkSendTaskStartTick", new Object2ObjectOpenHashMap<>());
             for (String name : new String[]{"asyncChunkRequestCallbackQueue", "asyncChunkRequestFailedQueue",
                     "normalUpdateQueue", "updateBlockEntities", "completedChunkLoads"})
                 set(level, Level.class, name, new ConcurrentLinkedQueue<>());
