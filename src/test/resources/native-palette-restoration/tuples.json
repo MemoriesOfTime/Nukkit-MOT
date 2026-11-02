@@ -1,0 +1,3322 @@
+[
+  {
+    "protocol": 589,
+    "id": 728,
+    "meta": 0,
+    "runtimeId": 11070,
+    "name": "minecraft:mud",
+    "version": 18087969,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 589,
+    "id": 734,
+    "meta": 0,
+    "runtimeId": 609,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18087969,
+    "states": {
+      "top_slot_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 589,
+    "id": 734,
+    "meta": 1,
+    "runtimeId": 610,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18087969,
+    "states": {
+      "top_slot_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 589,
+    "id": 730,
+    "meta": 0,
+    "runtimeId": 11280,
+    "name": "minecraft:mud_bricks",
+    "version": 18087969,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 589,
+    "id": 732,
+    "meta": 0,
+    "runtimeId": 715,
+    "name": "minecraft:packed_mud",
+    "version": 18087969,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 594,
+    "id": 728,
+    "meta": 0,
+    "runtimeId": 11058,
+    "name": "minecraft:mud",
+    "version": 18090528,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 594,
+    "id": 734,
+    "meta": 0,
+    "runtimeId": 610,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18090528,
+    "states": {
+      "top_slot_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 594,
+    "id": 734,
+    "meta": 1,
+    "runtimeId": 611,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18090528,
+    "states": {
+      "top_slot_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 594,
+    "id": 730,
+    "meta": 0,
+    "runtimeId": 11271,
+    "name": "minecraft:mud_bricks",
+    "version": 18090528,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 594,
+    "id": 732,
+    "meta": 0,
+    "runtimeId": 717,
+    "name": "minecraft:packed_mud",
+    "version": 18090528,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 618,
+    "id": 728,
+    "meta": 0,
+    "runtimeId": 11039,
+    "name": "minecraft:mud",
+    "version": 18095666,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 618,
+    "id": 734,
+    "meta": 0,
+    "runtimeId": 615,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18095666,
+    "states": {
+      "minecraft:vertical_half": {
+        "type": "string",
+        "value": "bottom"
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 618,
+    "id": 734,
+    "meta": 1,
+    "runtimeId": 616,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18095666,
+    "states": {
+      "minecraft:vertical_half": {
+        "type": "string",
+        "value": "top"
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 618,
+    "id": 730,
+    "meta": 0,
+    "runtimeId": 11253,
+    "name": "minecraft:mud_bricks",
+    "version": 18095666,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 618,
+    "id": 732,
+    "meta": 0,
+    "runtimeId": 724,
+    "name": "minecraft:packed_mud",
+    "version": 18095666,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 622,
+    "id": 728,
+    "meta": 0,
+    "runtimeId": 11035,
+    "name": "minecraft:mud",
+    "version": 18098179,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 622,
+    "id": 734,
+    "meta": 0,
+    "runtimeId": 615,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18098179,
+    "states": {
+      "minecraft:vertical_half": {
+        "type": "string",
+        "value": "bottom"
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 622,
+    "id": 734,
+    "meta": 1,
+    "runtimeId": 616,
+    "name": "minecraft:mud_brick_double_slab",
+    "version": 18098179,
+    "states": {
+      "minecraft:vertical_half": {
+        "type": "string",
+        "value": "top"
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 622,
+    "id": 730,
+    "meta": 0,
+    "runtimeId": 11249,
+    "name": "minecraft:mud_bricks",
+    "version": 18098179,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 622,
+    "id": 732,
+    "meta": 0,
+    "runtimeId": 724,
+    "name": "minecraft:packed_mud",
+    "version": 18098179,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1031,
+    "meta": 0,
+    "runtimeId": 7224,
+    "name": "minecraft:copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1031,
+    "meta": 1,
+    "runtimeId": 7225,
+    "name": "minecraft:copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1031,
+    "meta": 2,
+    "runtimeId": 7226,
+    "name": "minecraft:copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1031,
+    "meta": 3,
+    "runtimeId": 7227,
+    "name": "minecraft:copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1032,
+    "meta": 0,
+    "runtimeId": 11414,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1032,
+    "meta": 1,
+    "runtimeId": 11415,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1032,
+    "meta": 2,
+    "runtimeId": 11416,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1032,
+    "meta": 3,
+    "runtimeId": 11417,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1034,
+    "meta": 0,
+    "runtimeId": 2405,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1034,
+    "meta": 1,
+    "runtimeId": 2406,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1034,
+    "meta": 2,
+    "runtimeId": 2407,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1034,
+    "meta": 3,
+    "runtimeId": 2408,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1035,
+    "meta": 0,
+    "runtimeId": 1359,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1035,
+    "meta": 1,
+    "runtimeId": 1360,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1035,
+    "meta": 2,
+    "runtimeId": 1361,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1035,
+    "meta": 3,
+    "runtimeId": 1362,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1036,
+    "meta": 0,
+    "runtimeId": 6973,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1036,
+    "meta": 1,
+    "runtimeId": 6974,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1036,
+    "meta": 2,
+    "runtimeId": 6975,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1036,
+    "meta": 3,
+    "runtimeId": 6976,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1038,
+    "meta": 0,
+    "runtimeId": 11430,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1038,
+    "meta": 1,
+    "runtimeId": 11431,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1038,
+    "meta": 2,
+    "runtimeId": 11432,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1038,
+    "meta": 3,
+    "runtimeId": 11433,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1037,
+    "meta": 0,
+    "runtimeId": 10038,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1037,
+    "meta": 1,
+    "runtimeId": 10039,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1037,
+    "meta": 2,
+    "runtimeId": 10040,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1037,
+    "meta": 3,
+    "runtimeId": 10041,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1033,
+    "meta": 0,
+    "runtimeId": 13250,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1033,
+    "meta": 1,
+    "runtimeId": 13251,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1033,
+    "meta": 2,
+    "runtimeId": 13252,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 630,
+    "id": 1033,
+    "meta": 3,
+    "runtimeId": 13253,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18100737,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1031,
+    "meta": 0,
+    "runtimeId": 7238,
+    "name": "minecraft:copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1031,
+    "meta": 1,
+    "runtimeId": 7239,
+    "name": "minecraft:copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1031,
+    "meta": 2,
+    "runtimeId": 7240,
+    "name": "minecraft:copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1031,
+    "meta": 3,
+    "runtimeId": 7241,
+    "name": "minecraft:copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1032,
+    "meta": 0,
+    "runtimeId": 11418,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1032,
+    "meta": 1,
+    "runtimeId": 11419,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1032,
+    "meta": 2,
+    "runtimeId": 11420,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1032,
+    "meta": 3,
+    "runtimeId": 11421,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1034,
+    "meta": 0,
+    "runtimeId": 2411,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1034,
+    "meta": 1,
+    "runtimeId": 2412,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1034,
+    "meta": 2,
+    "runtimeId": 2413,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1034,
+    "meta": 3,
+    "runtimeId": 2414,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1035,
+    "meta": 0,
+    "runtimeId": 1365,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1035,
+    "meta": 1,
+    "runtimeId": 1366,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1035,
+    "meta": 2,
+    "runtimeId": 1367,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1035,
+    "meta": 3,
+    "runtimeId": 1368,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1036,
+    "meta": 0,
+    "runtimeId": 6983,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1036,
+    "meta": 1,
+    "runtimeId": 6984,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1036,
+    "meta": 2,
+    "runtimeId": 6985,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1036,
+    "meta": 3,
+    "runtimeId": 6986,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1038,
+    "meta": 0,
+    "runtimeId": 11434,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1038,
+    "meta": 1,
+    "runtimeId": 11435,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1038,
+    "meta": 2,
+    "runtimeId": 11436,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1038,
+    "meta": 3,
+    "runtimeId": 11437,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1037,
+    "meta": 0,
+    "runtimeId": 10056,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1037,
+    "meta": 1,
+    "runtimeId": 10057,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1037,
+    "meta": 2,
+    "runtimeId": 10058,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1037,
+    "meta": 3,
+    "runtimeId": 10059,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1033,
+    "meta": 0,
+    "runtimeId": 13264,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1033,
+    "meta": 1,
+    "runtimeId": 13265,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1033,
+    "meta": 2,
+    "runtimeId": 13266,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 649,
+    "id": 1033,
+    "meta": 3,
+    "runtimeId": 13267,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18103297,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1031,
+    "meta": 0,
+    "runtimeId": 7238,
+    "name": "minecraft:copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1031,
+    "meta": 1,
+    "runtimeId": 7239,
+    "name": "minecraft:copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1031,
+    "meta": 2,
+    "runtimeId": 7240,
+    "name": "minecraft:copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1031,
+    "meta": 3,
+    "runtimeId": 7241,
+    "name": "minecraft:copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1032,
+    "meta": 0,
+    "runtimeId": 11421,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1032,
+    "meta": 1,
+    "runtimeId": 11422,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1032,
+    "meta": 2,
+    "runtimeId": 11423,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1032,
+    "meta": 3,
+    "runtimeId": 11424,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1034,
+    "meta": 0,
+    "runtimeId": 2435,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1034,
+    "meta": 1,
+    "runtimeId": 2436,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1034,
+    "meta": 2,
+    "runtimeId": 2437,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1034,
+    "meta": 3,
+    "runtimeId": 2438,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1035,
+    "meta": 0,
+    "runtimeId": 1376,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1035,
+    "meta": 1,
+    "runtimeId": 1377,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1035,
+    "meta": 2,
+    "runtimeId": 1378,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1035,
+    "meta": 3,
+    "runtimeId": 1379,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1036,
+    "meta": 0,
+    "runtimeId": 6989,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1036,
+    "meta": 1,
+    "runtimeId": 6990,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1036,
+    "meta": 2,
+    "runtimeId": 6991,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1036,
+    "meta": 3,
+    "runtimeId": 6992,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1038,
+    "meta": 0,
+    "runtimeId": 11437,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1038,
+    "meta": 1,
+    "runtimeId": 11438,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1038,
+    "meta": 2,
+    "runtimeId": 11439,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1038,
+    "meta": 3,
+    "runtimeId": 11440,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1037,
+    "meta": 0,
+    "runtimeId": 10066,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1037,
+    "meta": 1,
+    "runtimeId": 10067,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1037,
+    "meta": 2,
+    "runtimeId": 10068,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1037,
+    "meta": 3,
+    "runtimeId": 10069,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1033,
+    "meta": 0,
+    "runtimeId": 13271,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1033,
+    "meta": 1,
+    "runtimeId": 13272,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1033,
+    "meta": 2,
+    "runtimeId": 13273,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 662,
+    "id": 1033,
+    "meta": 3,
+    "runtimeId": 13274,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18105860,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1031,
+    "meta": 0,
+    "runtimeId": 7227,
+    "name": "minecraft:copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1031,
+    "meta": 1,
+    "runtimeId": 7228,
+    "name": "minecraft:copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1031,
+    "meta": 2,
+    "runtimeId": 7229,
+    "name": "minecraft:copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1031,
+    "meta": 3,
+    "runtimeId": 7230,
+    "name": "minecraft:copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1032,
+    "meta": 0,
+    "runtimeId": 11404,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1032,
+    "meta": 1,
+    "runtimeId": 11405,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1032,
+    "meta": 2,
+    "runtimeId": 11406,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1032,
+    "meta": 3,
+    "runtimeId": 11407,
+    "name": "minecraft:exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1034,
+    "meta": 0,
+    "runtimeId": 2430,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1034,
+    "meta": 1,
+    "runtimeId": 2431,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1034,
+    "meta": 2,
+    "runtimeId": 2432,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1034,
+    "meta": 3,
+    "runtimeId": 2433,
+    "name": "minecraft:oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1035,
+    "meta": 0,
+    "runtimeId": 1379,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1035,
+    "meta": 1,
+    "runtimeId": 1380,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1035,
+    "meta": 2,
+    "runtimeId": 1381,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1035,
+    "meta": 3,
+    "runtimeId": 1382,
+    "name": "minecraft:waxed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1036,
+    "meta": 0,
+    "runtimeId": 6975,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1036,
+    "meta": 1,
+    "runtimeId": 6976,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1036,
+    "meta": 2,
+    "runtimeId": 6977,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1036,
+    "meta": 3,
+    "runtimeId": 6978,
+    "name": "minecraft:waxed_exposed_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1038,
+    "meta": 0,
+    "runtimeId": 11420,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1038,
+    "meta": 1,
+    "runtimeId": 11421,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1038,
+    "meta": 2,
+    "runtimeId": 11422,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1038,
+    "meta": 3,
+    "runtimeId": 11423,
+    "name": "minecraft:waxed_oxidized_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1037,
+    "meta": 0,
+    "runtimeId": 10047,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1037,
+    "meta": 1,
+    "runtimeId": 10048,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1037,
+    "meta": 2,
+    "runtimeId": 10049,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1037,
+    "meta": 3,
+    "runtimeId": 10050,
+    "name": "minecraft:waxed_weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1033,
+    "meta": 0,
+    "runtimeId": 13262,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1033,
+    "meta": 1,
+    "runtimeId": 13263,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1033,
+    "meta": 2,
+    "runtimeId": 13264,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 0
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 671,
+    "id": 1033,
+    "meta": 3,
+    "runtimeId": 13265,
+    "name": "minecraft:weathered_copper_bulb",
+    "version": 18108419,
+    "states": {
+      "lit": {
+        "type": "byte",
+        "value": 1
+      },
+      "powered_bit": {
+        "type": "byte",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 0,
+    "runtimeId": 3116,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 1,
+    "runtimeId": 3117,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 2,
+    "runtimeId": 3118,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 3,
+    "runtimeId": 3119,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 4,
+    "runtimeId": 3120,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 5,
+    "runtimeId": 3121,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 6,
+    "runtimeId": 3122,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 7,
+    "runtimeId": 3123,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 8,
+    "runtimeId": 3124,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 9,
+    "runtimeId": 3125,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 10,
+    "runtimeId": 3126,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 11,
+    "runtimeId": 3127,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 12,
+    "runtimeId": 3128,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 13,
+    "runtimeId": 3129,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 14,
+    "runtimeId": 3130,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 818,
+    "id": 1282,
+    "meta": 15,
+    "runtimeId": 3131,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 0,
+    "runtimeId": 3124,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 1,
+    "runtimeId": 3125,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 2,
+    "runtimeId": 3126,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 3,
+    "runtimeId": 3127,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 0
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 4,
+    "runtimeId": 3128,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 5,
+    "runtimeId": 3129,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 6,
+    "runtimeId": 3130,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 7,
+    "runtimeId": 3131,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 1
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 8,
+    "runtimeId": 3132,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 9,
+    "runtimeId": 3133,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 10,
+    "runtimeId": 3134,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 11,
+    "runtimeId": 3135,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 2
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 12,
+    "runtimeId": 3136,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "south"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 13,
+    "runtimeId": 3137,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "west"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 14,
+    "runtimeId": 3138,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "north"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 827,
+    "id": 1282,
+    "meta": 15,
+    "runtimeId": 3139,
+    "name": "minecraft:dried_ghast",
+    "version": 18168865,
+    "states": {
+      "minecraft:cardinal_direction": {
+        "type": "string",
+        "value": "east"
+      },
+      "rehydration_level": {
+        "type": "int",
+        "value": 3
+      }
+    },
+    "change": "add"
+  },
+  {
+    "protocol": 944,
+    "id": 1346,
+    "meta": 0,
+    "runtimeId": 1704,
+    "name": "minecraft:golden_dandelion",
+    "version": 18168865,
+    "states": {},
+    "change": "add"
+  },
+  {
+    "protocol": 1001,
+    "id": 1363,
+    "meta": 0,
+    "runtimeId": 11112,
+    "name": "minecraft:potent_sulfur",
+    "version": 18168865,
+    "states": {
+      "potent_sulfur_state": {
+        "type": "string",
+        "value": "dry"
+      }
+    },
+    "change": "typed-repair"
+  },
+  {
+    "protocol": 2168,
+    "id": 1363,
+    "meta": 0,
+    "runtimeId": 11574,
+    "name": "minecraft:potent_sulfur",
+    "version": 18168865,
+    "states": {
+      "potent_sulfur_state": {
+        "type": "string",
+        "value": "dry"
+      }
+    },
+    "change": "typed-repair"
+  }
+]
