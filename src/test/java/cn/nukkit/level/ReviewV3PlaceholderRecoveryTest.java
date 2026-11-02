@@ -85,6 +85,8 @@ class ReviewV3PlaceholderRecoveryTest {
         level = mock(Level.class, CALLS_REAL_METHODS);
         field("server", server);
         field("asyncChunkLoadExecutor", executor);
+        field("asyncChunkLoadSlots", new java.util.concurrent.Semaphore(16));
+        field("runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
         field("pendingChunkLoads", new ConcurrentHashMap<>());
         field("completedChunkLoads", new ConcurrentLinkedQueue<>());
         field("chunkLoadFailures", Caffeine.newBuilder().build());

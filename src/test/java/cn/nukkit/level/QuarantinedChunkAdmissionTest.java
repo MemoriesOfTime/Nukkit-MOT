@@ -23,6 +23,7 @@ class QuarantinedChunkAdmissionTest {
         field(level, "chunkGenerationQueueSize", 100);
         doReturn(centre).when(level).getChunkIfLoaded(anyInt(), anyInt());
         doReturn(centre).when(level).getChunk(anyInt(), anyInt(), eq(true));
+        doReturn(centre).when(level).getChunkIfLoaded(anyInt(), anyInt());
         return level;
     }
 

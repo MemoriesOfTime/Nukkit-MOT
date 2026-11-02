@@ -68,7 +68,8 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
 
     public Item getItem() {
         if (item_ == null) {
-            CompoundTag NBTTag = this.namedTag.getCompound("Item");
+            // Item decoding owns its tag: setNamedTag/getNamedTag normalize compound names.
+            CompoundTag NBTTag = this.namedTag.getCompound("Item").copy();
             item_ = NBTIO.getItemHelper(NBTTag);
         }
         return item_;

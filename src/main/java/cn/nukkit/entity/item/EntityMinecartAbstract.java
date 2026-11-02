@@ -375,9 +375,11 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return 是否有漏斗被通知
      */
     private boolean checkPushHopper(AxisAlignedBB pushArea, InventoryHolder holder) {
-        int minX = NukkitMath.ceilDouble(pushArea.getMinX());
-        int minY = NukkitMath.ceilDouble(pushArea.getMinY());
-        int minZ = NukkitMath.ceilDouble(pushArea.getMinZ());
+        // The cells the cart occupies. The area is a line through the cart's centre, so the lower
+        // bound is floor: a true ceiling would pass that cell whenever the centre is fractional.
+        int minX = NukkitMath.floorDouble(pushArea.getMinX());
+        int minY = NukkitMath.floorDouble(pushArea.getMinY());
+        int minZ = NukkitMath.floorDouble(pushArea.getMinZ());
         int maxX = NukkitMath.floorDouble(pushArea.getMaxX());
         int maxY = NukkitMath.floorDouble(pushArea.getMaxY());
         int maxZ = NukkitMath.floorDouble(pushArea.getMaxZ());
@@ -405,9 +407,11 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return 是否有漏斗被通知
      */
     private boolean checkPickupHopper(AxisAlignedBB pickupArea, InventoryHolder holder) {
-        int minX = NukkitMath.ceilDouble(pickupArea.getMinX());
-        int minY = NukkitMath.ceilDouble(pickupArea.getMinY());
-        int minZ = NukkitMath.ceilDouble(pickupArea.getMinZ());
+        // The cells the cart occupies. The area is a line through the cart's centre, so the lower
+        // bound is floor: a true ceiling would pass that cell whenever the centre is fractional.
+        int minX = NukkitMath.floorDouble(pickupArea.getMinX());
+        int minY = NukkitMath.floorDouble(pickupArea.getMinY());
+        int minZ = NukkitMath.floorDouble(pickupArea.getMinZ());
         int maxX = NukkitMath.floorDouble(pickupArea.getMaxX());
         int maxY = NukkitMath.floorDouble(pickupArea.getMaxY());
         int maxZ = NukkitMath.floorDouble(pickupArea.getMaxZ());

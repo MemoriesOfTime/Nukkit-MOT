@@ -79,6 +79,8 @@ class ReviewV2LifecycleQuarantineProbeTest {
         field("server", lifecycleServer);
         reader = Executors.newSingleThreadExecutor();
         field("asyncChunkLoadExecutor", reader);
+        field("asyncChunkLoadSlots", new java.util.concurrent.Semaphore(16));
+        field("runningAsyncChunkLoads", new java.util.concurrent.atomic.AtomicInteger());
         field("pendingChunkLoads", new ConcurrentHashMap<>());
         field("completedChunkLoads", new ConcurrentLinkedQueue<>());
         field("chunkLoadFailures", Caffeine.newBuilder().build());
