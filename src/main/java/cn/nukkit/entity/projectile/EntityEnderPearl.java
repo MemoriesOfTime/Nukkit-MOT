@@ -19,6 +19,8 @@ import cn.nukkit.utils.Utils;
 public class EntityEnderPearl extends EntityProjectile {
 
     public static final int NETWORK_ID = 87;
+    private boolean pearlImpactInProgress;
+    private boolean pearlImpactAccepted;
 
     @Override
     public int getNetworkId() {
@@ -60,11 +62,12 @@ public class EntityEnderPearl extends EntityProjectile {
 
     @Override
     public boolean onUpdate(int currentTick) {
-        if (this.closed) {
+        if (this.closed || this.pearlImpactAccepted || this.pearlImpactInProgress) {
             return false;
         }
 
-        if (this.isCollided && this.shootingEntity instanceof Player) {
+        // Physical contact can remain set after a cancelled native block-hit event.
+        if (this.isCollided && this.hadCollision && this.shootingEntity instanceof Player) {
             Block[] blocks = getCollisionHelper().getCollisionBlocks();
 
             boolean portal = false;
@@ -74,11 +77,10 @@ public class EntityEnderPearl extends EntityProjectile {
                 }
             }
 
+            this.pearlImpactAccepted = true;
             this.close();
 
-            if (!portal) {
-                teleport();
-
+            if (!portal && teleport()) {
                 if (Server.getInstance().mobsFromBlocks) {
                     if (Utils.rand(1, 20) == 5) {
                         Position spawnPos = add(0.5, 1, 0.5);
@@ -110,21 +112,48 @@ public class EntityEnderPearl extends EntityProjectile {
     
     @Override
     public void onCollideWithEntity(Entity entity) {
+        if (this.closed || this.pearlImpactAccepted || this.pearlImpactInProgress) {
+            return;
+        }
+        this.pearlImpactInProgress = true;
+        try {
+            super.onCollideWithEntity(entity);
+        } catch (RuntimeException | Error failure) {
+            // An accepted physical hit consumes the pearl even if teleport/damage callbacks fail.
+            if (this.pearlImpactAccepted && !this.closed) {
+                try {
+                    this.close();
+                } catch (RuntimeException | Error cleanupFailure) {
+                    if (cleanupFailure != failure) {
+                        failure.addSuppressed(cleanupFailure);
+                    }
+                }
+            }
+            throw failure;
+        } finally {
+            this.pearlImpactInProgress = false;
+        }
+    }
+
+    @Override
+    protected void onAcceptedEntityCollision(Entity entity) {
+        this.pearlImpactAccepted = true;
         if (this.shootingEntity instanceof Player) {
             teleport();
         }
-
-        super.onCollideWithEntity(entity);
     }
 
-    private void teleport() {
-        if (!this.level.equals(this.shootingEntity.getLevel())) {
-            return;
+    private boolean teleport() {
+        if (!(this.shootingEntity instanceof Player owner) || owner.closed
+                || !owner.isAlive() || !owner.isOnline() || owner.isSpectator()
+                || !this.level.equals(owner.getLevel())) {
+            return false;
         }
 
+        if (!owner.teleport(new Vector3(NukkitMath.floorDouble(this.x) + 0.5, this.y, NukkitMath.floorDouble(this.z) + 0.5), TeleportCause.ENDER_PEARL)) {
+            return false;
+        }
         this.level.addLevelEvent(this.shootingEntity.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_ENDERMAN_TELEPORT);
-
-        this.shootingEntity.teleport(new Vector3(NukkitMath.floorDouble(this.x) + 0.5, this.y, NukkitMath.floorDouble(this.z) + 0.5), TeleportCause.ENDER_PEARL);
 
         int gamemode = ((Player) this.shootingEntity).getGamemode();
         if (gamemode == 0 || gamemode == 2) {
@@ -133,5 +162,6 @@ public class EntityEnderPearl extends EntityProjectile {
 
         this.level.addLevelEvent(this, LevelEventPacket.EVENT_PARTICLE_ENDERMAN_TELEPORT);
         this.level.addLevelEvent(this.shootingEntity.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_ENDERMAN_TELEPORT);
+        return true;
     }
 }

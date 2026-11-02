@@ -81,7 +81,12 @@ public class EntityWitherSkull extends EntityProjectile {
 
     @Override
     public void onCollideWithEntity(Entity entity) {
-        super.onCollideWithEntity(entity);
-        entity.addEffect(Effect.getEffect(Effect.WITHER).setDuration(200), EntityPotionEffectEvent.Cause.ATTACK);
+        boolean accepted = super.onCollideWithEntityAccepted(entity);
+        int difficulty = this.server.getDifficulty();
+        if (accepted && difficulty > 1) {
+            entity.addEffect(Effect.getEffect(Effect.WITHER)
+                    .setAmplifier(1).setDuration(difficulty > 2 ? 800 : 200),
+                    EntityPotionEffectEvent.Cause.ATTACK);
+        }
     }
 }
