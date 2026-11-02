@@ -38,6 +38,7 @@ class CraftingEvent_v113AdapterTest {
     @BeforeEach
     void setUp() {
         MockServer.reset();
+        Mockito.lenient().when(MockServer.get().isPrimaryThread()).thenReturn(true);
         craftingManager = Mockito.mock(CraftingManager.class);
         Mockito.lenient().when(MockServer.get().getCraftingManager()).thenReturn(craftingManager);
     }
@@ -104,6 +105,32 @@ class CraftingEvent_v113AdapterTest {
         assertTrue(player.getInventory().contains(Item.get(BlockID.PLANKS, 0, 4)));
     }
 
+    @Test
+    void refusesCraftingFromOfflinePlayerWithoutConsumingServerGrid() {
+        TestPlayer player = new TestPlayer();
+        ShapelessRecipe recipe = logToPlanksRecipe();
+        player.getCraftingGrid().setItem(0, Item.get(BlockID.LOG));
+        player.loggedIn = false;
+        Mockito.lenient().when(craftingManager.matchRecipe(any(), any(), any())).thenReturn(recipe);
+
+        assertFalse(CraftingEvent_v113Adapter.execute(player, recipe, recipe.getResult()));
+        assertEquals(BlockID.LOG, player.getCraftingGrid().getItem(0).getId());
+        assertFalse(player.getInventory().contains(Item.get(BlockID.PLANKS, 0, 4)));
+    }
+
+    @Test
+    void refusesCraftingOutsideServerThreadWithoutConsumingServerGrid() {
+        TestPlayer player = new TestPlayer();
+        ShapelessRecipe recipe = logToPlanksRecipe();
+        player.getCraftingGrid().setItem(0, Item.get(BlockID.LOG));
+        Mockito.lenient().when(craftingManager.matchRecipe(any(), any(), any())).thenReturn(recipe);
+        Mockito.lenient().when(MockServer.get().isPrimaryThread()).thenReturn(false);
+
+        assertFalse(CraftingEvent_v113Adapter.execute(player, recipe, recipe.getResult()));
+        assertEquals(BlockID.LOG, player.getCraftingGrid().getItem(0).getId());
+        assertFalse(player.getInventory().contains(Item.get(BlockID.PLANKS, 0, 4)));
+    }
+
     private static ShapelessRecipe logToPlanksRecipe() {
         return new ShapelessRecipe(Item.get(BlockID.PLANKS, 0, 4), List.of(Item.get(BlockID.LOG)));
     }
@@ -131,6 +158,7 @@ class CraftingEvent_v113AdapterTest {
             this.protocol = ProtocolInfo.v1_1_0;
             this.gameVersion = GameVersion.V1_1_0;
             this.spawned = true;
+            this.loggedIn = true;
         }
 
         @Override

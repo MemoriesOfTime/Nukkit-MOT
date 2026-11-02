@@ -216,6 +216,8 @@ public abstract class BaseInventory implements Inventory {
             item = ev.getNewItem();
         }
 
+        if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
+
         if (holder instanceof BlockEntity) {
             ((BlockEntity) holder).setDirty();
         }
@@ -308,13 +310,13 @@ public abstract class BaseInventory implements Inventory {
             return;
         }
         Item old = this.getItem(index);
-        Item overflow = null;
         if (item == null || item.isNull() || item.getCount() <= 0) {
             this.slots.remove(index);
         } else {
-            Item[] parts = splitOverstack(item);
-            item = parts[0];
-            overflow = parts[1];
+            // This is a server snapshot restore, not a new item grant. Splitting here
+            // changes unrelated slots and can destroy items when a later restored slot
+            // overwrites the overflow. Preserve the original count and slot exactly;
+            // normal setItem/addItem paths still enforce their stack limits.
             if (item.getStackNetId() == 0) {
                 item.autoAssignStackNetworkId();
             }
@@ -328,64 +330,6 @@ public abstract class BaseInventory implements Inventory {
             ((BlockEntity) holder).setDirty();
         }
         this.onSlotChange(index, old, false);
-        this.routeOverflowForce(overflow);
-    }
-
-    /**
-     * setItemForce 专用的溢出处理：契约要求不触发事件、不发网络包、
-     * 不产生世界掉落，因此绕过 addItem/setItem，按堆叠上限分块直接
-     * 写入空槽；装不下的记 warn 丢弃。
-     * <p>
-     * Overflow handling for setItemForce: the contract forbids events, network
-     * packets and world drops, so chunks of up to the stack limit are written
-     * straight into empty slots, bypassing addItem/setItem; whatever does not
-     * fit is discarded with a warning.
-     */
-    protected final void routeOverflowForce(Item overflow) {
-        if (overflow == null || overflow.isNull() || overflow.getCount() <= 0) {
-            return;
-        }
-        int limit = Math.min(overflow.getMaxStackSize(), this.getMaxStackSize());
-        if (limit <= 0) {
-            return;
-        }
-        // 先合并已有同类堆叠，保持与 addItem 相同的库存填充顺序。
-        // Merge into compatible partial stacks first, matching addItem ordering.
-        for (int i = 0; i < this.getSize() && overflow.getCount() > 0; ++i) {
-            Item slot = this.getItem(i);
-            if (slot.getId() == Item.AIR || slot.getCount() <= 0 || !overflow.equals(slot)) {
-                continue;
-            }
-            int amount = Math.min(limit - slot.getCount(), overflow.getCount());
-            if (amount <= 0) continue;
-            Item old = slot.clone();
-            slot.setCount(slot.getCount() + amount);
-            overflow.setCount(overflow.getCount() - amount);
-            this.slots.put(i, slot.clone());
-            this.onSlotChange(i, old, false);
-        }
-        for (int i = 0; i < this.getSize() && overflow.getCount() > 0; ++i) {
-            Item slot = this.getItem(i);
-            if (slot.getId() != Item.AIR && slot.getCount() > 0) continue;
-            Item chunk = overflow.clone();
-            chunk.setCount(Math.min(limit, overflow.getCount()));
-            overflow.setCount(overflow.getCount() - chunk.getCount());
-            // 直接写入，避免再次进入 setItemForce -> routeOverflowForce 的递归路径。
-            // Write directly to avoid recursively re-entering setItemForce -> routeOverflowForce.
-            Item old = this.getItem(i);
-            if (chunk.getStackNetId() == 0) {
-                chunk.autoAssignStackNetworkId();
-            }
-            if (chunk instanceof ItemBundle bundle) {
-                ensureUniqueBundleId(i, bundle);
-            }
-            this.slots.put(i, chunk.clone());
-            this.onSlotChange(i, old, false);
-        }
-        if (overflow.getCount() > 0) {
-            log.warn("Discarded {}x item id {} overflowing setItemForce into a full inventory",
-                    overflow.getCount(), overflow.getId());
-        }
     }
 
     @Override
@@ -465,6 +409,29 @@ public abstract class BaseInventory implements Inventory {
         }
     }
 
+    /**
+     * Observe one native rescue decrement. Unknown inventory subclasses retain their public
+     * virtual mutation path and cannot claim a receipt without a commit-point contract.
+     */
+    public final Item decreaseTotemCount(int slot, int selectedSlot, Item selected) {
+        if (getClass() != PlayerInventory.class && getClass() != PlayerOffhandInventory.class) {
+            this.decreaseCount(slot);
+            return null;
+        }
+        Item item = this.getItem(slot);
+        if (item.getCount() <= 0) return null;
+        TotemConsumption receipt = slot == selectedSlot && selected == this.slots.get(slot)
+                && item.getId() == Item.TOTEM && InventoryMutationGuard.canConfirmSlotMutation(this)
+                ? new TotemConsumption(this, selected, item) : null;
+        item.count--;
+        this.setItemObserved(slot, item, true, receipt);
+        return receipt == null ? null : receipt.consumed();
+    }
+
+    protected boolean setItemObserved(int slot, Item item, boolean send, TotemConsumption receipt) {
+        return this.setItem(slot, item, send);
+    }
+
     @Override
     public boolean canAddItem(Item item) {
         int count = item.getCount();
@@ -500,6 +467,13 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item[] addItem(Item... slots) {
+        // A profile requested by a slot callback observes the completed batch, including partial success.
+        try (InventoryMutationGuard.Lease batch = InventoryMutationGuard.tryClaim(java.util.List.of(this))) {
+            return this.addItemWithinBatch(slots);
+        }
+    }
+
+    private Item[] addItemWithinBatch(Item... slots) {
         List<Item> itemSlots = new ArrayList<>();
         for (Item slot : slots) {
             if (slot.getId() != 0 && slot.getCount() > 0) {
@@ -522,11 +496,14 @@ public abstract class BaseInventory implements Inventory {
                     if (item.getCount() < maxStackSize) {
                         int amount = Math.min(maxStackSize - item.getCount(), slot.getCount());
                         if (amount > 0) {
-                            slot.setCount(slot.getCount() - amount);
-                            item.setCount(item.getCount() + amount);
-                            this.setItem(i, item);
-                            if (slot.getCount() <= 0) {
-                                iterator.remove();
+                            Item candidate = item.clone();
+                            candidate.setCount(item.getCount() + amount);
+                            if (this.setItemExactBulk(i, candidate)) {
+                                slot.setCount(slot.getCount() - amount);
+                                item = this.getItem(i);
+                                if (slot.getCount() <= 0) {
+                                    iterator.remove();
+                                }
                             }
                         }
                     }
@@ -539,17 +516,21 @@ public abstract class BaseInventory implements Inventory {
 
         if (!itemSlots.isEmpty() && !emptySlots.isEmpty()) {
             for (int slotIndex : emptySlots) {
-                if (!itemSlots.isEmpty()) {
-                    Item slot = itemSlots.get(0);
+                for (Iterator<Item> iterator = itemSlots.iterator(); iterator.hasNext();) {
+                    Item slot = iterator.next();
                     int amount = Math.min(Math.min(slot.getMaxStackSize(), this.getMaxStackSize()), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
+                    if (amount <= 0) continue;
                     Item item = slot.clone();
                     item.setCount(amount);
-                    this.setItem(slotIndex, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
+                    if (this.setItemExactBulk(slotIndex, item)) {
+                        slot.setCount(slot.getCount() - amount);
+                        if (slot.getCount() <= 0) {
+                            iterator.remove();
+                        }
+                        break;
                     }
                 }
+                if (itemSlots.isEmpty()) break;
             }
         }
 
@@ -558,6 +539,13 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item[] removeItem(Item... slots) {
+        // A profile requested by a slot callback observes the completed batch, including partial success.
+        try (InventoryMutationGuard.Lease batch = InventoryMutationGuard.tryClaim(java.util.List.of(this))) {
+            return this.removeItemWithinBatch(slots);
+        }
+    }
+
+    private Item[] removeItemWithinBatch(Item... slots) {
         List<Item> itemSlots = new ArrayList<>();
         for (Item slot : slots) {
             if (slot.getId() != 0 && slot.getCount() > 0) {
@@ -574,11 +562,14 @@ public abstract class BaseInventory implements Inventory {
             for (Item slot : new ArrayList<>(itemSlots)) {
                 if (slot.equals(item, item.hasMeta(), item.getCompoundTag() != null)) {
                     int amount = Math.min(item.getCount(), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
-                    item.setCount(item.getCount() - amount);
-                    this.setItem(i, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
+                    Item candidate = item.clone();
+                    candidate.setCount(item.getCount() - amount);
+                    if (this.setItemExactBulk(i, candidate)) {
+                        slot.setCount(slot.getCount() - amount);
+                        item = this.getItem(i);
+                        if (slot.getCount() <= 0) {
+                            itemSlots.remove(slot);
+                        }
                     }
                 }
             }
@@ -589,6 +580,27 @@ public abstract class BaseInventory implements Inventory {
         }
 
         return itemSlots.toArray(Item.EMPTY_ARRAY);
+    }
+
+    private boolean setItemExactBulk(int slot, Item target) {
+        try (InventoryMutationGuard.WriteScope write = InventoryMutationGuard.tryExactBulkWrite(this, slot, target)) {
+            if (write == null) return false;
+            try {
+                if (this.setItem(slot, target.clone())
+                        && InventoryMutationGuard.matchesTarget(this.getItem(slot), target)) {
+                    return true;
+                }
+            } catch (RuntimeException | Error failure) {
+                try {
+                    write.restorePreviousSlot();
+                } catch (RuntimeException | Error restoreFailure) {
+                    if (restoreFailure != failure) failure.addSuppressed(restoreFailure);
+                }
+                throw failure;
+            }
+            write.restorePreviousSlot();
+            return false;
+        }
     }
 
     @Override
@@ -606,6 +618,8 @@ public abstract class BaseInventory implements Inventory {
                 }
                 item = ev.getNewItem();
             }
+
+            if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
             if (holder instanceof BlockEntity) {
                 ((BlockEntity) holder).setDirty();

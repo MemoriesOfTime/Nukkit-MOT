@@ -310,7 +310,7 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         if (this.getCanTrade()) {
             var inv = new TradeInventory(this);
-            player.addWindow(inv, Player.TRADE_WINDOW_ID);
+            player.requestWindowOpen(inv, Player.TRADE_WINDOW_ID);
             return false; // 不消耗物品
         } else {
             return false;

@@ -180,14 +180,15 @@ class InventoryServerAuthoritativeSyncTest {
     }
 
     @Test
-    void failedPermanentWindowOpenKeepsWindowMappingWithoutClosePacket() {
+    void permanentWindowMappingDoesNotAttemptScreenOpenOrSendClosePacket() {
         TestPlayer player = createWindowTestPlayer();
         player.spawned = false;
         FailingContainerInventory inventory = new FailingContainerInventory(Mockito.mock(BlockEntityChest.class));
 
         int result = player.addWindow(inventory, 42, true);
 
-        assertEquals(-1, result);
+        assertEquals(42, result);
+        assertEquals(0, inventory.openAttempts, "a permanent slot mapping must not open a screen");
         assertEquals(42, player.getWindowId(inventory));
         assertFalse(player.sentPackets.stream().anyMatch(ContainerClosePacket.class::isInstance));
     }
@@ -259,10 +260,15 @@ class InventoryServerAuthoritativeSyncTest {
 
     private static TestPlayer createWindowTestPlayer() {
         SourceInterface sourceInterface = Mockito.mock(SourceInterface.class);
+        NetworkPlayerSession session = Mockito.mock(NetworkPlayerSession.class);
         Mockito.when(sourceInterface.getSession(Mockito.any(InetSocketAddress.class)))
-                .thenReturn(Mockito.mock(NetworkPlayerSession.class));
+                .thenReturn(session);
 
         TestPlayer player = new TestPlayer(sourceInterface);
+        Mockito.doAnswer(invocation -> {
+            player.sentPackets.add(invocation.getArgument(0));
+            return null;
+        }).when(session).sendPacket(Mockito.any(DataPacket.class));
         player.protocol = ProtocolInfo.v1_21_30;
         player.spawned = true;
         return player;
@@ -276,14 +282,11 @@ class InventoryServerAuthoritativeSyncTest {
             super(sourceInterface, 1L, new InetSocketAddress("127.0.0.1", 19132));
         }
 
-        @Override
-        public boolean dataPacket(DataPacket packet) {
-            this.sentPackets.add(packet);
-            return true;
-        }
     }
 
     private static final class FailingContainerInventory extends ContainerInventory {
+
+        private int openAttempts;
 
         private FailingContainerInventory(InventoryHolder holder) {
             super(holder, InventoryType.HOPPER);
@@ -291,6 +294,7 @@ class InventoryServerAuthoritativeSyncTest {
 
         @Override
         public boolean open(Player who) {
+            this.openAttempts++;
             return false;
         }
     }

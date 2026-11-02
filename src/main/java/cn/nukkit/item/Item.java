@@ -1678,6 +1678,15 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return this.cachedNBT;
     }
 
+    /** Detached metadata view; preserves the name and contents of any retained live NBT root. */
+    @ApiStatus.Internal
+    public CompoundTag getNamedTagSnapshot() {
+        if (!this.hasCompoundTag()) return null;
+        CompoundTag snapshot = this.cachedNBT == null ? parseCompoundTag(this.tags) : this.cachedNBT.copy();
+        snapshot.setName("");
+        return snapshot;
+    }
+
     public CompoundTag getOrCreateNamedTag() {
         if (!this.hasCompoundTag()) {
             return new CompoundTag();

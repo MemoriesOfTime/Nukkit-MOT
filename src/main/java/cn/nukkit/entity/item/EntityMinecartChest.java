@@ -77,7 +77,7 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        player.addWindow(this.inventory);
+        player.requestWindowOpen(this.inventory);
         return false; // If true, the count of items player has in hand decreases
     }
 

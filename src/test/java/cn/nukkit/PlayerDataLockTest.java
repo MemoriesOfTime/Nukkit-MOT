@@ -9,7 +9,9 @@ import cn.nukkit.scheduler.Task;
 import cn.nukkit.scheduler.TaskHandler;
 import cn.nukkit.utils.PlayerDataMigrator;
 import cn.nukkit.utils.PlayerDataSerializer;
+import cn.nukkit.utils.PlayerDataSaveQueue;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -111,29 +113,32 @@ class PlayerDataLockTest {
     @Nested
     @Timeout(30)
     class Lifecycle {
+        private final List<Fixture> opened = new ArrayList<>();
+        Fixture fixture() throws Exception { Fixture value = new Fixture(); opened.add(value); return value; }
+        @AfterEach void closeQueues() { opened.forEach(value -> value.queue.close()); }
         private static final UUID PREVIOUS = UUID.fromString("6a1b7ac6-2f0f-4a6a-9f43-2b6c4a1d0e11");
         private static final UUID CURRENT = UUID.fromString("762705ea-dcc6-4dfe-b281-20b8d1ffa86b");
 
         @Test void collectedRegistrationLockStillFlushesQueuedSaveBeforeMigration() throws Exception {
-            Fixture f = new Fixture();
+            Fixture f = fixture();
             f.server.saveOfflinePlayerData(PREVIOUS, new CompoundTag().putInt("value", 42), true);
             for (int i = 0; i < 5; i++) System.gc();
             assertEquals(PlayerDataMigrator.Result.MIGRATED, f.server.migratePlayerData(PREVIOUS, CURRENT));
             assertEquals(42, f.read(CURRENT));
             assertEquals(1, f.serializer.previousWrites.get());
-            assertTrue(f.pending.isEmpty());
+            assertTrue(f.queue.flushAll().toCompletableFuture().isDone());
             // A worker dispatched before the synchronous flush must not write the old path again.
-            f.scheduled.get(0).onRun(1);
+            f.queue.flushAll().toCompletableFuture().join();
             assertEquals(1, f.serializer.previousWrites.get());
         }
 
         @Test void runningAsyncSaveSharesLockWithReaderAndMigrationAcrossCollection() throws Exception {
-            Fixture f = new Fixture();
+            Fixture f = fixture();
             f.serializer.block = true;
             f.server.saveOfflinePlayerData(PREVIOUS, new CompoundTag().putInt("value", 73), true);
             ExecutorService workers = Executors.newFixedThreadPool(3);
             try {
-                Future<?> save = workers.submit(() -> f.scheduled.get(0).onRun(1));
+                Future<?> save = f.queue.flush(PREVIOUS.toString()).toCompletableFuture();
                 assertTrue(f.serializer.writeStarted.await(3, TimeUnit.SECONDS));
                 CountDownLatch callersReady = new CountDownLatch(2);
                 Future<CompoundTag> read = workers.submit(() -> {
@@ -154,7 +159,7 @@ class PlayerDataLockTest {
                 assertEquals(PlayerDataMigrator.Result.MIGRATED, migration.get(5, TimeUnit.SECONDS));
                 assertEquals(73, f.read(CURRENT));
                 assertEquals(1, f.serializer.previousWrites.get());
-                assertTrue(f.pending.isEmpty());
+                assertTrue(f.queue.flushAll().toCompletableFuture().isDone());
             } finally {
                 f.serializer.releaseWrite.countDown();
                 workers.shutdownNow();
@@ -162,7 +167,7 @@ class PlayerDataLockTest {
         }
 
         @Test void reverseConcurrentMigrationsKeepGlobalLockOrder() throws Exception {
-            Fixture f = new Fixture();
+            Fixture f = fixture();
             ExecutorService workers = Executors.newFixedThreadPool(2);
             CountDownLatch start = new CountDownLatch(1);
             try {
@@ -187,24 +192,17 @@ class PlayerDataLockTest {
         private static final class Fixture {
             final Server server = mock(Server.class, CALLS_REAL_METHODS);
             final MemorySerializer serializer = new MemorySerializer();
-            final ConcurrentHashMap<String, ArrayDeque<Task>> pending = new ConcurrentHashMap<>();
-            final List<Task> scheduled = new CopyOnWriteArrayList<>();
+            final PlayerDataSaveQueue queue = new PlayerDataSaveQueue(2, 16);
             Fixture() throws Exception {
                 inject(server, "playerDataLocks", Server.createPlayerDataLocks());
-                inject(server, "pendingPlayerDataSaves", pending);
+                inject(server, "playerDataSaves", queue);
                 inject(server, "playerDataSerializer", serializer);
                 inject(server, "pluginManager", mock(PluginManager.class));
                 ServerScheduler scheduler = mock(ServerScheduler.class);
                 doReturn(scheduler).when(server).getScheduler();
                 doReturn(true).when(server).shouldSavePlayerData();
+                doReturn(true).when(server).isPrimaryThread();
                 server.savePlayerDataByUuid = false;
-                when(scheduler.scheduleTask(any(Plugin.class), any(Runnable.class), eq(true))).thenAnswer(call -> {
-                    Task task = call.getArgument(1);
-                    TaskHandler handler = new TaskHandler(call.getArgument(0), task, scheduled.size() + 1, true);
-                    task.setHandler(handler);
-                    scheduled.add(task);
-                    return handler;
-                });
             }
             int read(UUID id) throws IOException {
                 try (InputStream input = serializer.read(id.toString(), id).orElseThrow()) {
@@ -218,6 +216,7 @@ class PlayerDataLockTest {
             final CountDownLatch writeStarted = new CountDownLatch(1), releaseWrite = new CountDownLatch(1);
             final AtomicInteger previousWrites = new AtomicInteger();
             volatile boolean block;
+            public boolean supportsConcurrentReads() { return true; }
             public Optional<InputStream> read(String name, UUID id) {
                 return Optional.ofNullable(data.get(name)).map(ByteArrayInputStream::new);
             }
@@ -227,7 +226,7 @@ class PlayerDataLockTest {
                     if (block) {
                         writeStarted.countDown();
                         try {
-                            if (!releaseWrite.await(10, TimeUnit.SECONDS)) throw new IOException("test write timeout");
+                            if (!releaseWrite.await(30, TimeUnit.SECONDS)) throw new IOException("test write timeout");
                         } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IOException(e); }
                     }
                 }

@@ -82,7 +82,7 @@ public class BlockBeacon extends BlockTransparent implements BlockEntityHolder<B
                 BlockEntity.createBlockEntity(BlockEntity.BEACON, this.getChunk(), nbt);
             }
 
-            player.addWindow(new BeaconInventory(player.getUIInventory(), this), Player.BEACON_WINDOW_ID);
+            player.requestWindowOpen(new BeaconInventory(player.getUIInventory(), this), Player.BEACON_WINDOW_ID);
         }
         return true;
     }

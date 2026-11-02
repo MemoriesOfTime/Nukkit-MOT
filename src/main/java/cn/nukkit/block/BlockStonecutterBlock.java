@@ -83,7 +83,7 @@ public class BlockStonecutterBlock extends BlockSolidMeta implements Faceable {
     @Override
     public boolean onActivate(Item item, Player player) {
         if (player != null) {
-            player.addWindow(new StonecutterInventory(player.getUIInventory(), this), Player.STONECUTTER_WINDOW_ID);
+            player.requestWindowOpen(new StonecutterInventory(player.getUIInventory(), this), Player.STONECUTTER_WINDOW_ID);
         }
         return true;
     }

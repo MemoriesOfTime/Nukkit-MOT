@@ -4,7 +4,6 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.inventory.BundleInventory;
 import cn.nukkit.inventory.InventoryHolder;
-import cn.nukkit.level.Sound;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -98,26 +97,12 @@ public class ItemBundle extends StringItemBase implements InventoryHolder {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        Map.Entry<Integer, Item> entry = this.getInventory().getContents().entrySet().stream()
-                .filter(e -> e.getValue() != null && !e.getValue().isNull())
-                .min(Map.Entry.comparingByKey())
-                .orElse(null);
-        if (entry == null) {
-            return false;
+        try {
+            return cn.nukkit.inventory.NativeBundleOutput.output(this, player);
+        } finally {
+            // Native output owns the carrier NBT; discard this caller clone's old contents cache.
+            this.inventory = null;
         }
-
-        Item item = entry.getValue().clone();
-        if (!this.getInventory().clear(entry.getKey(), false)) {
-            return false;
-        }
-        if (!player.dropItem(item)) {
-            this.getInventory().setItem(entry.getKey(), entry.getValue(), false);
-            return false;
-        }
-        if (player.getLevel() != null) {
-            player.getLevel().addSound(player, Sound.BUNDLE_DROP_CONTENTS);
-        }
-        return true;
     }
 
     @Override

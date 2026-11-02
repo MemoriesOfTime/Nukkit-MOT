@@ -22,6 +22,7 @@ import cn.nukkit.event.level.LevelInitEvent;
 import cn.nukkit.event.level.LevelLoadEvent;
 import cn.nukkit.event.server.*;
 import cn.nukkit.inventory.CraftingManager;
+import cn.nukkit.inventory.InventoryMutationGuard;
 import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItemMapping;
@@ -124,6 +125,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Pattern;
 
 /**
@@ -147,6 +149,18 @@ public class Server {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private volatile boolean hasStopped;
+    private volatile String requestedShutdownReason;
+    private boolean shutdownAdvancing;
+    private boolean shutdownAdvanceRequested;
+    private boolean shutdownStopEventDispatched;
+    private boolean shutdownPlayerClosingStarted;
+    private volatile Thread shutdownHookThread;
+    private volatile Thread shutdownHookWorker;
+    private volatile long shutdownDeadlineNanos;
+    private volatile boolean shutdownTimedOut;
+    private final Object deferredShutdownIdentity = new Object();
+    private final CompletableFuture<Void> shutdownCompletion = new CompletableFuture<>();
+    private final ConcurrentMap<Player, Runnable> pendingPlayerCloses = new ConcurrentHashMap<>();
     private volatile long shutdownProgressAt = Long.MAX_VALUE;
 
     private final PluginManager pluginManager;
@@ -285,12 +299,41 @@ public class Server {
      * lowercased name).
      */
     private final ConcurrentMap<String, ReentrantLock> playerDataLocks = createPlayerDataLocks();
-    /**
-     * 已调度未执行的异步保存任务，按身份索引；迁移前同步冲刷。
-     * <p>
-     * Scheduled-but-not-yet-run async save tasks indexed by identity; flushed before a migration.
-     */
-    private final ConcurrentHashMap<String, ArrayDeque<Task>> pendingPlayerDataSaves = new ConcurrentHashMap<>();
+    private PlayerDataSaveQueue playerDataSaves = new PlayerDataSaveQueue();
+    private Map<Player, LoginProfileOwner> pendingProfileLogins = new IdentityHashMap<>();
+    private ConcurrentLinkedQueue<Runnable> pendingProfileIO = new ConcurrentLinkedQueue<>();
+    private AtomicInteger profileCaptureHandoffs = new AtomicInteger();
+
+    /** The terminated MAIN may be replaced only by this server's designated shutdown owner. */
+    boolean isProfileOwnerThread() {
+        return isPrimaryThread() || Thread.currentThread() == shutdownHookWorker && currentThread != null
+                && currentThread.getState() == Thread.State.TERMINATED && InventoryMutationGuard.isIdle();
+    }
+
+    PlayerDataSaveQueue profileQueue() {
+        // Constructor-bypassing integrations still receive one server-owned queue.
+        synchronized (this) {
+            if (playerDataSaves == null) playerDataSaves = new PlayerDataSaveQueue();
+            return playerDataSaves;
+        }
+    }
+
+    private record LoginProfileOwner(String name, UUID uuid) { }
+
+    /** MAIN-only, bounded native login ownership through final profile application. */
+    boolean reserveLoginProfile(Player player, String name, UUID uuid) {
+        if (pendingProfileLogins == null) pendingProfileLogins = new IdentityHashMap<>();
+        for (var entry : pendingProfileLogins.entrySet()) {
+            if (entry.getKey() != player && (entry.getValue().name().equals(name) || entry.getValue().uuid().equals(uuid))) return false;
+        }
+        if (!pendingProfileLogins.containsKey(player) && pendingProfileLogins.size() >= 256) return false;
+        pendingProfileLogins.put(player, new LoginProfileOwner(name, uuid));
+        return true;
+    }
+
+    void releaseLoginProfile(Player player) {
+        if (pendingProfileLogins != null) pendingProfileLogins.remove(player);
+    }
 
     /**
      * The server's MOTD. Remember to call network.setName() when updated.
@@ -1109,7 +1152,7 @@ public class Server {
             }
         });
 
-        Runtime.getRuntime().addShutdownHook(new Thread(this::forceShutdown));
+        Runtime.getRuntime().addShutdownHook(new Thread(this::runShutdownHook, "Server shutdown hook"));
 
         this.start();
     }
@@ -1585,19 +1628,37 @@ public class Server {
         this.forceShutdown(this.getPropertyString("shutdown-message", "§cServer closed").replace("§n", "\n"));
     }
 
+    /** A foreign caller requests the complete owner-thread sequence, before any dependency teardown. */
     public void forceShutdown(String reason) {
-        if (this.hasStopped) {
-            return;
+        if (!this.requestShutdown(reason)) return;
+        if (!this.isPrimaryThread() && this.currentThread.getState() != Thread.State.TERMINATED) return;
+        synchronized (this) {
+            if (this.hasStopped || this.shutdownTimedOut) return;
+            if (this.shutdownAdvancing) {
+                this.shutdownAdvanceRequested = true;
+                return;
+            }
+            this.shutdownAdvancing = true;
         }
         long shutdownStart = System.currentTimeMillis();
-        this.touchShutdownProgress();
-        this.hasStopped = true;
-
         try {
-            isRunning.compareAndSet(true, false);
-
-            ServerStopEvent serverStopEvent = new ServerStopEvent();
-            pluginManager.callEvent(serverStopEvent);
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            this.drainPlayerCloses();
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            reason = this.requestedShutdownReason;
+            this.touchShutdownProgress();
+            if (!this.shutdownStopEventDispatched) {
+                this.shutdownStopEventDispatched = true;
+                pluginManager.callEvent(new ServerStopEvent());
+            }
+            // A stop listener can retain a new native claim; resume without repeating its event.
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            if (this.shutdownTimedOut) return;
+            if (!this.shutdownPlayerClosingStarted) {
+                this.shutdownPlayerClosingStarted = true;
 
             if (this.holdWorldSave) {
                 this.getLogger().warning("World save hold was not released! Any backup currently being taken may be invalid");
@@ -1609,12 +1670,41 @@ public class Server {
             }
 
             LoginChainVerifier.shared().shutdown();
+            }
             this.getLogger().debug("Disconnecting all players...");
             for (Player player : new ArrayList<>(this.players.values())) {
+                if (this.shutdownTimedOut) return;
                 player.close(player.getLeaveMessage(), reason);
                 this.touchShutdownProgress();
             }
 
+            // Quit/serialize listeners can retain another claim; pending players resume their captured close phase.
+            if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity,
+                    this::resumeShutdown)) return;
+            if (this.shutdownTimedOut) return;
+            // An unadmitted final snapshot is still owned by its Player, not by the IO queue.
+            while (this.players.values().stream().anyMatch(Player::hasPendingProfileRetirement)) {
+                drainProfileIO(); drainPlayerCloses();
+                if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity, this::resumeShutdown)) return;
+                if (System.nanoTime() >= this.shutdownDeadlineNanos || Thread.currentThread().isInterrupted()) {
+                    this.expireShutdown(); return;
+                }
+                java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
+            }
+            // Only admitted profile continuations run here; plugin heartbeat work stays untouched.
+            while (!profileQueue().flushAll().toCompletableFuture().isDone()) {
+                drainProfileIO();
+                if (System.nanoTime() >= this.shutdownDeadlineNanos || Thread.currentThread().isInterrupted()) {
+                    this.expireShutdown(); return;
+                }
+                java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
+            }
+            drainProfileIO();
+            if (!profileQueue().close(java.time.Duration.ofNanos(Math.max(0, this.shutdownDeadlineNanos - System.nanoTime())))) {
+                this.expireShutdown();
+                return;
+            }
+            this.hasStopped = true;
             this.getLogger().debug("Disabling all plugins...");
             this.disablePlugins();
             this.touchShutdownProgress();
@@ -1666,11 +1756,153 @@ public class Server {
 
             this.getLogger().info(this.baseLang.translateString("nukkit.server.stopped",
                     String.valueOf(NukkitMath.round((System.currentTimeMillis() - shutdownStart) / 1000d, 1))));
+            this.shutdownCompletion.complete(null);
         } catch (Exception e) {
+            this.hasStopped = true;
+            this.shutdownCompletion.completeExceptionally(e);
             log.fatal("Exception happened while shutting down, exiting the process", e);
-            Nukkit.shutdownLogging();
-            System.exit(1);
+            if (Thread.currentThread() != this.shutdownHookThread && Thread.currentThread() != this.shutdownHookWorker) {
+                Nukkit.shutdownLogging();
+                System.exit(1);
+            }
+        } catch (Error failure) {
+            this.hasStopped = true;
+            this.shutdownCompletion.completeExceptionally(failure);
+            throw failure;
+        } finally {
+            boolean retry;
+            synchronized (this) {
+                this.shutdownAdvancing = false;
+                retry = this.shutdownAdvanceRequested && !this.hasStopped && !this.shutdownTimedOut;
+                this.shutdownAdvanceRequested = false;
+            }
+            if (retry) this.forceShutdown(this.requestedShutdownReason);
         }
+    }
+
+    private boolean requestShutdown(String reason) {
+        synchronized (this) {
+            if (this.hasStopped || this.shutdownTimedOut) return false;
+            if (this.requestedShutdownReason == null) {
+                this.requestedShutdownReason = reason;
+                this.shutdownDeadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+                this.touchShutdownProgress();
+            }
+        }
+        this.isRunning.set(false);
+        return true;
+    }
+
+    private void resumeShutdown() {
+        if (this.shutdownHookThread != null && this.currentThread.getState() == Thread.State.TERMINATED)
+            this.startShutdownHookFallback();
+        else this.forceShutdown(this.requestedShutdownReason);
+    }
+
+    private void startShutdownHookFallback() {
+        if (this.currentThread.getState() != Thread.State.TERMINATED || this.shutdownTimedOut) return;
+        if (InventoryMutationGuard.deferUntilIdle(this.deferredShutdownIdentity, this::startShutdownHookFallback)) return;
+        Thread worker;
+        synchronized (this) {
+            if (this.shutdownHookWorker != null || this.shutdownCompletion.isDone() || this.shutdownTimedOut) return;
+            worker = new Thread(() -> {
+                try { this.completeShutdownOnOwner(); }
+                finally { this.shutdownHookWorker = null; }
+            }, "Terminated owner shutdown");
+            worker.setDaemon(true);
+            this.shutdownHookWorker = worker;
+        }
+        worker.start();
+    }
+
+    private void expireShutdown() {
+        synchronized (this) {
+            if (this.shutdownCompletion.isDone()) return;
+            this.shutdownTimedOut = true;
+            this.shutdownCompletion.completeExceptionally(new TimeoutException("Shutdown owner completion deadline"));
+        }
+    }
+
+    /** Only shutdown continuations run here; plugins, levels and scheduled work remain intact while claimed. */
+    private boolean completeShutdownOnOwner() {
+        while (!this.shutdownCompletion.isDone()) {
+            if (System.nanoTime() >= this.shutdownDeadlineNanos || Thread.currentThread().isInterrupted()) {
+                this.expireShutdown();
+                return false;
+            }
+            this.forceShutdown(this.requestedShutdownReason);
+            if (this.shutdownCompletion.isDone()) break;
+            long remaining = this.shutdownDeadlineNanos - System.nanoTime();
+            if (remaining <= 0) { this.expireShutdown(); return false; }
+            try {
+                this.shutdownCompletion.get(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(100)), TimeUnit.NANOSECONDS);
+            } catch (TimeoutException retry) {
+                // A foreign release may only request another owner continuation. Recheck on this owner.
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt(); this.expireShutdown(); return false;
+            } catch (ExecutionException failure) { return false; }
+        }
+        return !this.shutdownCompletion.isCompletedExceptionally();
+    }
+
+    /** Internal: off-thread disconnects remain pending until their inventory owner can close them. */
+    public void deferPlayerClose(Player player, Runnable close) {
+        this.pendingPlayerCloses.putIfAbsent(player, close);
+    }
+
+    private void drainPlayerCloses() {
+        Throwable failure = null;
+        for (var entry : new ArrayList<>(this.pendingPlayerCloses.entrySet())) {
+            if (!this.pendingPlayerCloses.remove(entry.getKey(), entry.getValue())) continue;
+            try { entry.getValue().run(); } catch (RuntimeException | Error closeFailure) {
+                if (failure == null) failure = closeFailure;
+                else if (failure != closeFailure) failure.addSuppressed(closeFailure);
+            }
+        }
+        if (failure instanceof RuntimeException exception) throw exception;
+        if (failure instanceof Error error) throw error;
+    }
+
+    void runShutdownHook() {
+        this.shutdownHookThread = Thread.currentThread();
+        try {
+            if (this.currentThread.getState() == Thread.State.TERMINATED) {
+                if (this.requestShutdown(this.getPropertyString("shutdown-message", "§cServer closed").replace("§n", "\n")))
+                    this.startShutdownHookFallback();
+            } else this.forceShutdown();
+        } finally {
+            if (!this.awaitShutdownCompletion(30_000)) {
+                log.warn("Shutdown owner did not complete before the hook deadline; only previously admitted profiles are available");
+            }
+            this.shutdownHookThread = null;
+        }
+    }
+
+    boolean awaitShutdownCompletion(long timeoutMillis) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeoutMillis));
+        if (this.shutdownDeadlineNanos != 0) deadline = Math.min(deadline, this.shutdownDeadlineNanos);
+        while (!this.shutdownCompletion.isDone()) {
+            // Runtime.exit holds the owner until hooks finish. Waiting for it would deadlock the hook.
+            for (StackTraceElement frame : this.currentThread.getStackTrace()) {
+                if ((frame.getClassName().equals("java.lang.Shutdown")
+                        && (frame.getMethodName().equals("exit") || frame.getMethodName().equals("shutdown")))
+                        || (frame.getClassName().equals("java.lang.Runtime") && frame.getMethodName().equals("exit"))) return false;
+            }
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) { this.expireShutdown(); return false; }
+            try {
+                this.shutdownCompletion.get(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(100)), TimeUnit.NANOSECONDS);
+            } catch (TimeoutException retry) {
+                // Recheck the owner exit boundary and the finite deadline.
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                this.expireShutdown();
+                return false;
+            } catch (ExecutionException failed) {
+                return false;
+            }
+        }
+        return !this.shutdownCompletion.isCompletedExceptionally();
     }
 
     public void start() {
@@ -1697,6 +1929,9 @@ public class Server {
 
         this.tickProcessor();
         this.forceShutdown();
+        if (!this.completeShutdownOnOwner()) {
+            log.warn("Shutdown did not complete before owner exit; only previously admitted profiles are available");
+        }
     }
 
     private static final byte[] QUERY_PREFIX = {(byte) 0xfe, (byte) 0xfd};
@@ -1785,6 +2020,7 @@ public class Server {
 
     public void addOnlinePlayer(Player player) {
         this.playerList.put(player.getUniqueId(), player);
+        this.releaseLoginProfile(player);
         PlayerListPacket.Entry entry = new PlayerListPacket.Entry(player.getUniqueId(), player.getId(), player.getDisplayName(), player.getSkin(), player.getLoginChainData().getXUID(), player.getLocatorBarColor());
         Player[] viewers = this.playerList.values().stream()
                 .filter(viewer -> !viewer.sentSkins.contains(player.getUniqueId()))
@@ -1994,6 +2230,7 @@ public class Server {
     // The actual tick body also accepts a monotonic clock for deterministic boundary tests.
     void tick(long tickTime, LongSupplier nanoTime) {
 
+        this.drainPlayerCloses();
         long time = tickTime - this.nextTick;
         if (time < -25) {
             try {
@@ -2106,8 +2343,11 @@ public class Server {
         return nextTick;
     }
 
+    /** A timed-out shutdown may retain admitted snapshots, but cannot start another live checkpoint. */
+    public boolean isShutdownTimedOut() { return this.shutdownTimedOut; }
+
     public boolean isShutdownInProgress() {
-        return this.hasStopped;
+        return this.hasStopped || this.requestedShutdownReason != null;
     }
 
     public long getShutdownProgressAt() {
@@ -2587,6 +2827,7 @@ public class Server {
             pluginManager.callEvent(event);
         }
 
+        awaitProfileIO(profileQueue().flush(name), true);
         Optional<InputStream> dataStream = Optional.empty();
         try {
             ReentrantLock dataLock = playerDataLock(name);
@@ -2602,7 +2843,7 @@ public class Server {
         } catch (IOException e) {
             log.warn(this.getLanguage().translateString("nukkit.data.playerCorrupted", name));
             log.throwing(e);
-            create = true;
+            return null;
         } finally {
             if (dataStream.isPresent()) {
                 try {
@@ -2614,9 +2855,17 @@ public class Server {
         }
         CompoundTag nbt = null;
         if (create) {
+            nbt = newPlayerData();
+
+            this.saveOfflinePlayerData(name, nbt, true, runEvent);
+        }
+        return nbt;
+    }
+
+    CompoundTag newPlayerData() {
             Position spawn = this.getDefaultLevel().getSafeSpawn();
             long time = System.currentTimeMillis();
-            nbt = new CompoundTag()
+            return new CompoundTag()
                     .putLong("firstPlayed", time / 1000)
                     .putLong("lastPlayed", time / 1000)
                     .putList(new ListTag<DoubleTag>("Pos")
@@ -2640,9 +2889,73 @@ public class Server {
                     .putBoolean("OnGround", true)
                     .putBoolean("Invulnerable", false);
 
-            this.saveOfflinePlayerData(name, nbt, true, runEvent);
+    }
+
+    record LoginProfileFiles(boolean uuidExists, boolean nameExists, Optional<NameEntry> previous) { }
+
+    PlayerDataSaveQueue.ReadHandle<LoginProfileFiles> inspectLoginProfile(UUID uuid, String name, boolean xboxAuthed) {
+        return profileQueue().read(Set.of(uuid.toString(), name), current -> {
+            boolean uuidExists = profileFileExists(uuid.toString());
+            boolean nameExists = profileFileExists(name);
+            // Read only: invalid lookup bytes must not become an unfenced async DB mutation.
+            Optional<NameEntry> previous = savePlayerDataByUuid && !xboxAuthed && !uuidExists && nameLookup != null
+                    ? Optional.ofNullable(decodeNameEntry(nameLookup.get(name.getBytes(StandardCharsets.UTF_8)))) : Optional.empty();
+            return new LoginProfileFiles(uuidExists, nameExists, previous);
+        });
+    }
+
+    private boolean profileFileExists(String identity) throws IOException {
+        try {
+            java.nio.file.Files.readAttributes(java.nio.file.Path.of(getDataPath(), "players", identity + ".dat"),
+                    java.nio.file.attribute.BasicFileAttributes.class);
+            return true;
+        } catch (java.nio.file.NoSuchFileException missing) { return false; }
+    }
+
+    /** Legacy readers execute on MAIN only after their FIFO predecessors have acknowledged. */
+    final class LoginProfileRead implements AutoCloseable {
+        final PlayerDataSaveQueue.ReadHandle<CompoundTag> observation;
+        final PlayerDataSerializer serializer;
+        final String key;
+        final UUID storageUuid;
+        final boolean legacy;
+        boolean taken;
+        CompoundTag value;
+        LoginProfileRead(PlayerDataSaveQueue.ReadHandle<CompoundTag> observation, PlayerDataSerializer serializer,
+                         String key, UUID storageUuid, boolean legacy) {
+            this.observation = observation; this.serializer = serializer; this.key = key;
+            this.storageUuid = storageUuid; this.legacy = legacy;
         }
-        return nbt;
+        CompletableFuture<CompoundTag> ready() { return observation.completion().toCompletableFuture(); }
+        boolean isCurrent() { return observation.isCurrent(); }
+        boolean isSuperseded() { return observation.isSuperseded(); }
+        CompoundTag take() throws IOException {
+            if (!ready().isDone()) throw new IllegalStateException("Profile read is pending");
+            CompoundTag result = ready().join();
+            if (!legacy) return result;
+            if (!taken) { taken = true; value = readSelectedProfile(serializer, key, storageUuid); }
+            return value;
+        }
+        @Override public void close() { observation.close(); }
+    }
+
+    LoginProfileRead readLoginProfile(String key, UUID uuid, String name, BooleanSupplier current) {
+        PlayerDataSerializeEvent event = new PlayerDataSerializeEvent(key, playerDataSerializer);
+        pluginManager.callEvent(event);
+        if (!current.getAsBoolean()) throw new CancellationException("Profile read listener superseded login");
+        PlayerDataSerializer selected = event.getSerializer();
+        UUID storageUuid = event.getUuid().orElse(null);
+        boolean legacy = !selected.supportsConcurrentReads();
+        var observation = profileQueue().read(Set.of(uuid.toString(), name), observationCurrent ->
+                legacy ? null : readSelectedProfile(selected, key, storageUuid));
+        return new LoginProfileRead(observation, selected, key, storageUuid, legacy);
+    }
+
+    private CompoundTag readSelectedProfile(PlayerDataSerializer selected, String key, UUID uuid) throws IOException {
+        Optional<InputStream> source = selected.getClass() == DefaultPlayerDataSerializer.class
+                ? ((DefaultPlayerDataSerializer) selected).readStrict(key, uuid) : selected.read(key, uuid);
+        if (source.isEmpty()) return null;
+        try (InputStream input = source.get()) { return NBTIO.readCompressed(input); }
     }
 
     /**
@@ -2652,39 +2965,139 @@ public class Server {
      * already applied the auth gates), so xboxAuthed is always false here.
      */
     PlayerDataMigrator.Result migratePlayerData(UUID previous, UUID current) {
-        String previousKey = previous.toString();
-        String currentKey = current.toString();
-        // 先冲刷旧身份的排队保存，否则任务闭包里的旧路径会在移动后重建孤儿文件
-        // Flush the previous identity's queued saves first, or a task's old path recreates an
-        // orphaned file after the move
-        flushPendingPlayerDataSaves(previousKey);
+        return awaitProfileIO(migratePlayerDataForLogin(previous, current, current.toString(), () -> true), true);
+    }
 
-        PlayerDataSerializeEvent previousEvent = new PlayerDataSerializeEvent(previousKey, playerDataSerializer);
-        pluginManager.callEvent(previousEvent);
-        PlayerDataSerializeEvent currentEvent = new PlayerDataSerializeEvent(currentKey, playerDataSerializer);
-        pluginManager.callEvent(currentEvent);
-
-        // 双身份按字典序获取锁，并发迁移 A→B / B→A 不会互相死锁
-        // Acquire both identities in lexicographic order so concurrent A→B / B→A migrations
-        // cannot deadlock each other
-        ReentrantLock first = playerDataLock(previousKey.compareTo(currentKey) <= 0 ? previousKey : currentKey);
-        ReentrantLock second = playerDataLock(previousKey.compareTo(currentKey) <= 0 ? currentKey : previousKey);
-        first.lock();
-        try {
-            second.lock();
-            try {
-                // 事件在锁外触发，监听器可能刚注册了旧身份的排队写：持锁后再冲刷一次
-                // Events fire outside the locks; flush again in case a listener queued an
-                // old-path save in between
-                flushPendingPlayerDataSaves(previousKey);
-                return PlayerDataMigrator.migrate(previousEvent.getSerializer(), currentEvent.getSerializer(),
-                        previous, current, false);
-            } finally {
-                second.unlock();
+    CompletionStage<PlayerDataMigrator.Result> migratePlayerDataForLogin(UUID previous, UUID current, String name, BooleanSupplier token) {
+        if (previous == null || current == null || previous.equals(current))
+            return CompletableFuture.completedStage(PlayerDataMigrator.Result.SKIPPED);
+        String source = previous.toString(), target = current.toString();
+        PlayerDataSerializeEvent oldEvent = new PlayerDataSerializeEvent(source, playerDataSerializer);
+        pluginManager.callEvent(oldEvent);
+        if (!token.getAsBoolean()) throw new CancellationException("Source serializer listener superseded migration");
+        PlayerDataSerializeEvent newEvent = new PlayerDataSerializeEvent(target, playerDataSerializer);
+        pluginManager.callEvent(newEvent);
+        if (!token.getAsBoolean()) throw new CancellationException("Target serializer listener superseded migration");
+        PlayerDataSerializer oldSerializer = oldEvent.getSerializer(), newSerializer = newEvent.getSerializer();
+        if (!token.getAsBoolean()) throw new CancellationException("Migration owner changed before admission");
+        return profileQueue().migrateVerified(source, new HashSet<>(List.of(source, target, name)), recovering -> withProfileLocks(Set.of(source, target), () -> {
+            boolean eligible = PlayerDataMigrator.isSourceIdentityEligible(previous, current, false);
+            if (!eligible) {
+                if (recovering) throw new PlayerDataSaveQueue.MigrationException("Protected identity cannot acknowledge recovery");
+                return PlayerDataMigrator.migrate(migrationSerializer(oldSerializer), migrationSerializer(newSerializer), previous, current, false);
             }
-        } finally {
-            first.unlock();
+            // Missing is legitimate; corrupt/unreadable eligible source is never a fresh-profile signal.
+            CompoundTag authoritativeSource = readSelectedProfile(oldSerializer, source, previous);
+            if (recovering) {
+                acknowledgeMigrationRecovery(oldSerializer, newSerializer, authoritativeSource, target, current, previous);
+                return PlayerDataMigrator.Result.MIGRATED;
+            }
+            PlayerDataMigrator.Result result = PlayerDataMigrator.migrate(
+                    migrationSerializer(oldSerializer), migrationSerializer(newSerializer), previous, current, false);
+            if (result == PlayerDataMigrator.Result.FAILED) throw new PlayerDataSaveQueue.MigrationException("Profile migration was not acknowledged");
+            if (result == PlayerDataMigrator.Result.MIGRATED && oldSerializer == newSerializer
+                    && oldSerializer.getClass() == DefaultPlayerDataSerializer.class) {
+                // Existing mover may use its platform fallback. No atomic-publication receipt is claimed here.
+                try { ((DefaultPlayerDataSerializer) oldSerializer).syncDirectory(); }
+                catch (IOException error) { throw new PlayerDataSaveQueue.MigrationException("Unknown profile migration ACK", error); }
+            }
+            return result;
+        }), profileMigrationExecutor(oldSerializer, newSerializer)).completion();
+    }
+
+    CompletionStage<PlayerDataMigrator.Result> migrateLegacyPlayerDataForLogin(String name, UUID current, BooleanSupplier token) {
+        PlayerDataSerializeEvent oldEvent = new PlayerDataSerializeEvent(name, playerDataSerializer);
+        pluginManager.callEvent(oldEvent);
+        if (!token.getAsBoolean()) throw new CancellationException("Source serializer listener superseded migration");
+        PlayerDataSerializeEvent newEvent = new PlayerDataSerializeEvent(current.toString(), playerDataSerializer);
+        pluginManager.callEvent(newEvent);
+        if (!token.getAsBoolean()) throw new CancellationException("Target serializer listener superseded migration");
+        PlayerDataSerializer oldSerializer = oldEvent.getSerializer(), newSerializer = newEvent.getSerializer();
+        if (!token.getAsBoolean()) throw new CancellationException("Migration owner changed before admission");
+        return profileQueue().migrateVerified(name, Set.of(name, current.toString()), recovering -> withProfileLocks(Set.of(name, current.toString()), () -> {
+            CompoundTag existing = readSelectedProfile(newSerializer, current.toString(), current);
+            if (recovering) {
+                CompoundTag authoritativeSource = readSelectedProfile(oldSerializer, name, oldEvent.getUuid().orElse(null));
+                acknowledgeMigrationRecovery(oldSerializer, newSerializer, authoritativeSource, current.toString(), current, null);
+                return PlayerDataMigrator.Result.MIGRATED;
+            }
+            if (existing != null) return PlayerDataMigrator.Result.SKIPPED;
+            CompoundTag legacy = readSelectedProfile(oldSerializer, name, oldEvent.getUuid().orElse(null));
+            if (legacy == null) throw new PlayerDataSaveQueue.MigrationException("Legacy profile disappeared");
+            // Publish and validate the target before deleting the only legacy copy.
+            writeSelectedProfile(newSerializer, legacy, current.toString(), newEvent.getUuid().orElse(null));
+            if (readSelectedProfile(newSerializer, current.toString(), current) == null)
+                throw new PlayerDataSaveQueue.MigrationException("Legacy target was not readable");
+            // Custom deletion failure leaves a duplicate old source, never a missing only copy.
+            oldSerializer.delete(name, oldEvent.getUuid().orElse(null));
+            if (oldSerializer.getClass() == DefaultPlayerDataSerializer.class)
+                ((DefaultPlayerDataSerializer) oldSerializer).syncDirectory();
+            return PlayerDataMigrator.Result.MIGRATED;
+        }), profileMigrationExecutor(oldSerializer, newSerializer)).completion();
+    }
+
+    private void acknowledgeMigrationRecovery(PlayerDataSerializer previous, PlayerDataSerializer canonical,
+                                               CompoundTag source, String target, UUID uuid, UUID handoverSource) throws IOException {
+        CompoundTag published = readSelectedProfile(canonical, target, uuid);
+        if (handoverSource != null && (source != null && !PlayerDataMigrator.isSourcePayloadEligible(source, handoverSource)
+                || published != null && !PlayerDataMigrator.isSourcePayloadEligible(published, handoverSource)))
+            throw new PlayerDataSaveQueue.MigrationException("Authenticated payload cannot acknowledge offline migration recovery");
+        if (published == null) {
+            if (source == null) throw new PlayerDataSaveQueue.MigrationException("Migration recovery has neither authoritative source nor canonical target");
+            // A prior strict-read/encode failure may have published nothing. The repaired source is authoritative.
+            writeSelectedProfile(canonical, source, target, uuid);
+            CompoundTag verified = readSelectedProfile(canonical, target, uuid);
+            if (!source.equals(verified)) throw new PlayerDataSaveQueue.MigrationException("Recovered migration target failed payload verification");
+            return;
         }
+        // Native rename can leave the sole valid copy at the exact target after a failed directory ACK.
+        // A custom provider needs the still-authoritative source; parseable partial output alone is not proof.
+        if (source != null && !source.equals(published))
+            throw new PlayerDataSaveQueue.MigrationException("Canonical migration payload differs from its authoritative source");
+        if (source == null && (previous != canonical || canonical.getClass() != DefaultPlayerDataSerializer.class))
+            throw new PlayerDataSaveQueue.MigrationException("Custom migration recovery has no authoritative source");
+        // Re-publish the verified canonical payload: same-channel file force, atomic rename and qualified directory ACK.
+        // The selected custom provider instead must successfully acknowledge a new full stream write.
+        writeSelectedProfile(canonical, published, target, uuid);
+    }
+
+    private <T> T withProfileLocks(Set<String> keys, PlayerDataSaveQueue.Operation<T> operation) throws Exception {
+        List<ReentrantLock> locks = keys.stream().sorted().map(this::playerDataLock).toList();
+        locks.forEach(ReentrantLock::lock);
+        try { return operation.run(); }
+        finally { for (int i = locks.size() - 1; i >= 0; i--) locks.get(i).unlock(); }
+    }
+
+    private Executor profileMigrationExecutor(PlayerDataSerializer first, PlayerDataSerializer second) {
+        if (first.supportsConcurrentReads() && second.supportsConcurrentReads()) return null;
+        return task -> {
+            if (isProfileOwnerThread()) task.run();
+            else {
+                synchronized (this) {
+                    if (pendingProfileIO == null) pendingProfileIO = new ConcurrentLinkedQueue<>();
+                    pendingProfileIO.add(task);
+                }
+                try { getScheduler().scheduleTask(InternalPlugin.INSTANCE, this::drainProfileIO); }
+                catch (RuntimeException | Error rejected) { pendingProfileIO.remove(task); throw rejected; }
+            }
+        };
+    }
+
+    private void drainProfileIO() {
+        if (pendingProfileIO == null) return;
+        Runnable continuation;
+        while ((continuation = pendingProfileIO.poll()) != null) continuation.run();
+    }
+
+    /** A Default subclass still owns its virtual hooks; do not select the migrator's native path. */
+    private static PlayerDataSerializer migrationSerializer(PlayerDataSerializer selected) {
+        if (!(selected instanceof DefaultPlayerDataSerializer) || selected.getClass() == DefaultPlayerDataSerializer.class)
+            return selected;
+        return new PlayerDataSerializer() {
+            public Optional<InputStream> read(String name, UUID uuid) throws IOException { return selected.read(name, uuid); }
+            public OutputStream write(String name, UUID uuid) throws IOException { return selected.write(name, uuid); }
+            public boolean delete(String name, UUID uuid) throws IOException { return selected.delete(name, uuid); }
+        };
     }
 
     /**
@@ -2698,48 +3111,6 @@ public class Server {
 
     private ReentrantLock playerDataLock(String key) {
         return playerDataLocks.computeIfAbsent(key, k -> new ReentrantLock());
-    }
-
-    /**
-     * 在调用线程同步执行排队保存：{@link Task#cancel()} 会内联执行 onCancel 完成落盘，
-     * {@code hasRun} 保证不与池线程的正常执行重复。
-     * <p>
-     * Runs queued saves synchronously on the calling thread: {@link Task#cancel()} executes
-     * onCancel inline; {@code hasRun} keeps it from duplicating a pool-thread run.
-     */
-    private void flushPendingPlayerDataSaves(String name) {
-        ArrayDeque<Task> queued;
-        ReentrantLock lock = playerDataLock(name);
-        lock.lock();
-        try {
-            queued = pendingPlayerDataSaves.remove(name);
-        } finally {
-            lock.unlock();
-        }
-        if (queued == null) {
-            return;
-        }
-        for (Task saveTask : queued) {
-            saveTask.cancel();
-        }
-    }
-
-    private void unregisterPendingSave(String name, Task saveTask) {
-        // 关服的 cancelAllTasks 不持身份锁，注销需自行加锁
-        // Shutdown's cancelAllTasks holds no identity lock, so removal locks by itself
-        ReentrantLock lock = playerDataLock(name);
-        lock.lock();
-        try {
-            ArrayDeque<Task> queue = pendingPlayerDataSaves.get(name);
-            if (queue != null) {
-                queue.remove(saveTask);
-                if (queue.isEmpty()) {
-                    pendingPlayerDataSaves.remove(name, queue);
-                }
-            }
-        } finally {
-            lock.unlock();
-        }
     }
 
     public void saveOfflinePlayerData(UUID uuid, CompoundTag tag) {
@@ -2764,80 +3135,117 @@ public class Server {
     }
 
     private void saveOfflinePlayerData(String name, CompoundTag tag, boolean async, boolean runEvent) {
-        String nameLower = name.toLowerCase(Locale.ROOT);
-        if (this.shouldSavePlayerData()) {
-            PlayerDataSerializeEvent event = new PlayerDataSerializeEvent(nameLower, playerDataSerializer);
-            if (runEvent) {
-                pluginManager.callEvent(event);
+        if (!shouldSavePlayerData()) return;
+        if (!async && profileQueue().isWorkerThread()) throw new IllegalStateException("Profile worker cannot synchronously save itself");
+        if (!isProfileOwnerThread()) {
+            AtomicInteger handoffs;
+            synchronized (this) {
+                if (profileCaptureHandoffs == null) profileCaptureHandoffs = new AtomicInteger();
+                handoffs = profileCaptureHandoffs;
             }
-
-            if (async) {
-                Task saveTask = new Task() {
-                    volatile boolean hasRun = false;
-
-                    @Override
-                    public void onRun(int currentTick) {
-                        this.onCancel();
-                    }
-
-                    // Doing it like this ensures that the player data will be saved in a server shutdown
-                    @Override
-                    public void onCancel() {
-                        // hasRun 的检查与置位必须在身份锁内：池线程置位后、取锁前的空窗里冲刷会空转，
-                        // 迁移移走文件后池线程恢复，把最新存档写回旧路径
-                        // The hasRun check-and-set must sit under the identity lock: in the pool
-                        // thread's flag-to-lock gap a flush no-ops, and the resumed thread then
-                        // writes the newest save to the path the migration already moved
-                        ReentrantLock saveLock = playerDataLock(nameLower);
-                        saveLock.lock();
-                        try {
-                            if (!this.hasRun) {
-                                this.hasRun = true;
-                                saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
-                                unregisterPendingSave(nameLower, this);
-                            }
-                        } finally {
-                            saveLock.unlock();
-                        }
-                    }
-                };
-                // 同锁调度并注册：冲刷要么看到完整注册的任务，要么看到干净队列，无空窗
-                // Schedule and register under one lock so a flush never sees a
-                // scheduled-but-unregistered task
-                ReentrantLock lock = playerDataLock(nameLower);
-                lock.lock();
-                try {
-                    this.getScheduler().scheduleTask(InternalPlugin.INSTANCE, saveTask, true);
-                    pendingPlayerDataSaves.computeIfAbsent(nameLower, k -> new ArrayDeque<>()).add(saveTask);
-                } finally {
-                    lock.unlock();
+            int occupied;
+            do {
+                occupied = handoffs.get();
+                if (occupied >= 256) throw new RejectedExecutionException("Profile MAIN handoff capacity exhausted");
+            } while (!handoffs.compareAndSet(occupied, occupied + 1));
+            CompoundTag detached;
+            try { detached = tag.copy(); }
+            catch (RuntimeException | Error error) { handoffs.decrementAndGet(); throw error; }
+            CompletableFuture<PlayerDataSerializer.WriteAcknowledgement> result = new CompletableFuture<>();
+            if (async) result.whenComplete((ack, error) -> {
+                if (error != null) log.error("Player profile capture failed for {}", name, profileFailure(error));
+            });
+            Task capture = new Task() {
+                final AtomicBoolean ownsHandoff = new AtomicBoolean(true);
+                @Override public void onRun(int tick) {
+                    if (!ownsHandoff.compareAndSet(true, false)) return;
+                    handoffs.decrementAndGet();
+                    try {
+                        admitPlayerData(name, detached, runEvent, () -> true).completion().whenComplete((ack, error) -> {
+                            if (error == null) result.complete(ack); else result.completeExceptionally(error);
+                        });
+                    } catch (Throwable error) { result.completeExceptionally(error); }
                 }
-            } else {
-                saveOfflinePlayerDataInternal(event.getSerializer(), tag, nameLower, event.getUuid().orElse(null));
-            }
+                @Override public void onCancel() {
+                    if (!ownsHandoff.compareAndSet(true, false)) return;
+                    handoffs.decrementAndGet();
+                    result.completeExceptionally(new RejectedExecutionException("Profile MAIN handoff was cancelled"));
+                }
+            };
+            try {
+                var handler = getScheduler().scheduleTask(InternalPlugin.INSTANCE, capture);
+                if (handler != null && handler.isCancelled()) capture.onCancel();
+            } catch (RuntimeException | Error rejected) { capture.onCancel(); throw rejected; }
+            if (!async) awaitProfileIO(result, false);
+            return;
         }
+        var admitted = admitPlayerData(name, tag, runEvent, () -> true);
+        if (!async) awaitProfileIO(admitted.completion(), false);
     }
 
-    /**
-     * Internal: Save offline player data
-     *
-     * @param serializer serializer
-     * @param tag compound tag
-     * @param name player name
-     * @param uuid player uuid
-     */
-    private void saveOfflinePlayerDataInternal(PlayerDataSerializer serializer, CompoundTag tag, String name, UUID uuid) {
+    /** Observable terminal storage result; UUID bypasses name lookup resolution. */
+    public CompletionStage<PlayerDataSerializer.WriteAcknowledgement> saveOfflinePlayerDataAsync(UUID uuid, CompoundTag tag) {
+        if (!isProfileOwnerThread()) return CompletableFuture.failedStage(new IllegalStateException("Profile capture requires its owner"));
+        return admitPlayerData(uuid.toString(), tag, true, () -> true).completion();
+    }
+
+    record PreparedPlayerData(String key, CompoundTag snapshot, PlayerDataSerializer serializer, UUID uuid) { }
+
+    PlayerDataSaveQueue.Admission<PlayerDataSerializer.WriteAcknowledgement> admitPlayerData(
+            String name, CompoundTag tag, boolean runEvent, BooleanSupplier current) {
+        return admitPreparedPlayerData(preparePlayerData(name, tag, runEvent, current));
+    }
+
+    PreparedPlayerData preparePlayerData(String name, CompoundTag tag, boolean runEvent, BooleanSupplier current) {
+        if (!isProfileOwnerThread()) throw new IllegalStateException("Profile selection requires its owner");
+        if (profileQueue().isWorkerThread()) throw new IllegalStateException("Profile IO callback cannot synchronously save itself");
+        if (!shouldSavePlayerData()) throw new IllegalStateException("Player data persistence is disabled");
+        String key = name.toLowerCase(Locale.ROOT);
+        PlayerDataSerializeEvent event = new PlayerDataSerializeEvent(key, playerDataSerializer);
+        if (runEvent) pluginManager.callEvent(event);
+        if (shutdownTimedOut) throw new IllegalStateException("Player checkpoint admission exceeded the shutdown deadline");
+        // A listener may close the native login or admit a newer write before this outer snapshot.
+        if (!current.getAsBoolean()) throw new CancellationException("Profile capture was superseded by its listener");
+        return new PreparedPlayerData(key, tag.copy(), event.getSerializer(), event.getUuid().orElse(null));
+    }
+
+    PlayerDataSaveQueue.Admission<PlayerDataSerializer.WriteAcknowledgement> admitPreparedPlayerData(PreparedPlayerData prepared) {
+        if (!isProfileOwnerThread() || shutdownTimedOut) throw new IllegalStateException("Profile admission owner is unavailable");
+        var admission = profileQueue().admit(prepared.key(), () -> writeSelectedProfile(
+                prepared.serializer(), prepared.snapshot(), prepared.key(), prepared.uuid()));
+        admission.completion().whenComplete((ack, error) -> {
+            if (error != null) log.error("Player profile publication failed for {}", prepared.key(), profileFailure(error));
+        });
+        return admission;
+    }
+
+    private PlayerDataSerializer.WriteAcknowledgement writeSelectedProfile(
+            PlayerDataSerializer serializer, CompoundTag tag, String name, UUID uuid) throws IOException {
         ReentrantLock lock = playerDataLock(name);
         lock.lock();
         try {
-            try (OutputStream dataStream = serializer.write(name, uuid)) {
-                NBTIO.writeGZIPCompressed(tag, dataStream, ByteOrder.BIG_ENDIAN);
-            } catch (Exception e) {
-                log.error(this.getLanguage().translateString("nukkit.data.saveError", name, e));
-            }
-        } finally {
-            lock.unlock();
-        }
+            if (serializer.getClass() == DefaultPlayerDataSerializer.class)
+                return ((DefaultPlayerDataSerializer) serializer).writeAtomicallyAcknowledged(name, uuid, tag);
+            try (OutputStream output = serializer.write(name, uuid)) { NBTIO.writeGZIPCompressed(tag, output, ByteOrder.BIG_ENDIAN); }
+            return PlayerDataSerializer.WriteAcknowledgement.PROVIDER_ACK;
+        } finally { lock.unlock(); }
+    }
+
+    <T> T awaitProfileIO(CompletionStage<T> result, boolean strict) {
+        if (profileQueue().isWorkerThread()) throw new IllegalStateException("Profile worker cannot wait on its own FIFO");
+        try { return result.toCompletableFuture().get(30, TimeUnit.SECONDS); }
+        catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IllegalStateException("Profile wait interrupted", error); }
+        catch (ExecutionException error) {
+            Throwable cause = profileFailure(error);
+            if (cause instanceof Error fatal) throw fatal;
+            if (strict || !(cause instanceof IOException)) throw new IllegalStateException("Profile publication failed", cause);
+            return null; // Preserve the historical void API's logged IOException contract.
+        } catch (TimeoutException error) { throw new IllegalStateException("Profile ACK deadline expired", error); }
+    }
+
+    private static Throwable profileFailure(Throwable error) {
+        while ((error instanceof CompletionException || error instanceof ExecutionException) && error.getCause() != null) error = error.getCause();
+        return error;
     }
 
     /**

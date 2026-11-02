@@ -93,7 +93,14 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
                 int slot = item.contains("Slot") ? item.getByte("Slot") : index;
                 index++;
                 if (slot < 0 || slot >= loadedArmor.length || loadedArmor[slot] != null) {
-                    discarded++;
+                    // An empty entry carries nothing, so dropping it loses nothing. Vanilla Bedrock
+                    // writes five positional armour entries without a Slot tag - head, chest, legs,
+                    // feet and the body slot added in 1.20.5 - so every mob saved by the client or
+                    // by an imported world has one entry more than Nukkit has slots for. Reporting
+                    // that filled the log of every server loading such a world.
+                    if (!isEmptyItemEntry(item)) {
+                        discarded++;
+                    }
                     continue;
                 }
                 loadedArmor[slot] = NBTIO.getItemHelper(item);
@@ -414,6 +421,23 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
         }
 
         super.close();
+    }
+
+    /**
+     * Whether a saved armour entry holds no item at all.
+     *
+     * <p>Vanilla writes an empty slot as {@code Count: 0b} with an empty {@code Name}; Nukkit
+     * writes it as id {@code 0}. Both forms mean the same thing: there is nothing to lose.
+     */
+    private static boolean isEmptyItemEntry(CompoundTag item) {
+        if (item.getByte("Count") <= 0) {
+            return true;
+        }
+        if (item.contains("Name")) {
+            String name = item.getString("Name");
+            return name.isEmpty() || "minecraft:air".equals(name) || "air".equals(name);
+        }
+        return item.getShort("id") == 0;
     }
 
     private void saveTool() {

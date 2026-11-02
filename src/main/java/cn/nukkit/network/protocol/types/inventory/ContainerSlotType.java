@@ -193,7 +193,7 @@ public enum ContainerSlotType {
             return id >= RECIPE_FOOD_CONTAINER.id ? null : fromId(id);
         }
         if (protocol >= ProtocolInfo.v1_20_50) {
-            return id == DYNAMIC_CONTAINER.id ? null : fromId(id);
+            return id >= DYNAMIC_CONTAINER.id ? null : fromId(id);
         }
         if (protocol >= ProtocolInfo.v1_19_80) {
             return id >= CRAFTER_BLOCK_CONTAINER.id ? null : fromId(id);

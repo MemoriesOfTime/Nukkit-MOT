@@ -87,7 +87,7 @@ public class BlockCrafter extends BlockSolidMeta implements Faceable, BlockEntit
             return true;
         }
 
-        player.addWindow(this.getOrCreateBlockEntity().getInventory());
+        player.requestWindowOpen(this.getOrCreateBlockEntity().getInventory());
         return true;
     }
 

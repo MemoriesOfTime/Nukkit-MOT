@@ -141,7 +141,7 @@ public class BlockEnchantingTable extends BlockTransparent implements BlockEntit
                 }
             }
 
-            player.addWindow(new EnchantInventory(player.getUIInventory(), this.getLocation()), Player.ENCHANT_WINDOW_ID);
+            player.requestWindowOpen(new EnchantInventory(player.getUIInventory(), this.getLocation()), Player.ENCHANT_WINDOW_ID);
         }
 
         return true;

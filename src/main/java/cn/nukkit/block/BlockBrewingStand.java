@@ -132,7 +132,7 @@ public class BlockBrewingStand extends BlockTransparentMeta implements BlockEnti
                 }
             }
 
-            player.addWindow(brewing.getInventory());
+            player.requestWindowOpen(brewing.getInventory());
         }
 
         return true;

@@ -144,7 +144,7 @@ public class CraftLoomActionProcessor implements ItemStackRequestActionProcessor
                 PlayerUIComponent.CREATED_ITEM_OUTPUT_UI_SLOT,
                 result.getCount(), result.getStackNetId(),
                 result.hasCustomName() ? result.getCustomName() : "",
-                result.getDamage(), ""
+                ItemStackRequestActionProcessor.durabilityCorrection(result), ""
         );
         return context.success(List.of(new ItemStackResponseContainer(
                 ContainerSlotType.CREATED_OUTPUT,

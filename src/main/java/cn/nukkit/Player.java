@@ -80,6 +80,7 @@ import cn.nukkit.network.protocol.netease.PyRpcPacket;
 import cn.nukkit.network.protocol.netease.pyrpc.PyRpcSubPacket;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.protocol.types.debugshape.DebugShape;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
@@ -133,12 +134,19 @@ import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -244,6 +252,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected Inventory topWindow;
     private boolean inventoryOpen;
     protected int closingWindowId = Integer.MIN_VALUE;
+    // A screen is distinct from the permanent inventory/UI/armor/crafting slot mappings.
+    private Integer inventoryScreenId;
+    private ContainerType inventoryScreenType = ContainerType.NONE;
+    private int pendingCloseWindowId = Integer.MIN_VALUE;
+    private ContainerType pendingCloseWindowType = ContainerType.NONE;
+    private Inventory inventoryCloseInProgress;
+    private boolean inventoryScreenOpening;
+    private int inventoryScreenChangeDepth;
+    private long windowOpenRequestSequence;
+    private WindowOpenRequest pendingWindowOpen;
+    private WindowOpenRequest activeWindowOpenRequest;
+    private static final long WINDOW_OPEN_REQUEST_MAX_NANOS = 5_000_000_000L;
 
     public Vector3 speed = null;
     /**
@@ -259,6 +279,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public int craftingType = CRAFTING_SMALL;
 
     protected PlayerUIInventory playerUIInventory;
+    private final Object deferredProfileSaveIdentity = new Object();
+    private final Object deferredPlayerCloseIdentity = new Object();
+    private boolean capturingProfile;
+    private boolean savingProfile;
+    private boolean closingPlayer;
+    private Runnable pendingProfileClose;
+    private Runnable pendingPlayerCloseContinuation;
+    private Boolean pendingProfileSave;
+    private PlayerDataSaveQueue.Admission<PlayerDataSerializer.WriteAcknowledgement> lastProfileAdmission;
+    private NativeProfileLogin nativeProfileLogin;
+    private boolean loginDataStarted;
+    private Server.PreparedPlayerData lastPreparedProfile;
+    private Server.PreparedPlayerData pendingFinalProfile;
+    private long profileCloseRetryDeadline;
+    private boolean profileCloseRetryExpired;
     protected CraftingGrid craftingGrid;
     protected CraftingTransaction craftingTransaction;
     protected EnchantTransaction enchantTransaction;
@@ -584,9 +619,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setViewingEnderChest(BlockEnderChest chest) {
-        if (chest == null && this.viewingEnderChest != null) {
+        if (this.viewingEnderChest != null) {
             this.viewingEnderChest.getViewers().remove(this);
-        } else if (chest != null) {
+        }
+        if (chest != null) {
             chest.getViewers().add(this);
         }
         this.viewingEnderChest = chest;
@@ -1247,6 +1283,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.getDataFlag(DATA_FLAGS, DATA_FLAG_ACTION) && this.startAction > -1;
     }
 
+    /**
+     * Whether a use transaction is only a repeat of a consumable that is still being used.
+     *
+     * <p>The client keeps sending {@code USE_ITEM_ACTION_CLICK_AIR} while the button is held down,
+     * and a player in a fight taps the button rather than holding it. Such a transaction arrives
+     * before the item is ready ({@code ticksUsed < useDuration}), so handing it to
+     * {@code Item#onUse} only gets the item refused - while the use state is already gone and the
+     * food is never eaten. Items without a use duration (bow, crossbow, shield) are released by the
+     * client and are not affected.
+     */
+    static boolean isRepeatedConsumableUse(int useDuration, int ticksUsed) {
+        return useDuration > 0 && ticksUsed < useDuration;
+    }
+
+    /**
+     * Whether a consumable is being used right now: food, a potion, milk or the ominous bottle.
+     *
+     * <p>Only these items carry a use duration and are finished by the server timer in
+     * {@link #processAutoCompletion()}. A bow, a crossbow or a shield keeps {@code useDuration == 0}
+     * and is finished by the client releasing the button, so they keep the old behaviour wherever
+     * this check guards a reset.
+     */
+    public boolean isConsumingItem() {
+        if (!this.isUsingItem() || this.inventory == null) {
+            return false;
+        }
+        Item held = this.inventory.getItemInHandFast();
+        return held != null && held.canRelease() && held.getUseDuration() > 0;
+    }
+
     public void setUsingItem(boolean value) {
         this.startAction = value ? this.server.getTick() : -1;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, value);
@@ -1890,7 +1956,26 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Outbound {}: {}", this.getName(), packet);
         }
 
+        // Raw workbench and player-inventory packets also share the close handshake.
+        Integer openingWindowId = packet instanceof ContainerOpenPacket open ? open.windowId
+                : packet instanceof UpdateTradePacket trade ? this.tradeScreenWindowId(trade) : null;
+        if (openingWindowId != null && this.spawned && this.protocol >= 407) {
+            if (this.activeWindowOpenRequest != null && (this.activeWindowOpenRequest.finished
+                    || !this.connected || this.closed || !this.spawned
+                    || !this.activeWindowOpenRequest.stillValid.getAsBoolean())) return false;
+            if (this.pendingCloseWindowId != Integer.MIN_VALUE || this.inventoryCloseInProgress != null
+                    || this.inventoryScreenId != null && !this.inventoryScreenId.equals(openingWindowId)) {
+                return false;
+            }
+        }
+        if (packet instanceof ContainerClosePacket close && close.wasServerInitiated && this.spawned && this.protocol >= 407
+                && !Objects.equals(this.inventoryScreenId, close.windowId) && this.pendingCloseWindowId != close.windowId) {
+            return false; // stale inventory callbacks cannot close a fresh screen
+        }
         this.networkSession.sendPacket(packet);
+        if (this.spawned && this.protocol >= 407) {
+            this.trackInventoryScreenPacket(packet);
+        }
         return true;
     }
 
@@ -2373,7 +2458,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Resolve transient items under the accepted transition's old mode: recover finite
         // items and discard creative items before a delayed close can use the new mode.
         // Cancelled transitions must leave the inventory available to its current owner.
+        boolean nativeUiReturn = NativeUIItemReturn.isSupported(this);
+        PlayerUIInventory transitionUi = this.playerUIInventory;
+        if (nativeUiReturn && !InventoryMutationGuard.canCaptureProfile(this.profileInventories())) return false;
         this.resetCraftingGridType();
+        if (nativeUiReturn && (this.closed || this.inventory == null || this.playerUIInventory != transitionUi
+                || !InventoryMutationGuard.canCaptureProfile(this.profileInventories())
+                || !transitionUi.getContents().isEmpty())) return false;
         this.resolveOpenTradeInputs();
 
         this.gamemode = gamemode;
@@ -3315,6 +3406,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!this.loggedIn) {
             return false;
         }
+        if (this.pendingWindowOpen != null && (this.closed || !this.spawned || !this.isAlive()
+                || System.nanoTime() - this.pendingWindowOpen.createdNanos > WINDOW_OPEN_REQUEST_MAX_NANOS)) {
+            this.pendingWindowOpen.cancel();
+        }
 
         int tickDiff = currentTick - this.lastUpdate;
 
@@ -3790,18 +3885,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected void processLogin() {
-        String lowerName = this.username.toLowerCase(Locale.ROOT);
-        if (!this.server.isWhitelisted(lowerName)) {
-            this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, server.whitelistReason);
-            return;
-        } else if (this.isBanned()) {
-            String reason = this.server.getNameBans().getEntires().get(lowerName).getReason();
-            this.kick(PlayerKickEvent.Reason.NAME_BANNED, "You are banned!" + (reason.isEmpty() ? "" : (" Reason: " + reason)));
-            return;
-        } else if (!server.strongIPBans && this.server.getIPBans().isBanned(this.getAddress())) {
-            this.kick(PlayerKickEvent.Reason.IP_BANNED, "Your IP is banned!");
-            return;
-        }
+        if (this.nativeProfileLogin != null || this.loginDataProcessed) return;
+        if (!this.checkLoginPolicy()) return;
 
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
@@ -3832,48 +3917,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        CompoundTag nbt;
-        File legacyDataFile = new File(server.getDataPath() + "players/" + lowerName + ".dat");
-        File dataFile = new File(server.getDataPath() + "players/" + this.uuid.toString() + ".dat");
-        if (this.server.savePlayerDataByUuid) {
-            if (!loginChainData.isXboxAuthed() && !dataFile.exists()) {
-                // The identity of unauthenticated players is no longer taken from the client, so
-                // data saved under their previous UUID has to follow them over — unless the name
-                // was last used by an Xbox authenticated account, whose data must stay with it.
-                Optional<Server.NameEntry> previousIdentity = this.server.lookupNameEntry(lowerName);
-                boolean authedOwner = previousIdentity.isPresent()
-                        && previousIdentity.get().provenance() == Server.NameProvenance.XBOX_AUTHED;
-                if (authedOwner) {
-                    this.server.getLogger().info("Not migrating player data for " + this.username
-                            + ": the name was last used by an Xbox authenticated account");
-                } else if (previousIdentity.isPresent() && this.server.migratePlayerData(previousIdentity.get().uuid(), this.uuid)
-                        == PlayerDataMigrator.Result.FAILED) {
-                    this.server.getLogger().warning("Aborted login of " + this.username + ": player data migration from "
-                            + previousIdentity.get().uuid() + " to " + this.uuid + " failed and will be retried");
-                    this.close("", "Failed to load your player data, please reconnect");
-                    return;
-                }
-            }
-            boolean dataFound = dataFile.exists();
-            if (!dataFound && legacyDataFile.exists()) {
-                // 按名直读，不经查找表解析——否则条目指向认证账户或塌缩身份时绕过守卫
-                // Read by name directly; lookup resolution would bypass the migration guards
-                nbt = this.server.getLegacyPlayerDataByName(lowerName);
-                if (!legacyDataFile.delete()) {
-                    this.server.getLogger().warning("Could not delete legacy player data for " + this.username);
-                }
-            } else {
-                nbt = this.server.getOfflinePlayerData(this.uuid, !dataFound);
-            }
-        } else {
-            boolean legacyMissing = !legacyDataFile.exists();
-            if (legacyMissing && dataFile.exists()) {
-                nbt = this.server.getOfflinePlayerData(this.uuid, false);
-            } else {
-                nbt = this.server.getOfflinePlayerData(lowerName, legacyMissing);
-            }
+        this.nativeProfileLogin = new NativeProfileLogin();
+        this.nativeProfileLogin.step();
+    }
+
+    private boolean checkLoginPolicy() {
+        String lowerName = this.username.toLowerCase(Locale.ROOT);
+        if (!this.server.isWhitelisted(lowerName)) {
+            this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, server.whitelistReason);
+            return false;
+        } else if (this.isBanned()) {
+            String reason = this.server.getNameBans().getEntires().get(lowerName).getReason();
+            this.kick(PlayerKickEvent.Reason.NAME_BANNED, "You are banned!" + (reason.isEmpty() ? "" : (" Reason: " + reason)));
+            return false;
+        } else if (!server.strongIPBans && this.server.getIPBans().isBanned(this.getAddress())) {
+            this.kick(PlayerKickEvent.Reason.IP_BANNED, "Your IP is banned!");
+            return false;
         }
 
+        return true;
+    }
+
+    /** Applies a successful observed profile on MAIN, once. Each user callback has a freshness fence. */
+    private void applyLoginData(CompoundTag nbt, NativeProfileLogin flow) {
         if (nbt == null) {
             this.close(this.getLeaveMessage(), "Invalid data");
             return;
@@ -3888,6 +3954,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         nbt.putString("NameTag", this.username);
 
         this.setExperience(nbt.getInt("EXP"), nbt.getInt("expLevel"));
+        if (!flow.fresh()) throw new CancellationException("Experience listener superseded login profile");
 
         if (this.server.getForceGamemode()) {
             this.gamemode = this.server.getGamemode();
@@ -3971,20 +4038,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             nbt.putString("XUID", xuid == null || xuid.isEmpty() ? "authenticated" : xuid);
         }
 
-        if (this.server.getAutoSave()) {
-            if (this.server.savePlayerDataByUuid) {
-                this.server.saveOfflinePlayerData(this.uuid, nbt, true);
-            } else {
-                this.server.saveOfflinePlayerData(this.username, nbt, true);
-            }
-        }
 
+        if ((this.server.getAutoSave() || flow.created) && this.server.shouldSavePlayerData()) {
+            flow.initialSave = this.server.admitPlayerData(
+                    this.server.savePlayerDataByUuid ? this.uuid.toString() : flow.name, nbt, true, flow::fresh);
+            if (!flow.initialSave.accepted()) throw new RejectedExecutionException("Initial profile checkpoint was refused");
+            // Resume after ACK without repeating experience/events or treating our own write as an external change.
+            flow.initialTag = nbt;
+            return;
+        }
+        finishLoginData(nbt, flow);
+    }
+
+    private void finishLoginData(CompoundTag nbt, NativeProfileLogin flow) {
         this.sendPlayStatus(PlayStatusPacket.LOGIN_SUCCESS);
+        if (!flow.fresh()) throw new CancellationException("Login success listener superseded profile");
 
         ListTag<DoubleTag> posList = nbt.getList("Pos", DoubleTag.class);
 
         super.init(this.level.getChunk((int) posList.get(0).data >> 4, (int) posList.get(2).data >> 4, true), nbt);
 
+        if (!flow.fresh()) throw new CancellationException("Entity initialization superseded login profile");
         if (!this.namedTag.contains("foodLevel")) {
             this.namedTag.putInt("foodLevel", 20);
         }
@@ -4025,7 +4099,170 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
+        if (!flow.fresh()) throw new CancellationException("Resource pack listener superseded login profile");
         this.syncLoginPhase(SessionLoginPhase.RESOURCE_PACK);
+        this.loginDataProcessed = true;
+        flow.complete();
+        if (this.preLoginEventTask != null) this.preLoginEventTask.onCompletion(this.server);
+    }
+
+    /** One bounded native flow, polled only on MAIN; no Player state is touched by an IO callback. */
+    private final class NativeProfileLogin {
+        final UUID identity = uuid;
+        final String name = username.toLowerCase(Locale.ROOT);
+        final String exactName = username;
+        final boolean uuidStorage = server.savePlayerDataByUuid;
+        final Object chain = loginChainData, session = networkSession, task = preLoginEventTask;
+        final long deadline;
+        final Map<String, CompletableFuture<PlayerDataMigrator.Result>> migrations = new HashMap<>();
+        final Set<String> refreshedMigrations = new HashSet<>();
+        PlayerDataSaveQueue.ReadHandle<Server.LoginProfileFiles> files;
+        Server.LoginProfileRead read;
+        PlayerDataSaveQueue.Admission<PlayerDataSerializer.WriteAcknowledgement> initialSave;
+        CompoundTag initialTag;
+        boolean created, applied, active = true;
+
+        NativeProfileLogin() {
+            long now = System.nanoTime();
+            long bound = TimeUnit.MILLISECONDS.toNanos(server.networkLoginTimeoutMilliseconds > 0
+                    ? server.networkLoginTimeoutMilliseconds : 25_000);
+            long lastActivity = networkSession == null || networkSession.getState() == null
+                    ? now : networkSession.getState().getLogin().getPhaseStartedNanos();
+            deadline = Math.min(now + bound, lastActivity + bound);
+        }
+
+        boolean valid() {
+            return active && nativeProfileLogin == this && connected && !closed && !loginDataProcessed
+                    && uuid.equals(identity) && Objects.equals(username, exactName)
+                    && loginChainData == chain && networkSession == session && preLoginEventTask == task
+                    && server.savePlayerDataByUuid == uuidStorage
+                    && (!(loginChainData instanceof ClientChainData client) || client.isAuthenticationCurrent())
+                    && (!server.xboxAuth || loginChainData.isXboxAuthed())
+                    && getCurrentLoginPhase() == SessionLoginPhase.PRE_LOGIN && System.nanoTime() < deadline;
+        }
+
+        boolean fresh() {
+            if (!valid()) return false;
+            return initialSave != null ? server.profileQueue().isLatest(initialSave)
+                    : files != null && files.isCurrent() && read != null && read.isCurrent();
+        }
+
+        void step() {
+            if (!valid()) { fail(new IllegalStateException("Profile login expired or changed identity")); return; }
+            try {
+                if (!checkLoginPolicy()) { cancel(); return; }
+                if (initialSave != null) {
+                    CompletableFuture<?> ack = initialSave.completion().toCompletableFuture();
+                    if (ack.isDone()) {
+                        ack.join();
+                        if (!fresh()) throw new CancellationException("Initial profile checkpoint superseded");
+                        finishLoginData(initialTag, this);
+                    }
+                } else if (!applied) {
+                    if (server.reserveLoginProfile(Player.this, name, identity) && olderSessionRetired()) load();
+                }
+            } catch (Throwable error) {
+                if (error instanceof CancellationException && valid() && !applied) closeReads();
+                else fail(error);
+            }
+            if (active) {
+                try { server.getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::step, 1); }
+                catch (RuntimeException stopped) { fail(stopped); }
+            }
+        }
+
+        boolean olderSessionRetired() {
+            for (Player older : new ArrayList<>(server.playerList.values())) {
+                if (older != Player.this && !older.closed && (identity.equals(older.uuid)
+                        || older.username != null && name.equalsIgnoreCase(older.username))) {
+                    if (older.connected && server.isDuplicateLoginKeepingExistingSession()) {
+                        Player.this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        cancel(); return false;
+                    }
+                    // A disconnected owner may still be waiting for physical claims or final queue admission.
+                    older.close("", "disconnectionScreen.loggedinOtherLocation");
+                    if (!older.closed) return false;
+                }
+            }
+            return true;
+        }
+
+        void load() throws IOException {
+            if (files != null && files.isSuperseded()) closeReads();
+            if (files != null && files.completion().toCompletableFuture().isCompletedExceptionally())
+                files.completion().toCompletableFuture().join();
+            if (files == null) files = server.inspectLoginProfile(identity, name, loginChainData.isXboxAuthed());
+            CompletableFuture<Server.LoginProfileFiles> inspected = files.completion().toCompletableFuture();
+            if (!inspected.isDone()) return;
+            Server.LoginProfileFiles paths = inspected.join();
+            if (server.savePlayerDataByUuid && !paths.uuidExists()) {
+                if (!loginChainData.isXboxAuthed() && paths.previous().isPresent()
+                        && paths.previous().get().provenance() != Server.NameProvenance.XBOX_AUTHED) {
+                    UUID previous = paths.previous().get().uuid();
+                    if (!migration("uuid:" + previous, () -> server.migratePlayerDataForLogin(previous, identity, name, this::mutationCurrent))) return;
+                }
+                if (paths.nameExists() && !migration("name:" + name,
+                        () -> server.migrateLegacyPlayerDataForLogin(name, identity, this::mutationCurrent))) return;
+            }
+            if (files == null || !files.isCurrent()) return;
+            String key = server.savePlayerDataByUuid || !paths.nameExists() && paths.uuidExists() ? identity.toString() : name;
+            if (read != null && read.isSuperseded()) { read.close(); read = null; }
+            if (read == null || !read.isCurrent()) {
+                if (read != null) {
+                    if (read.ready().isCompletedExceptionally()) read.ready().join();
+                    read.close();
+                }
+                read = server.readLoginProfile(key, identity, name, this::mutationCurrent);
+                // Serialize listener may close or replace the native owner.
+                if (!valid()) throw new CancellationException("Profile reader listener changed login owner");
+            }
+            if (!read.ready().isDone()) return;
+            CompoundTag profile = read.take();
+            // Legacy custom read may synchronously reenter events/saves/close.
+            if (!fresh()) { closeReads(); return; }
+            created = profile == null;
+            if (created) profile = server.newPlayerData();
+            if (!fresh()) { closeReads(); return; }
+            applied = true;
+            applyLoginData(profile, this);
+        }
+
+        boolean mutationCurrent() { return valid() && files != null && files.isCurrent(); }
+
+        boolean migration(String key, Supplier<CompletionStage<PlayerDataMigrator.Result>> start) {
+            CompletableFuture<PlayerDataMigrator.Result> result = migrations.get(key);
+            if (result == null) {
+                result = start.get().toCompletableFuture(); migrations.put(key, result);
+                if (!valid()) throw new CancellationException("Migration listener changed login owner");
+            }
+            if (!result.isDone()) return false;
+            if (result.join() == PlayerDataMigrator.Result.FAILED) throw new IllegalStateException("Profile migration failed");
+            if (refreshedMigrations.add(key)) { closeReads(); return false; }
+            return true;
+        }
+
+        void closeReads() {
+            if (files != null) files.close();
+            if (read != null) read.close();
+            files = null; read = null;
+        }
+
+        void complete() {
+            active = false; closeReads(); if (nativeProfileLogin == this) nativeProfileLogin = null;
+            // Keep name/UUID admission through resource packs until addOnlinePlayer, or close.
+        }
+
+        void cancel() {
+            active = false; closeReads(); if (nativeProfileLogin == this) nativeProfileLogin = null;
+            server.releaseLoginProfile(Player.this);
+        }
+
+        void fail(Throwable error) {
+            if (!active) return;
+            cancel();
+            server.getLogger().logException(error);
+            if (connected && !closed) close("", "Failed to load your player data, please reconnect");
+        }
     }
 
     private boolean rejectIfServerFull() {
@@ -4729,7 +4966,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         // A spear charge (minecraft:kinetic_weapon) is meant to be run with: it only
                         // strikes above a closing speed, and the spear does not slow the player down.
                         if (!UsingItemReceive.shouldKeepUsingDespiteStartSprinting(
-                                this.isJavaClient(), authHoldToUse, authStartUsingItem)
+                                this.isJavaClient(), authHoldToUse, authStartUsingItem, this.isConsumingItem())
                                 && !(this.inventory != null && this.inventory.getItemInHandFast().isSpear())) {
                             this.setUsingItem(false);
                         }
@@ -5235,7 +5472,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
 
-                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)) {
+                // A consumable in progress survives an unhandled action: the client keeps the
+                // animation running and the food would otherwise never finish.
+                if (UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(this.isJavaClient(), playerActionPacket.action)
+                        && !this.isConsumingItem()) {
                     this.setUsingItem(false);
                 }
                 break;
@@ -5270,13 +5510,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (!this.inventoryOpen) {
                             if (this.riding instanceof EntityChestBoat && this.riding == targetEntity) {
                                 if (this.protocol >= ProtocolInfo.v1_19_0) {
-                                    this.addWindow(((InventoryHolder) targetEntity).getInventory());
+                                    this.requestWindowOpen(((InventoryHolder) targetEntity).getInventory());
                                 }
                             } else if (this.protocol >= 407) {
-                                if (this.inventory.open(this)) {
-                                    this.inventoryOpen = true;
-                                    this.awardAchievement("openInventory");
-                                }
+                                this.requestWindowOpen(this.inventory, ContainerIds.INVENTORY,
+                                        () -> this.spawned && !this.closed, id -> {
+                                            if (id >= 0) this.awardAchievement("openInventory");
+                                        });
                             }
                         } else if (Nukkit.DEBUG > 1) {
                             server.getLogger().debug(this.username + " tried to open inventory but one is already open");
@@ -5484,64 +5724,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 break;
             case ProtocolInfo.CONTAINER_CLOSE_PACKET:
                 ContainerClosePacket containerClosePacket = (ContainerClosePacket) packet;
-
-                if (!this.spawned) {
-                    return;
-                }
-
-                if (containerClosePacket.windowId == -1) {
-                    // At least 1.21 does sometimes send windowId -1 when opening and closing containers quickly
-                    if (this.inventoryOpen) {
-                        this.inventoryOpen = false;
-
-                        if (this.craftingType == CRAFTING_SMALL) {
-                            for (Entry<Inventory, Integer> open : new ArrayList<>(this.windows.entrySet())) {
-                                if (open.getKey() instanceof ContainerInventory || open.getKey() instanceof PlayerEnderChestInventory) {
-                                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(open.getKey(), this));
-                                    this.closingWindowId = Integer.MAX_VALUE;
-                                    this.removeWindow(open.getKey(), true);
-                                    this.closingWindowId = Integer.MIN_VALUE;
-                                }
-                            }
-                            return;
-                        }
-                    }
-
-                    this.craftingType = CRAFTING_SMALL;
-                    this.resetCraftingGridType();
-                    this.addWindow(this.craftingGrid, ContainerIds.NONE);
-                    if (this.protocol >= 407) {
-                        ContainerClosePacket pk = new ContainerClosePacket();
-                        pk.windowId = -1;
-                        pk.wasServerInitiated = false;
-                        pk.type = containerClosePacket.type;
-                        this.dataPacket(pk);
-                    }
-                    //TODO Find out why the correct id is not returned
-                    TradeInventory tradeInventory = this.getTradeInventory();
-                    if (tradeInventory != null) {
-                        this.removeWindow(tradeInventory, true);
-                    }
-                } else if (this.windowIndex.containsKey(containerClosePacket.windowId)) {
-                    this.inventoryOpen = false;
-                    Inventory inn = this.windowIndex.get(containerClosePacket.windowId);
-                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(inn, this));
-                    this.closingWindowId = containerClosePacket.windowId;
-                    this.removeWindow(inn, true);
-                    this.closingWindowId = Integer.MIN_VALUE;
-                } else {  // Close the bugged inventory client refused with id -1 above
-                    ContainerClosePacket pk = new ContainerClosePacket();
-                    pk.windowId = containerClosePacket.windowId;
-                    pk.wasServerInitiated = false;
-                    pk.type = containerClosePacket.type;
-                    this.dataPacket(pk);
-
-//                    for (Inventory open : new ArrayList<>(this.windows.keySet())) {
-//                        if (open instanceof ContainerInventory) {
-//                            this.removeWindow(open);
-//                        }
-//                    }
-                }
+                if (!this.spawned) return;
+                if (this.protocol < 407) this.handleLegacyInventoryScreenClose(containerClosePacket);
+                else this.handleInventoryScreenClose(containerClosePacket);
                 break;
             case ProtocolInfo.BLOCK_ENTITY_DATA_PACKET:
                 if (!this.spawned || !this.isAlive()) {
@@ -6176,7 +6361,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             if (item.onClickAir(this, directionVector)) {
-                                if (this.isSurvival() || this.isAdventure()) {
+                                // Bundle output commits its canonical carrier inside the native coordinator.
+                                if ((this.isSurvival() || this.isAdventure()) && !(item instanceof cn.nukkit.item.ItemBundle)) {
                                     if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
                                         this.inventory.setItemInHand(item);
                                     } else {
@@ -6190,6 +6376,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
 
                                 int ticksUsed = this.server.getTick() - this.startAction;
+                                if (isRepeatedConsumableUse(item.getUseDuration(), ticksUsed)) {
+                                    // The client repeats this transaction while the button is held
+                                    // down. Handing it to onUse() this early only gets the item
+                                    // refused, and the use state would be gone: the food is never
+                                    // eaten. Keep using it and let processAutoCompletion() finish.
+                                    break;
+                                }
                                 this.setUsingItem(false);
                                 if (!item.onUse(this, ticksUsed)) {
                                     this.inventory.sendContents(this);
@@ -7312,6 +7505,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
+        if (this.closingPlayer) return;
+        if (!this.canCaptureProfileOnCurrentThread()) {
+            this.server.deferPlayerClose(this, () -> this.close(message, reason, notify, failReason));
+            return;
+        }
+        if (this.savingProfile) {
+            if (this.pendingProfileClose == null) this.pendingProfileClose = () -> this.close(message, reason, notify, failReason);
+            return;
+        }
+        if (InventoryMutationGuard.deferProfileUntilReleased(this.profileInventories(), this.deferredPlayerCloseIdentity,
+                () -> this.close(message, reason, notify, failReason))) return;
+        this.closingPlayer = true;
+        try {
+            Runnable continuation = this.pendingPlayerCloseContinuation;
+            this.pendingPlayerCloseContinuation = null;
+            if (continuation == null) this.closeNow(message, reason, notify, failReason);
+            else continuation.run();
+        } finally {
+            this.closingPlayer = false;
+        }
+    }
+
+    private void closeNow(TextContainer message, String reason, boolean notify, DisconnectFailReason failReason) {
+        if (this.nativeProfileLogin != null) this.nativeProfileLogin.cancel();
+        this.server.releaseLoginProfile(this);
         if (pendingLoginVerification != null) {
             pendingLoginVerification.cancel();
             pendingLoginVerification = null;
@@ -7330,93 +7548,175 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.connected = false;
             PlayerQuitEvent ev = null;
-            try {
-                if (this.username != null && !this.username.isEmpty()) {
+            if (this.username != null && !this.username.isEmpty()) {
+                try {
+                    this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
+                } catch (Throwable t) {
+                    this.server.getLogger().logException(t);
+                }
+                if (this.fishing != null) {
                     try {
-                        this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
+                        this.stopFishing(false);
                     } catch (Throwable t) {
                         this.server.getLogger().logException(t);
                     }
-                    if (this.loggedIn && (ev == null || ev.getAutoSave())) {
-                        try {
-                            this.save();
-                        } catch (Throwable t) {
-                            this.server.getLogger().logException(t);
-                        }
-                    }
-                    if (this.fishing != null) {
-                        try {
-                            this.stopFishing(false);
-                        } catch (Throwable t) {
-                            this.server.getLogger().logException(t);
-                        }
-                    }
-                }
-
-                for (Player player : new ArrayList<>(this.server.playerList.values())) {
-                    if (!player.canSee(this)) {
-                        player.showPlayer(this);
-                    }
-                }
-
-                this.hiddenPlayers.clear();
-
-                try {
-                    this.removeAllWindows(true);
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
-
-                DataDrivenScreen.removeActiveScreen(this);
-
-                this.unloadChunks(false);
-
-                try {
-                    super.close();
-                } catch (Throwable t) {
-                    this.server.getLogger().logException(t);
-                }
-            } finally {
-                this.interfaz.close(this, notify ? reason : "");
-
-                if (this.loggedIn) {
-                    this.server.removeOnlinePlayer(this);
-                    // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
-                    // Clear this player's UUID from viewers that previously received its list entry;
-                    // the REMOVE itself is broadcast by removeOnlinePlayer.
-                    this.server.getOnlinePlayers().values().stream()
-                            .filter(p -> p != this)
-                            .forEach(p -> {
-                                p.sentSkins.remove(this.getUniqueId());
-                                p.confirmedSkins.remove(this.getUniqueId());
-                            });
-                    this.loggedIn = false;
                 }
             }
 
-            if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
-                this.server.broadcastMessage(ev.getQuitMessage());
+            PlayerQuitEvent quit = ev;
+            if (!this.deferCloseContinuation(() -> this.closePlayerWindows(quit, reason, notify)))
+                this.closePlayerWindows(quit, reason, notify);
+            return;
+        }
+        this.clearRetiredPlayerState(reason, notify);
+    }
+
+    /** Preserve the already-fired quit event while a native callback finishes its inventory operation. */
+    private boolean deferCloseContinuation(Runnable continuation) {
+        this.pendingPlayerCloseContinuation = continuation;
+        if (InventoryMutationGuard.deferProfileUntilReleased(this.profileInventories(), this.deferredPlayerCloseIdentity,
+                this::close)) return true;
+        this.pendingPlayerCloseContinuation = null;
+        return false;
+    }
+
+    private void closePlayerWindows(PlayerQuitEvent ev, String reason, boolean notify) {
+        if (this.server.isShutdownTimedOut()) return;
+        for (Player player : new ArrayList<>(this.server.playerList.values())) {
+            if (!player.canSee(this)) {
+                player.showPlayer(this);
             }
-
-            this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
-            this.spawned = false;
-            this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
-                    TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
-                    this.getAddress(),
-                    String.valueOf(this.getPort()),
-                    this.getServer().getLanguage().translateString(reason)));
-            this.windows.clear();
-            this.topWindow = null;
-            this.hasSpawned.clear();
-            this.spawnPosition = null;
-
-            if (this.riding instanceof EntityRideable) {
-                this.riding.passengers.remove(this);
-            }
-
-            this.riding = null;
         }
 
+        this.hiddenPlayers.clear();
+
+        try {
+            this.removeAllWindows(true);
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+
+        try {
+            this.resetCraftingGridType();
+        } catch (Throwable t) {
+            this.server.getLogger().logException(t);
+        }
+        if (!this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify)))
+            this.saveAndRetirePlayer(ev, reason, notify);
+    }
+
+    private void saveAndRetirePlayer(PlayerQuitEvent ev, String reason, boolean notify) {
+        if (this.server.isShutdownTimedOut()) return;
+        if (this.loggedIn && (ev == null || ev.getAutoSave() || this.pendingProfileSave != null)) {
+            try {
+                if (this.pendingFinalProfile != null) {
+                    // The disconnected owner is retained: a late native credit may have changed its slots.
+                    this.captureProfileData();
+                    if (!InventoryMutationGuard.canCaptureProfile(this.profileInventories())) {
+                        this.pendingFinalProfile = null;
+                        throw new IllegalStateException("Final retry snapshot is provisional");
+                    }
+                    CompoundTag comparable = this.namedTag.copy();
+                    // This capture's generated wall-clock value alone is not a new inventory outcome.
+                    comparable.putLong("lastPlayed", this.pendingFinalProfile.snapshot().getLong("lastPlayed"));
+                    if (!comparable.equals(this.pendingFinalProfile.snapshot())) this.pendingFinalProfile = null;
+                }
+                if (this.pendingFinalProfile == null) this.save(true);
+                else this.lastProfileAdmission = this.server.admitPreparedPlayerData(this.pendingFinalProfile);
+                if (this.lastProfileAdmission != null && !this.lastProfileAdmission.accepted())
+                    throw new RejectedExecutionException("Final profile checkpoint was refused");
+            } catch (Throwable t) {
+                if (this.lastProfileAdmission != null && !this.lastProfileAdmission.accepted()
+                        && InventoryMutationGuard.canCaptureProfile(this.profileInventories()))
+                    this.pendingFinalProfile = this.lastPreparedProfile;
+                if (this.profileCloseRetryDeadline == 0) {
+                    this.server.getLogger().logException(t);
+                    this.profileCloseRetryDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(25);
+                }
+                this.pendingPlayerCloseContinuation = () -> this.saveAndRetirePlayer(ev, reason, notify);
+                if (System.nanoTime() < this.profileCloseRetryDeadline) this.server.deferPlayerClose(this, this::close);
+                else if (!this.profileCloseRetryExpired) {
+                    this.profileCloseRetryExpired = true;
+                    this.server.getLogger().error("Final profile admission deadline expired for " + this.username + "; retained owner requires recovery");
+                }
+                return;
+            }
+        }
+
+        if (this.server.isShutdownTimedOut()) return;
+        // A serialize listener may retain a new claim after this capture. Save its final outcome before retirement.
+        if (this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify))) {
+            this.pendingFinalProfile = null; return;
+        }
+        this.pendingFinalProfile = null;
+        try (InventoryMutationGuard.Lease retirement = InventoryMutationGuard.tryClaimProfile(this.profileInventories())) {
+            if (retirement == null) {
+                this.deferCloseContinuation(() -> this.saveAndRetirePlayer(ev, reason, notify));
+                return;
+            }
+            // The admitted profile owns these slots now; late despawn/network observers cannot accept another credit.
+            try (InventoryMutationGuard.WriteScope blocked = retirement.blockWrites()) {
+                this.retirePlayerNow(ev, reason, notify);
+            }
+        }
+    }
+
+    boolean hasPendingProfileRetirement() { return !this.closed && this.pendingPlayerCloseContinuation != null; }
+
+    private void retirePlayerNow(PlayerQuitEvent ev, String reason, boolean notify) {
+        try {
+            DataDrivenScreen.removeActiveScreen(this);
+
+            this.unloadChunks(false);
+
+            try {
+                super.close();
+            } catch (Throwable t) {
+                this.server.getLogger().logException(t);
+            }
+        } finally {
+            this.interfaz.close(this, notify ? reason : "");
+
+            if (this.loggedIn) {
+                this.server.removeOnlinePlayer(this);
+                // 从曾收到过本玩家皮肤的其他观察者处清理记录（REMOVE 已由 removeOnlinePlayer 广播）。
+                // Clear this player's UUID from viewers that previously received its list entry;
+                // the REMOVE itself is broadcast by removeOnlinePlayer.
+                this.server.getOnlinePlayers().values().stream()
+                        .filter(p -> p != this)
+                        .forEach(p -> {
+                            p.sentSkins.remove(this.getUniqueId());
+                            p.confirmedSkins.remove(this.getUniqueId());
+                        });
+                this.loggedIn = false;
+            }
+        }
+
+        if (ev != null && this.spawned && !Objects.equals(this.username, "") && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            this.server.broadcastMessage(ev.getQuitMessage());
+        }
+
+        this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
+        this.spawned = false;
+        this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
+                TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
+                this.getAddress(),
+                String.valueOf(this.getPort()),
+                this.getServer().getLanguage().translateString(reason)));
+        this.windows.clear();
+        this.topWindow = null;
+        this.hasSpawned.clear();
+        this.spawnPosition = null;
+
+        if (this.riding instanceof EntityRideable) {
+            this.riding.passengers.remove(this);
+        }
+
+        this.riding = null;
+        this.clearRetiredPlayerState(reason, notify);
+    }
+
+    private void clearRetiredPlayerState(String reason, boolean notify) {
         if (this.perm != null) {
             this.perm.clearPermissions();
             this.perm = null;
@@ -7443,17 +7743,80 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.save(false);
     }
 
-    /**
-     * Save player data to disk
-     *
-     * @param async save asynchronously
-     */
-    public void save(boolean async) {
-        if (this.closed) {
-            throw new IllegalStateException("Tried to save closed player");
-        }
+    private List<Inventory> profileInventories() {
+        return Arrays.asList(this.inventory, this.offhandInventory, this.enderChestInventory, this.playerUIInventory);
+    }
 
-        super.saveNBT();
+    private boolean canCaptureProfileOnCurrentThread() {
+        return this.server.isPrimaryThread() || this.server.isProfileOwnerThread();
+    }
+
+    /** Capture on the owner, or after its termination with no abandoned inventory mutation. */
+    @Override
+    public void saveNBT() {
+        if (this.server.isShutdownTimedOut()) throw new IllegalStateException("Player checkpoint exceeded the shutdown deadline");
+        if (!this.canCaptureProfileOnCurrentThread()) throw new IllegalStateException("Player snapshots require the inventory owner");
+        if (this.capturingProfile || !InventoryMutationGuard.canCaptureProfile(this.profileInventories())) {
+            throw new IllegalStateException("Player inventory snapshot is provisional");
+        }
+        this.capturingProfile = true;
+        try {
+            super.saveNBT();
+            if (this.playerUIInventory != null) this.playerUIInventory.savePlayerData(this.namedTag);
+        } finally {
+            this.capturingProfile = false;
+        }
+    }
+
+    /** Save on MAIN; async controls the later file write, not profile capture. */
+    public void save(boolean async) {
+        if (this.server.isShutdownTimedOut()) throw new IllegalStateException("Player checkpoint exceeded the shutdown deadline");
+        if (this.closed) throw new IllegalStateException("Tried to save closed player");
+        if (!this.canCaptureProfileOnCurrentThread()) throw new IllegalStateException("Player snapshots require the inventory owner");
+        // A serialize listener can refresh the tag being admitted, without recursively firing itself.
+        if (this.savingProfile) {
+            this.captureProfileData();
+            return;
+        }
+        this.pendingProfileSave = this.pendingProfileSave == null ? async : this.pendingProfileSave && async;
+        if (InventoryMutationGuard.deferProfileUntilReleased(this.profileInventories(), this.deferredProfileSaveIdentity, () -> {
+            Boolean requested = this.pendingProfileSave;
+            this.pendingProfileSave = null;
+            if (requested != null && !this.closed) this.save(requested);
+        })) return;
+        async = this.pendingProfileSave;
+        this.pendingProfileSave = null;
+        this.savingProfile = true;
+        Throwable originalFailure = null;
+        try {
+            this.captureProfileData();
+            this.lastProfileAdmission = null;
+            this.lastPreparedProfile = null;
+            if (this.level != null && !this.username.isEmpty() && this.server.shouldSavePlayerData()) {
+                this.lastPreparedProfile = this.server.preparePlayerData(
+                        this.server.savePlayerDataByUuid ? this.uuid.toString() : this.username, this.namedTag, true, () -> !this.closed);
+                this.lastProfileAdmission = this.server.admitPreparedPlayerData(this.lastPreparedProfile);
+                if (!this.lastProfileAdmission.accepted()) throw new RejectedExecutionException("Player checkpoint was refused");
+                if (!async) this.server.awaitProfileIO(this.lastProfileAdmission.completion(), false);
+            }
+        } catch (RuntimeException | Error failure) {
+            originalFailure = failure;
+            throw failure;
+        } finally {
+            this.savingProfile = false;
+            Runnable close = this.pendingProfileClose;
+            this.pendingProfileClose = null;
+            if (close != null) {
+                try { close.run(); } catch (RuntimeException | Error closeFailure) {
+                    if (originalFailure == null) throw closeFailure;
+                    if (originalFailure != closeFailure) originalFailure.addSuppressed(closeFailure);
+                }
+            }
+        }
+    }
+
+    private void captureProfileData() {
+        this.saveNBT();
 
         if (this.level != null) {
             this.namedTag.putString("Level", this.level.getFolderName());
@@ -7506,13 +7869,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.namedTag.putLong("wardenLastWarningTick", this.wardenWarningData.lastWarningTick);
             this.namedTag.putLong("wardenLastShriekTick", this.wardenWarningData.lastShriekTick);
 
-            if (!this.username.isEmpty() && this.namedTag != null) {
-                if (this.server.savePlayerDataByUuid) {
-                    this.server.saveOfflinePlayerData(this.uuid, this.namedTag, async);
-                } else {
-                    this.server.saveOfflinePlayerData(this.username, this.namedTag, async);
-                }
-            }
         }
     }
 
@@ -7528,6 +7884,60 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public LangCode getLanguageCode() {
         return LangCode.valueOf(this.getLoginChainData().getLanguageCode());
+    }
+
+    /**
+     * Closes an open ender chest window after the client sent ContainerClose with window id -1.
+     */
+    void closeEnderChestWindowForUnknownId() {
+        Inventory enderChest = this.getEnderChestInventory();
+        if (enderChest == null || this.getWindowId(enderChest) == -1) {
+            return;
+        }
+        this.server.getPluginManager().callEvent(new InventoryCloseEvent(enderChest, this));
+        this.closingWindowId = Integer.MAX_VALUE;
+        this.removeWindow(enderChest, true);
+        this.closingWindowId = Integer.MIN_VALUE;
+    }
+
+    /**
+     * Closes the windows of real world containers after the client sent ContainerClose with window
+     * id -1 while its own inventory was not open.
+     */
+    void closeWorldContainerWindowsForUnknownId() {
+        for (Inventory open : this.openWindowsSnapshot()) {
+            if (!isWorldBlockContainer(open) || this.getWindowId(open) == -1) {
+                continue;
+            }
+            this.server.getPluginManager().callEvent(new InventoryCloseEvent(open, this));
+            this.closingWindowId = Integer.MAX_VALUE;
+            this.removeWindow(open, true);
+            this.closingWindowId = Integer.MIN_VALUE;
+        }
+    }
+
+    List<Inventory> openWindowsSnapshot() {
+        return new ArrayList<>(this.windows.keySet());
+    }
+
+    /**
+     * A container window of a block entity that still stands in its level. A window whose holder is
+     * a fake block ({@link cn.nukkit.inventory.FakeBlockMenu}), a closed block entity or anything
+     * else is not a world container.
+     */
+    static boolean isWorldBlockContainer(Inventory inventory) {
+        if (!(inventory instanceof ContainerInventory)) {
+            return false;
+        }
+        if (inventory instanceof DoubleChestInventory doubleChest) {
+            return isWorldBlockContainer(doubleChest.getLeftSide()) && isWorldBlockContainer(doubleChest.getRightSide());
+        }
+        InventoryHolder holder = inventory.getHolder();
+        if (!(holder instanceof BlockEntity blockEntity) || blockEntity.closed) {
+            return false;
+        }
+        Level level = blockEntity.getLevel();
+        return level != null && level.getBlockEntityIfLoaded(blockEntity) == blockEntity;
     }
 
     @Override
@@ -7658,6 +8068,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
             }
         }
+
+        // A dead player keeps nothing open, like vanilla. Closed before the drops are collected: a
+        // container that hands its input slots back (trade, anvil, grindstone) returns them to the
+        // inventory that is about to drop, instead of into the inventory of the respawned player,
+        // and the lid of a chest or ender chest closes where it was opened.
+        this.removeAllWindows();
 
         PlayerDeathEvent ev = new PlayerDeathEvent(this, this.getDrops(), new TranslationContainer(message, params.toArray(new String[0])), this.expLevel);
         ev.setKeepInventory(this.level.gameRules.getBoolean(GameRule.KEEP_INVENTORY));
@@ -8620,7 +9036,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public Inventory getWindowById(int id) {
-        return this.windowIndex.get(id);
+        Inventory inventory = this.windowIndex.get(id);
+        if (inventory == null && id == (byte) TRADE_WINDOW_ID && Objects.equals(this.inventoryScreenId, TRADE_WINDOW_ID)
+                && this.windowIndex.get(TRADE_WINDOW_ID) instanceof TradeInventory) {
+            return this.windowIndex.get(TRADE_WINDOW_ID);
+        }
+        return inventory;
     }
 
     public int addWindow(Inventory inventory) {
@@ -8636,6 +9057,602 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public int addWindow(Inventory inventory, Integer forceId, boolean isPermanent, boolean alwaysOpen) {
+        if (this.protocol < 407) return this.addWindowLegacy(inventory, forceId, isPermanent, alwaysOpen);
+
+        Integer existing = this.windows.get(inventory);
+        if (existing != null) {
+            return existing;
+        }
+        boolean screen = !isPermanent && !(inventory instanceof CraftingGrid)
+                && (forceId == null || forceId >= 0);
+        if (screen) {
+            if (this.inventoryScreenOpening || this.inventoryCloseInProgress != null
+                    || this.inventoryScreenChangeDepth != 0 || this.pendingCloseWindowId != Integer.MIN_VALUE) {
+                return -1;
+            }
+            if (this.currentInventoryScreenId() != null) {
+                this.closeCurrentInventoryScreen();
+                return -1; // synchronous callers must not mistake a queued request for an open
+            }
+        }
+        if (inventory instanceof CraftingGrid && forceId != null && forceId == ContainerIds.NONE) {
+            Inventory previousGrid = this.windowIndex.get(forceId);
+            if (previousGrid instanceof CraftingGrid) {
+                this.windows.remove(previousGrid);
+            }
+        }
+        int cnt = this.allocateWindowId(forceId, screen);
+        if (cnt == Integer.MIN_VALUE) return -1;
+        this.windows.put(inventory, cnt);
+        // CraftingGrid.open() intentionally returns false: this is a slot mapping, not a screen.
+        // Its viewers belong to the permanent UI inventory and must never be added/removed here.
+        if (inventory instanceof CraftingGrid) return cnt;
+        if (isPermanent) {
+            this.permanentWindows.add(cnt);
+            inventory.getViewers().add(this);
+            return cnt;
+        }
+        if (screen) this.topWindow = inventory;
+        boolean previousOpening = this.inventoryScreenOpening;
+        int previousCraftingType = this.craftingType;
+        if (screen) this.inventoryScreenOpening = true;
+        boolean accepted = false;
+        try {
+            accepted = this.spawned && (!this.inventoryOpen || !screen) && inventory.open(this);
+            if (!accepted && alwaysOpen) {
+                inventory.getViewers().add(this);
+                accepted = true;
+            }
+            if (screen && !Objects.equals(this.inventoryScreenId, cnt)) accepted = false;
+            // An open callback may remove the very mapping it was given.
+            if (accepted && this.windows.get(inventory) != null && this.windows.get(inventory) == cnt) {
+                if (screen && this.inventoryScreenId == null) {
+                    this.inventoryScreenId = cnt;
+                    this.inventoryScreenType = this.inventoryNetworkType(inventory);
+                }
+                return cnt;
+            }
+            accepted = false;
+            return -1;
+        } finally {
+            try {
+                if (!accepted) {
+                    if (screen && inventory.getViewers().contains(this)) {
+                        int previousClosing = this.closingWindowId;
+                        this.closingWindowId = Integer.MAX_VALUE;
+                        try { inventory.close(this); }
+                        catch (RuntimeException | Error cleanupFailure) { this.server.getLogger().logException(cleanupFailure); }
+                        finally { this.closingWindowId = previousClosing; }
+                    }
+                    this.craftingType = previousCraftingType;
+                    if (!(inventory instanceof PlayerUIComponent)) inventory.getViewers().remove(this);
+                    if (this.windows.get(inventory) != null && this.windows.get(inventory) == cnt) this.windows.remove(inventory);
+                    if (isPermanent) this.permanentWindows.remove(cnt);
+                    if (this.topWindow == inventory) this.topWindow = null;
+                    if (Objects.equals(this.inventoryScreenId, cnt)) {
+                        // onOpen may already have sent the open packet before another callback failed.
+                        try { this.sendInventoryScreenClose(cnt, this.inventoryScreenType, true); }
+                        catch (RuntimeException | Error closeFailure) { this.server.getLogger().logException(closeFailure); }
+                    }
+                }
+            } finally {
+                this.inventoryScreenOpening = previousOpening;
+            }
+        }
+    }
+
+    private int allocateWindowId(Integer forceId, boolean screen) {
+        if (forceId != null) {
+            return this.windowIndex.containsKey(forceId) || screen && this.pendingCloseWindowId == forceId
+                    ? Integer.MIN_VALUE : forceId;
+        }
+        for (int attempts = 0; attempts < 99; attempts++) {
+            this.windowCnt = Math.max(MINIMUM_OTHER_WINDOW_ID, ++this.windowCnt % 99);
+            if (!this.windowIndex.containsKey(this.windowCnt) && this.pendingCloseWindowId != this.windowCnt) return this.windowCnt;
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    public Optional<Inventory> getTopWindow() {
+        if (this.protocol < 407) return this.getTopWindowLegacy();
+
+        if (this.topWindow != null && this.isScreenWindow(this.topWindow)) return Optional.of(this.topWindow);
+        this.topWindow = null;
+        for (Inventory inventory : this.windows.keySet()) {
+            if (this.isScreenWindow(inventory)) {
+                this.topWindow = inventory;
+                break;
+            }
+        }
+        return Optional.ofNullable(this.topWindow);
+    }
+
+    private boolean isScreenWindow(Inventory inventory) {
+        Integer id = this.windows.get(inventory);
+        return id != null && id >= 0 && !this.permanentWindows.contains(id) && !(inventory instanceof CraftingGrid);
+    }
+
+    private Integer currentInventoryScreenId() {
+        if (this.inventoryScreenId != null) return this.inventoryScreenId;
+        if (this.inventoryOpen) return ContainerIds.INVENTORY;
+        return this.getTopWindow().map(this.windows::get).orElse(null);
+    }
+
+    private ContainerType inventoryNetworkType(Inventory inventory) {
+        return ContainerType.from(inventory instanceof FakeBlockUIComponent component
+                ? component.getFakeBlockType().getNetworkType() : inventory.getType().getNetworkType());
+    }
+
+    private int tradeScreenWindowId(UpdateTradePacket packet) {
+        return this.windowIndex.get(TRADE_WINDOW_ID) instanceof TradeInventory
+                && (byte) TRADE_WINDOW_ID == packet.windowId ? TRADE_WINDOW_ID : packet.windowId;
+    }
+
+    private void trackInventoryScreenPacket(DataPacket packet) {
+        if (packet instanceof UpdateTradePacket trade) {
+            this.inventoryScreenId = this.tradeScreenWindowId(trade);
+            this.inventoryScreenType = ContainerType.from(trade.windowType);
+        } else if (packet instanceof ContainerOpenPacket open) {
+            this.inventoryScreenId = open.windowId;
+            this.inventoryScreenType = ContainerType.from(open.type);
+        } else if (packet instanceof ContainerClosePacket close && close.wasServerInitiated
+                && (Objects.equals(this.inventoryScreenId, close.windowId) || this.pendingCloseWindowId == close.windowId)) {
+            // A client-close response must never create another server-close barrier.
+            if (this.pendingCloseWindowId == Integer.MIN_VALUE || this.pendingCloseWindowId == close.windowId) {
+                this.pendingCloseWindowId = close.windowId;
+                this.pendingCloseWindowType = close.type;
+            }
+            if (Objects.equals(this.inventoryScreenId, close.windowId)) this.inventoryScreenId = null;
+            Inventory inventory = this.windowIndex.get(close.windowId);
+            if (inventory != null && this.isScreenWindow(inventory) && inventory != this.inventoryCloseInProgress) {
+                this.windows.remove(inventory); // also covers callers using inventory.close(player) directly
+                if (this.topWindow == inventory) this.topWindow = null;
+            }
+            if (close.windowId == ContainerIds.INVENTORY) this.inventoryOpen = false;
+        }
+    }
+
+    private boolean sendInventoryScreenClose(int id, ContainerType type, boolean serverInitiated) {
+        if (this.protocol < 407) return true;
+        ContainerClosePacket response = new ContainerClosePacket();
+        response.windowId = id;
+        response.type = type;
+        response.wasServerInitiated = serverInitiated;
+        return this.dataPacket(response);
+    }
+
+    /** True only for the one verified server close awaiting the client's response. */
+    public boolean isAwaitingContainerClose(int windowId) {
+        return this.pendingCloseWindowId != Integer.MIN_VALUE
+                && ((byte) this.pendingCloseWindowId == (byte) windowId
+                    || windowId == ContainerIds.NONE && this.currentInventoryScreenId() == null);
+    }
+
+    /** Close exactly this screen; a stale callback cannot close a newer screen. */
+    public boolean closeInventoryScreen(int expectedId, ContainerType expectedType) {
+        Integer current = this.currentInventoryScreenId();
+        if (current == null || current != expectedId) return false;
+        Inventory inventory = this.windowIndex.get(current);
+        ContainerType currentType = this.inventoryScreenId != null ? this.inventoryScreenType
+                : inventory != null ? this.inventoryNetworkType(inventory) : ContainerType.NONE;
+        if (currentType != expectedType) return false;
+        this.closeCurrentInventoryScreen();
+        return true;
+    }
+
+    private void closeCurrentInventoryScreen() {
+        Integer id = this.currentInventoryScreenId();
+        if (id == null || this.inventoryCloseInProgress != null) return;
+        Inventory inventory = this.windowIndex.get(id);
+        if (inventory != null && !(inventory instanceof CraftingGrid)) {
+            this.closeAndRemoveInventoryWindow(inventory, false, true);
+            if (this.getWindowId(inventory) == -1 || inventory == this.inventory && !this.inventoryOpen)
+                this.resetCraftingGridType();
+        } else {
+            this.inventoryScreenChangeDepth++;
+            try {
+                if (this.sendInventoryScreenClose(id, this.inventoryScreenType, true)) {
+                    this.inventoryScreenId = null;
+                    this.pendingCloseWindowId = id;
+                    this.pendingCloseWindowType = this.inventoryScreenType;
+                    this.inventoryOpen = false;
+                    this.resetCraftingGridType();
+                }
+            } finally {
+                this.inventoryScreenChangeDepth--;
+            }
+        }
+    }
+
+    public void removeWindow(Inventory inventory) { this.removeWindow(inventory, false); }
+
+    private Set<Inventory> removingAnvilWindows;
+
+    protected void removeWindow(Inventory inventory, boolean isResponse) {
+        boolean anvil = inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory;
+        if (anvil) {
+            if (this.removingAnvilWindows != null && this.removingAnvilWindows.contains(inventory)) return;
+            if (InventoryMutationGuard.deferUntilReleased(
+                    java.util.Arrays.asList(inventory, this.getInventory(), this.getUIInventory()), inventory,
+                    () -> this.removeWindow(inventory, isResponse))) return;
+            if (this.getWindowId(inventory) < 0) return;
+            if (this.removingAnvilWindows == null) {
+                this.removingAnvilWindows = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            }
+            this.removingAnvilWindows.add(inventory);
+        }
+        try {
+            this.removeWindowNow(inventory, isResponse);
+        } finally {
+            if (anvil) this.removingAnvilWindows.remove(inventory);
+        }
+    }
+
+    private void removeWindowNow(Inventory inventory, boolean isResponse) {
+        if (this.protocol < 407) { this.removeWindowLegacy(inventory, isResponse); return; }
+
+        if (this.pendingWindowOpen != null && this.pendingWindowOpen.inventory == inventory) this.pendingWindowOpen.cancel();
+        if (this.activeWindowOpenRequest != null && this.activeWindowOpenRequest.inventory == inventory) this.activeWindowOpenRequest.cancel();
+        if (inventory == this.inventoryCloseInProgress) return;
+        this.closeAndRemoveInventoryWindow(inventory, isResponse, false);
+    }
+
+    private void closeAndRemoveInventoryWindow(Inventory inventory, boolean isResponse, boolean fireEvent) {
+        Integer id = this.windows.get(inventory);
+        if (id == null) return;
+        // Hold the entire public window close until native transaction/UI ownership releases.
+        if ((inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory
+                || inventory instanceof FakeBlockUIComponent fake && fake.usesNativeInputReturn()
+                && NativeUIItemReturn.isSupported(this)) && InventoryMutationGuard.deferProfileUntilReleased(
+                Arrays.asList(inventory, this.getInventory(), this.getUIInventory()), inventory,
+                () -> this.closeAndRemoveInventoryWindow(inventory, isResponse, fireEvent))) return;
+        int previousClosingId = this.closingWindowId;
+        Inventory previousClosingInventory = this.inventoryCloseInProgress;
+        this.inventoryCloseInProgress = inventory;
+        this.inventoryScreenChangeDepth++;
+        if (isResponse || this.inventoryScreenOpening && this.inventoryScreenId == null)
+            this.closingWindowId = Integer.MAX_VALUE;
+        boolean ownScreen = Objects.equals(this.currentInventoryScreenId(), id);
+        boolean retainAnvilInputs = false;
+        try {
+            if (fireEvent && !(inventory instanceof FakeBlockUIComponent)) {
+                try { this.server.getPluginManager().callEvent(new InventoryCloseEvent(inventory, this)); }
+                catch (RuntimeException | Error notificationFailure) { this.server.getLogger().logException(notificationFailure); }
+            }
+            try {
+                inventory.close(this);
+                if (!isResponse && ownScreen && inventory instanceof TradeInventory)
+                    this.sendInventoryScreenClose(id, this.inventoryNetworkType(inventory), true);
+            }
+            finally {
+                retainAnvilInputs = inventory instanceof AnvilInventory anvil && inventory.getViewers().contains(this)
+                        && (!anvil.getInputSlot().isNull() || !anvil.getMaterialSlot().isNull())
+                        || inventory instanceof FakeBlockUIComponent fake && fake.usesNativeInputReturn()
+                        && NativeUIItemReturn.isSupported(this) && inventory.getViewers().contains(this) && this.playerUIInventory != null
+                        && this.playerUIInventory.getContents().entrySet().stream()
+                        .anyMatch(slot -> PlayerUIInventory.isPersistentSlot(slot.getKey()) && !slot.getValue().isNull());
+            }
+        } finally {
+            try {
+                // A throwing/canceling/reentrant plugin must not retain the old id or viewer.
+                if (!retainAnvilInputs) {
+                    if (!this.permanentWindows.contains(id) && Objects.equals(this.windows.get(inventory), id)) this.windows.remove(inventory);
+                    if (inventory != this.inventory && !(inventory instanceof PlayerUIComponent)) inventory.getViewers().remove(this);
+                    if (this.topWindow == inventory) this.topWindow = null;
+                }
+                if (ownScreen && !retainAnvilInputs) {
+                    if (isResponse) this.inventoryScreenId = null;
+                    this.inventoryOpen = false;
+                }
+            } finally {
+                this.inventoryCloseInProgress = previousClosingInventory;
+                this.closingWindowId = previousClosingId;
+                this.inventoryScreenChangeDepth--;
+            }
+        }
+    }
+
+    private void handleInventoryScreenClose(ContainerClosePacket packet) {
+        int id = packet.windowId;
+        if (this.isAwaitingContainerClose(id)) {
+            // Ack first; only then clear the barrier and invoke an opener/callback.
+            // NONE is the Bedrock rejection alias; serialize the last window id as PMMP does.
+            if (!this.sendInventoryScreenClose(this.pendingCloseWindowId, this.pendingCloseWindowType, false)) return;
+            this.pendingCloseWindowId = Integer.MIN_VALUE;
+            this.pendingCloseWindowType = ContainerType.NONE;
+            this.flushPendingWindowOpen();
+            return;
+        }
+        Integer activeId = this.currentInventoryScreenId();
+        Inventory inventory = activeId == null ? null : this.windowIndex.get(activeId);
+        boolean noneClosesActive = id == ContainerIds.NONE && activeId != null
+                && (this.inventoryOpen || activeId == ContainerIds.NONE || inventory instanceof PlayerEnderChestInventory
+                    || isWorldBlockContainer(inventory)
+                    || Objects.equals(this.inventoryScreenId, activeId) && inventory != null
+                        && inventory.getHolder() instanceof FakeBlockMenu);
+        if (activeId != null && (id == (byte) activeId.intValue() || noneClosesActive)) {
+            if ((inventory instanceof AnvilInventory || inventory instanceof GrindstoneInventory
+                || inventory instanceof FakeBlockUIComponent fake && fake.usesNativeInputReturn()
+                && NativeUIItemReturn.isSupported(this)) && InventoryMutationGuard.deferProfileUntilReleased(
+                    Arrays.asList(inventory, this.getInventory(), this.getUIInventory()), inventory,
+                    () -> this.handleInventoryScreenClose(packet))) return;
+            ContainerType type = inventory != null && !(inventory instanceof CraftingGrid)
+                    ? this.inventoryNetworkType(inventory) : this.inventoryScreenType;
+            this.inventoryScreenChangeDepth++;
+            int previousClosingId = this.closingWindowId;
+            this.closingWindowId = Integer.MAX_VALUE;
+            boolean acknowledged = false;
+            try {
+                if (!this.sendInventoryScreenClose(id, type, false)) return;
+                acknowledged = true;
+                this.inventoryScreenId = null;
+                this.inventoryOpen = false;
+                if (inventory != null && !(inventory instanceof CraftingGrid))
+                    this.closeAndRemoveInventoryWindow(inventory, true, true);
+            } finally {
+                try {
+                    if (acknowledged && (!(inventory instanceof AnvilInventory) || this.getWindowId(inventory) == -1))
+                        this.resetCraftingGridType();
+                } finally {
+                    this.closingWindowId = previousClosingId;
+                    this.inventoryScreenChangeDepth--;
+                    this.flushPendingWindowOpen();
+                }
+            }
+        } else if (activeId == null && id != ContainerIds.NONE) {
+            // Positive unknown closes can be handshake retries. Never echo them over a fresh screen.
+            this.sendInventoryScreenClose(id, packet.type, false);
+        }
+    }
+
+    /** A cancelable open request. Cancellation belongs to this request, never a newer one. */
+    public final class WindowOpenRequest {
+        private final Inventory inventory;
+        private final BooleanSupplier stillValid;
+        private final Runnable opener;
+        private final Runnable refused;
+        private final long createdNanos = System.nanoTime();
+        private boolean finished;
+        private WindowOpenRequest(Inventory inventory, BooleanSupplier valid, Runnable opener, Runnable refused) {
+            this.inventory = inventory;
+            this.stillValid = valid;
+            this.opener = opener;
+            this.refused = refused;
+        }
+        public void cancel() {
+            if (this.finished) return;
+            this.finished = true;
+            if (Player.this.pendingWindowOpen == this) Player.this.pendingWindowOpen = null;
+            try { this.refused.run(); }
+            catch (RuntimeException | Error callbackFailure) { Player.this.server.getLogger().logException(callbackFailure); }
+        }
+    }
+
+    /** Open a native world inventory after any prior close ACK; stale holders never reopen. */
+    public WindowOpenRequest requestWindowOpen(Inventory inventory) { return this.requestWindowOpen(inventory, null); }
+
+    public WindowOpenRequest requestWindowOpen(Inventory inventory, Integer forceId) {
+        Level origin = this.level;
+        InventoryHolder holder = inventory instanceof DoubleChestInventory doubleChest
+                ? doubleChest.getLeftSide().getHolder() : inventory.getHolder();
+        Position anchor = holder instanceof Position position ? position.clone() : null;
+        Block anchorBlock = anchor != null && !(holder instanceof Entity) && origin != null ? origin.getBlock(anchor) : null;
+        return this.requestWindowOpen(inventory, forceId, () -> {
+            if (this.level != origin) return false;
+            if (inventory instanceof DoubleChestInventory doubleChest && (!isWorldBlockContainer(inventory)
+                    || doubleChest.getLeftSide().getDoubleInventory() != inventory
+                    || doubleChest.getRightSide().getDoubleInventory() != inventory)) return false;
+            if (holder instanceof Entity entity && (entity.closed || entity.getLevel() != origin || !entity.isAlive())) return false;
+            if (holder instanceof BlockEntity entity && (entity.closed || entity.getLevel() != origin
+                    || origin.getBlockEntityIfLoaded(entity) != entity)) return false;
+            if (anchor != null && this.distanceSquared(anchor) > 100) return false;
+            return anchorBlock == null || holder instanceof BlockEntity || origin.getBlock(anchor).equals(anchorBlock);
+        }, ignored -> { });
+    }
+
+    /** The ender chest has a player-owned inventory but a separately owned world lid. */
+    public WindowOpenRequest requestEnderChestWindow(BlockEnderChest chest) {
+        Level origin = chest.getLevel();
+        BlockEntity holder = origin.getBlockEntityIfLoaded(chest);
+        Inventory inventory = this.getEnderChestInventory();
+        return this.requestInventoryScreenOpen(inventory,
+                () -> this.level == origin && this.distanceSquared(chest) <= 100
+                        && origin.getBlock(chest).getId() == chest.getId()
+                        && origin.getBlockEntityIfLoaded(chest) == holder,
+                () -> {
+                    this.setViewingEnderChest(chest);
+                    boolean opened = false;
+                    try { opened = this.addWindow(inventory) != -1; }
+                    finally { if (!opened) this.setViewingEnderChest(null); }
+                }, () -> { });
+    }
+
+    /** Callback runs once with the real opened id, or -1 if canceled/refused. No optimistic success. */
+    public WindowOpenRequest requestWindowOpen(Inventory inventory, Integer forceId,
+                                               BooleanSupplier stillValid, IntConsumer completion) {
+        Objects.requireNonNull(inventory);
+        Objects.requireNonNull(completion);
+        boolean[] completed = {false};
+        IntConsumer deliver = result -> {
+            if (completed[0]) return;
+            completed[0] = true;
+            completion.accept(result);
+        };
+        return this.requestInventoryScreenOpen(inventory, stillValid, () -> {
+            int result;
+            if (inventory == this.inventory) {
+                if (this.inventoryOpen) result = ContainerIds.INVENTORY;
+                else {
+                    this.inventoryScreenOpening = true;
+                    try {
+                        boolean accepted = inventory.open(this) && (this.protocol < 407 || Objects.equals(this.inventoryScreenId, ContainerIds.INVENTORY));
+                        this.inventoryOpen = accepted;
+                        result = accepted ? ContainerIds.INVENTORY : -1;
+                    } finally {
+                        this.inventoryScreenOpening = false;
+                    }
+                }
+            } else result = this.addWindow(inventory, forceId);
+            deliver.accept(result);
+        }, () -> deliver.accept(-1));
+    }
+
+    /** Barrier for a plugin screen sent as raw ContainerOpen (e.g. a workbench with id -1). */
+    public WindowOpenRequest requestInventoryScreenOpen(BooleanSupplier stillValid, Runnable opener, Runnable refused) {
+        return this.requestInventoryScreenOpen(null, stillValid, opener, refused);
+    }
+
+    private WindowOpenRequest requestInventoryScreenOpen(Inventory inventory, BooleanSupplier stillValid,
+                                                         Runnable opener, Runnable refused) {
+        WindowOpenRequest request = new WindowOpenRequest(inventory, Objects.requireNonNull(stillValid),
+                Objects.requireNonNull(opener), Objects.requireNonNull(refused));
+        try {
+            if (!this.connected || this.closed || !this.spawned || !this.isAlive() || !stillValid.getAsBoolean()) {
+                request.cancel();
+                return request;
+            }
+        } catch (RuntimeException | Error validityFailure) {
+            this.server.getLogger().logException(validityFailure);
+            request.cancel();
+            return request;
+        }
+        if (this.protocol < 407) {
+            try {
+                request.opener.run();
+                request.finished = true;
+            } catch (RuntimeException | Error failure) {
+                this.server.getLogger().logException(failure);
+                request.cancel();
+            }
+            return request;
+        }
+        long sequence = ++this.windowOpenRequestSequence;
+        WindowOpenRequest previous = this.pendingWindowOpen;
+        this.pendingWindowOpen = null;
+        if (this.activeWindowOpenRequest != null) this.activeWindowOpenRequest.cancel();
+        if (previous != null) previous.cancel();
+        // A cancellation callback can create a newer request; preserve it.
+        if (sequence != this.windowOpenRequestSequence) { request.cancel(); return request; }
+        this.pendingWindowOpen = request;
+        if (this.inventoryCloseInProgress == null && !this.inventoryScreenOpening && this.inventoryScreenChangeDepth == 0) {
+            boolean alreadyWaiting = this.pendingCloseWindowId != Integer.MIN_VALUE;
+            Integer current = this.currentInventoryScreenId();
+            if (current != null && (inventory == null || this.windowIndex.get(current) != inventory)) this.closeCurrentInventoryScreen();
+            if (alreadyWaiting && this.pendingCloseWindowId != Integer.MIN_VALUE) {
+                // A new user action retries the instruction; a timer never opens over an unacked close.
+                this.sendInventoryScreenClose(this.pendingCloseWindowId, this.pendingCloseWindowType, true);
+            }
+            this.flushPendingWindowOpen();
+        }
+        return request;
+    }
+
+    private void flushPendingWindowOpen() {
+        if (this.pendingCloseWindowId != Integer.MIN_VALUE || this.inventoryCloseInProgress != null
+                || this.inventoryScreenOpening || this.inventoryScreenChangeDepth != 0) return;
+        WindowOpenRequest request = this.pendingWindowOpen;
+        if (request == null) return;
+        Integer active = this.currentInventoryScreenId();
+        if (active != null && (request.inventory == null || this.windowIndex.get(active) != request.inventory)) {
+            this.closeCurrentInventoryScreen();
+            if (this.currentInventoryScreenId() != null || this.pendingCloseWindowId != Integer.MIN_VALUE) return;
+        }
+        this.pendingWindowOpen = null;
+        boolean previousOpening = this.inventoryScreenOpening;
+        if (request.inventory == null) this.inventoryScreenOpening = true;
+        try {
+            if (!this.connected || this.closed || !this.spawned || !this.isAlive()
+                    || System.nanoTime() - request.createdNanos > WINDOW_OPEN_REQUEST_MAX_NANOS
+                    || !request.stillValid.getAsBoolean()) {
+                request.cancel();
+                return;
+            }
+            this.activeWindowOpenRequest = request;
+            request.opener.run();
+            request.finished = true;
+        } catch (RuntimeException | Error failure) {
+            this.server.getLogger().logException(failure);
+            if (!request.finished) request.cancel();
+            else request.refused.run();
+        } finally {
+            if (this.activeWindowOpenRequest == request) this.activeWindowOpenRequest = null;
+            this.inventoryScreenOpening = previousOpening;
+            this.flushPendingWindowOpen();
+        }
+    }
+
+    private void handleLegacyInventoryScreenClose(ContainerClosePacket containerClosePacket) {
+
+                if (!this.spawned) {
+                    return;
+                }
+
+                if (containerClosePacket.windowId == -1) {
+                    // At least 1.21 does sometimes send windowId -1 when opening and closing containers quickly
+                    if (this.inventoryOpen) {
+                        this.inventoryOpen = false;
+
+                        if (this.craftingType == CRAFTING_SMALL) {
+                            for (Entry<Inventory, Integer> open : new ArrayList<>(this.windows.entrySet())) {
+                                if (open.getKey() instanceof ContainerInventory || open.getKey() instanceof PlayerEnderChestInventory) {
+                                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(open.getKey(), this));
+                                    this.closingWindowId = Integer.MAX_VALUE;
+                                    this.removeWindow(open.getKey(), true);
+                                    this.closingWindowId = Integer.MIN_VALUE;
+                                }
+                            }
+                            return;
+                        }
+                    }
+
+                    // 1.21 clients also close an ender chest with -1 while their own inventory is not
+                    // open. Without this the window stayed open on the server: the lid hung open for
+                    // everyone and the chest did not open again for this player until a teleport.
+                    closeEnderChestWindowForUnknownId();
+                    // The same happens to a chest, barrel, shulker box, hopper or furnace of the world:
+                    // the lid hung open and the block did not open again for this player. Only windows
+                    // of real block entities are closed here. A plugin window drawn on a fake block has
+                    // no block entity, and a late -1 must not shut a fresh window of that kind.
+                    closeWorldContainerWindowsForUnknownId();
+
+                    this.craftingType = CRAFTING_SMALL;
+                    this.resetCraftingGridType();
+                    this.addWindow(this.craftingGrid, ContainerIds.NONE);
+                    if (this.protocol >= 407) {
+                        ContainerClosePacket pk = new ContainerClosePacket();
+                        pk.windowId = -1;
+                        pk.wasServerInitiated = false;
+                        pk.type = containerClosePacket.type;
+                        this.dataPacket(pk);
+                    }
+                    //TODO Find out why the correct id is not returned
+                    TradeInventory tradeInventory = this.getTradeInventory();
+                    if (tradeInventory != null) {
+                        this.removeWindow(tradeInventory, true);
+                    }
+                } else if (this.windowIndex.containsKey(containerClosePacket.windowId)) {
+                    this.inventoryOpen = false;
+                    Inventory inn = this.windowIndex.get(containerClosePacket.windowId);
+                    this.server.getPluginManager().callEvent(new InventoryCloseEvent(inn, this));
+                    this.closingWindowId = containerClosePacket.windowId;
+                    this.removeWindow(inn, true);
+                    this.closingWindowId = Integer.MIN_VALUE;
+                } else {  // Close the bugged inventory client refused with id -1 above
+                    ContainerClosePacket pk = new ContainerClosePacket();
+                    pk.windowId = containerClosePacket.windowId;
+                    pk.wasServerInitiated = false;
+                    pk.type = containerClosePacket.type;
+                    this.dataPacket(pk);
+
+//                    for (Inventory open : new ArrayList<>(this.windows.keySet())) {
+//                        if (open instanceof ContainerInventory) {
+//                            this.removeWindow(open);
+//                        }
+//                    }
+                }
+    }
+
+    private int addWindowLegacy(Inventory inventory, Integer forceId, boolean isPermanent, boolean alwaysOpen) {
         if (this.windows.containsKey(inventory)) {
             return this.windows.get(inventory);
         }
@@ -8671,7 +9688,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return cnt;
     }
 
-    public Optional<Inventory> getTopWindow() {
+    private Optional<Inventory> getTopWindowLegacy() {
         if (this.topWindow != null && this.windows.containsKey(this.topWindow)
                 && !this.permanentWindows.contains(this.windows.get(this.topWindow))) {
             return Optional.of(this.topWindow);
@@ -8688,11 +9705,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return Optional.ofNullable(fallback);
     }
 
-    public void removeWindow(Inventory inventory) {
-        this.removeWindow(inventory, false);
-    }
-
-    protected void removeWindow(Inventory inventory, boolean isResponse) {
+    private void removeWindowLegacy(Inventory inventory, boolean isResponse) {
         inventory.close(this);
         // TODO: This needs a proper fix
         // Requiring isResponse here causes issues with inventory events and an item duplication glitch
@@ -8701,6 +9714,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (inventory == this.topWindow) {
                 this.topWindow = null;
             }
+        }
+    }
+
+    private void removeAllWindowsLegacy(boolean permanent) {
+        for (Entry<Integer, Inventory> entry : new ArrayList<>(this.windowIndex.entrySet())) {
+            if (!permanent && this.permanentWindows.contains(entry.getKey())) {
+                continue;
+            }
+
+            this.removeWindow(entry.getValue());
         }
     }
 
@@ -8717,7 +9740,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected void addDefaultWindows() {
         this.addWindow(this.getInventory(), ContainerIds.INVENTORY, true, true);
 
-        this.playerUIInventory = new PlayerUIInventory(this);
+        this.playerUIInventory = new PlayerUIInventory(this, this.namedTag);
         this.addWindow(this.playerUIInventory, ContainerIds.UI, true);
         this.addWindow(this.offhandInventory, ContainerIds.OFFHAND, true, true);
 
@@ -8752,6 +9775,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void resetCraftingGridType() {
+        // A custom Level's legacy void drop hook retains its existing authority and contract.
+        if (!NativeUIItemReturn.isSupported(this)) {
+            this.resetCraftingGridTypeLegacy();
+            return;
+        }
+        if (this.playerUIInventory != null) {
+            if (!NativeUIItemReturn.returnInputs(this)) return;
+            if (this.craftingGrid instanceof BigCraftingGrid && this.connected) {
+                this.craftingGrid = this.playerUIInventory.getCraftingGrid();
+                this.addWindow(this.craftingGrid, ContainerIds.NONE);
+            }
+        }
+        this.craftingType = CRAFTING_SMALL;
+    }
+
+    private void resetCraftingGridTypeLegacy() {
         if (this.playerUIInventory != null) {
             Item[] drops;
 
@@ -8824,8 +9863,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param permanent remove permanent windows
      */
     public void removeAllWindows(boolean permanent) {
+        if (this.protocol < 407) { this.removeAllWindowsLegacy(permanent); return; }
+
+        if (this.pendingWindowOpen != null) this.pendingWindowOpen.cancel();
+        if (this.activeWindowOpenRequest != null) this.activeWindowOpenRequest.cancel();
+        this.closeCurrentInventoryScreen();
         for (Entry<Integer, Inventory> entry : new ArrayList<>(this.windowIndex.entrySet())) {
-            if (!permanent && this.permanentWindows.contains(entry.getKey())) {
+            if (!permanent && (this.permanentWindows.contains(entry.getKey()) || entry.getValue() instanceof CraftingGrid)) {
                 continue;
             }
 
@@ -9177,22 +10221,131 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return success
      */
     public boolean pickupEntity(Entity entity, boolean near) {
+        if (!near || !(entity instanceof EntityItem || entity instanceof EntityArrow
+                || entity instanceof EntityThrownTrident)) {
+            return this.pickupEntityUnclaimed(entity, near, null, null);
+        }
+        try (EntityPickupClaim.Lease source = EntityPickupClaim.tryClaim(entity)) {
+            if (source == null) return false;
+            PlayerInventory inventory = this.inventory;
+            ItemPickupContext context = new ItemPickupContext(this, inventory, entity);
+            try (InventoryMutationGuard.Lease destination = InventoryMutationGuard.tryClaim(
+                    Collections.singleton(inventory))) {
+                return destination != null && context.matches(this, entity)
+                        && this.pickupEntityUnclaimed(entity, true, context, destination);
+            }
+        }
+    }
+
+    private boolean canConsumePickupSource(Entity entity) {
+        return this.spawned && this.isAlive() && this.isOnline() && !this.isSpectator() && !entity.isClosed()
+                && !entity.isPublicationDeferred();
+    }
+
+    private record ItemPickupContext(Player owner, PlayerInventory inventory, Level playerLevel,
+                                     Level sourceLevel, FullChunk sourceChunk, long sourceId, int gamemode) {
+        private ItemPickupContext(Player player, PlayerInventory inventory, Entity source) {
+            this(player, inventory, player.getLevel(), source.getLevel(), source.chunk, source.getId(), player.getGamemode());
+        }
+        private boolean matches(Player player, Entity source) {
+            return player == owner && player.canConsumePickupSource(source)
+                    && player.inventory == inventory && inventory.getHolder() == player
+                    && player.getLevel() == playerLevel && player.getGamemode() == gamemode
+                    && source.getLevel() == sourceLevel && source.chunk == sourceChunk
+                    && source.getId() == sourceId && sourceLevel != null && sourceLevel.getEntity(sourceId) == source;
+        }
+    }
+
+    private static Item arrowPickupItem(EntityArrow arrow) {
+        if (arrow.namedTag != null && arrow.namedTag.containsCompound("item")) {
+            CompoundTag tag = arrow.namedTag.getCompound("item");
+            Item item = Item.get(tag.getInt("id"), tag.getInt("Damage"), tag.getInt("Count"));
+            if (tag.containsCompound("tag")) item.setCompoundTag(tag.getCompound("tag").clone());
+            return item;
+        }
+        return new ItemArrow();
+    }
+
+    private void consumeItemPickup(Entity entity) {
+        try {
+            TakeItemEntityPacket pk = new TakeItemEntityPacket();
+            pk.entityId = this.getId();
+            pk.target = entity.getId();
+            Server.broadcastPacket(entity.getViewers().values(), pk);
+            this.dataPacket(pk);
+        } finally {
+            // A cosmetic packet failure cannot leave an accepted inventory grant beside its source.
+            entity.close();
+        }
+    }
+
+    private boolean retainPickupRemainder(Entity entity, Item offered, Item[] remainders) {
+        Item remainder = remainders[0]; // A single offered stack has at most one native remainder.
+        boolean acceptedAny = remainder.getCount() < offered.getCount();
+        if (entity instanceof EntityItem itemEntity) {
+            itemEntity.getItem().setCount(remainder.getCount());
+        } else if (entity instanceof EntityArrow arrow) {
+            if (arrow.namedTag == null) arrow.namedTag = new CompoundTag();
+            CompoundTag itemTag = arrow.namedTag.containsCompound("item")
+                    ? arrow.namedTag.getCompound("item").clone() : new CompoundTag();
+            itemTag.putInt("id", remainder.getId()).putInt("Damage", remainder.getDamage())
+                    .putInt("Count", remainder.getCount());
+            if (remainder.hasCompoundTag()) itemTag.putCompound("tag", remainder.getNamedTag().clone());
+            else itemTag.remove("tag");
+            arrow.namedTag.putCompound("item", itemTag);
+        } else if (entity instanceof EntityThrownTrident trident) {
+            trident.setItem(remainder);
+        }
+        return acceptedAny;
+    }
+
+    private void restorePickupInventory(ItemPickupContext context, Entity entity, Item sourceBefore,
+            Map<Integer, Item> before, InventoryMutationGuard.NativeMetadataSnapshot metadata) {
+        metadata.restore();
+        context.inventory().slots.clear();
+        context.inventory().slots.putAll(before);
+        // Restore the live source amount; an independent entity close is never replayed into the world.
+        if (!entity.isClosed()) this.retainPickupRemainder(entity, sourceBefore, new Item[]{sourceBefore});
+    }
+
+    private <T> T applyPickupInventory(ItemPickupContext context, InventoryMutationGuard.Lease claim,
+            Entity entity, Item offered, Supplier<T> apply, T refused) {
+        PlayerInventory destination = context.inventory();
+        Map<Integer, Item> before = new HashMap<>();
+        destination.slots.forEach((slot, stack) -> before.put(slot, stack.clone()));
+        InventoryMutationGuard.NativeMetadataSnapshot metadata = claim.captureNativeMetadata();
+        Item sourceBefore = offered.clone();
+        try {
+            T accepted = apply.get();
+            if (Boolean.FALSE.equals(accepted) || !context.matches(this, entity) || !metadata.matches()) {
+                this.restorePickupInventory(context, entity, sourceBefore, before, metadata);
+                return refused;
+            }
+            return accepted;
+        } catch (RuntimeException | Error failure) {
+            try {
+                this.restorePickupInventory(context, entity, sourceBefore, before, metadata);
+            } catch (RuntimeException | Error cleanup) {
+                if (cleanup != failure) failure.addSuppressed(cleanup);
+            }
+            try {
+                destination.sendContents(this);
+            } catch (RuntimeException | Error updateFailure) {
+                if (updateFailure != failure) failure.addSuppressed(updateFailure);
+            }
+            throw failure;
+        }
+    }
+
+    private boolean pickupEntityUnclaimed(Entity entity, boolean near, ItemPickupContext context,
+                                           InventoryMutationGuard.Lease destination) {
         if (!this.spawned || !this.isAlive() || !this.isOnline() || this.isSpectator() || entity.isClosed()) {
             return false;
         }
 
         if (near) {
             if (entity instanceof EntityArrow entityArrow && entityArrow.hadCollision) {
-                Item item;
-                if (entityArrow.namedTag != null && entityArrow.namedTag.containsCompound("item")) {
-                    CompoundTag tag = entityArrow.namedTag.getCompound("item");
-                    item = Item.get(tag.getInt("id"), tag.getInt("Damage"), tag.getInt("Count"));
-                    if (tag.containsCompound("tag")) {
-                        item.setCompoundTag(tag.getCompound("tag"));
-                    }
-                } else {
-                    item = new ItemArrow();
-                }
+                Item item = arrowPickupItem(entityArrow);
                 if (!this.isCreative() && !this.inventory.canAddItem(item)) {
                     return false;
                 }
@@ -9205,20 +10358,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 this.server.getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
+                if (ev.isCancelled() || !context.matches(this, entity)) {
                     return false;
                 }
 
-                TakeItemEntityPacket pk = new TakeItemEntityPacket();
-                pk.entityId = this.getId();
-                pk.target = entity.getId();
-                Server.broadcastPacket(entity.getViewers().values(), pk);
-                this.dataPacket(pk);
-
                 if (!this.isCreative()) {
-                    this.inventory.addItem(item.clone());
+                    Item offered = arrowPickupItem(entityArrow);
+                    Item[] remainders = this.applyPickupInventory(context, destination, entity, offered,
+                            () -> context.inventory().addItem(offered.clone()), new Item[]{offered.clone()});
+                    if (remainders.length != 0) return this.retainPickupRemainder(entity, offered, remainders);
                 }
-                entity.close();
+                this.consumeItemPickup(entity);
                 return true;
             }
             if (entity instanceof EntityThrownTrident) {
@@ -9249,24 +10399,30 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 this.server.getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
+                if (ev.isCancelled() || !context.matches(this, entity)) {
                     return false;
                 }
 
-                TakeItemEntityPacket pk = new TakeItemEntityPacket();
-                pk.entityId = this.getId();
-                pk.target = entity.getId();
-                Server.broadcastPacket(entity.getViewers().values(), pk);
-                this.dataPacket(pk);
-
                 if (!thrownTrident.isCreative()) {
-                    if (inventory.getItem(thrownTrident.getFavoredSlot()).getId() == Item.AIR) {
-                        inventory.setItem(thrownTrident.getFavoredSlot(), item.clone());
+                    Item offered = thrownTrident.getItem().clone();
+                    int favoredSlot = thrownTrident.getFavoredSlot();
+                    if (favoredSlot >= 0 && favoredSlot < context.inventory().getSize()
+                            && context.inventory().getItem(favoredSlot).getId() == Item.AIR) {
+                        if (!this.applyPickupInventory(context, destination, entity, offered, () -> {
+                            try (InventoryMutationGuard.WriteScope write = destination.expectWrite(
+                                    context.inventory(), favoredSlot, offered)) {
+                                return context.inventory().setItem(favoredSlot, offered.clone())
+                                        && InventoryMutationGuard.matchesTarget(
+                                        context.inventory().getItem(favoredSlot), offered);
+                            }
+                        }, false)) return false;
                     } else {
-                        inventory.addItem(item.clone());
+                        Item[] remainders = this.applyPickupInventory(context, destination, entity, offered,
+                                () -> context.inventory().addItem(offered.clone()), new Item[]{offered.clone()});
+                        if (remainders.length != 0) return this.retainPickupRemainder(entity, offered, remainders);
                     }
                 }
-                entity.close();
+                this.consumeItemPickup(entity);
                 return true;
             }
             if (entity instanceof EntityItem) {
@@ -9280,23 +10436,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         InventoryPickupItemEvent ev;
                         this.server.getPluginManager().callEvent(ev = new InventoryPickupItemEvent(this.inventory, (EntityItem) entity));
-                        if (ev.isCancelled()) {
+                        if (ev.isCancelled() || !context.matches(this, entity)) {
                             return false;
                         }
 
-                        switch (item.getId()) {
+                        Item offered = ((EntityItem) entity).getItem().clone();
+                        Item[] remainders = this.applyPickupInventory(context, destination, entity, offered,
+                                () -> context.inventory().addItem(offered.clone()), new Item[]{offered.clone()});
+                        if (remainders.length != 0) return this.retainPickupRemainder(entity, offered, remainders);
+                        this.consumeItemPickup(entity);
+                        switch (offered.getId()) {
                             case Item.WOOD, Item.WOOD2 -> this.awardAchievement("mineWood");
                             case Item.DIAMOND -> this.awardAchievement("diamond");
                         }
-
-                        TakeItemEntityPacket pk = new TakeItemEntityPacket();
-                        pk.entityId = this.getId();
-                        pk.target = entity.getId();
-                        Server.broadcastPacket(entity.getViewers().values(), pk);
-                        this.dataPacket(pk);
-
-                        this.inventory.addItem(item.clone());
-                        entity.close();
                         return true;
                     }
                 }
@@ -9816,15 +10968,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 // shouldLogin；守卫防止两条触发路径重复执行
                 // processLogin must run ahead of the shouldLogin check (it sends the pack info
                 // the client needs to finish); the guard keeps the two trigger paths single-shot
-                if (!playerInstance.loginDataProcessed) {
-                    playerInstance.loginDataProcessed = true;
+                if (!playerInstance.loginDataStarted) {
+                    playerInstance.loginDataStarted = true;
                     playerInstance.processLogin();
+                    // A custom protected hook that owns its complete legacy flow stays single-shot.
+                    if (playerInstance.nativeProfileLogin == null && playerInstance.connected)
+                        playerInstance.loginDataProcessed = true;
                     if (!playerInstance.connected) {
                         return;
                     }
                 }
 
-                if (playerInstance.shouldLogin) {
+                if (playerInstance.shouldLogin && playerInstance.loginDataProcessed) {
                     playerInstance.setSkin(this.event.getSkin());
                     playerInstance.completeLoginSequence();
                     for (Consumer<Server> action : this.event.getScheduledActions()) {

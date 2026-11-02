@@ -53,7 +53,10 @@ public abstract class ContainerInventory extends BaseInventory {
             pk.entityId = ((Entity) holder).getId();
         }
 
-        who.dataPacket(pk);
+        if (!who.dataPacket(pk)) {
+            this.getViewers().remove(who);
+            return;
+        }
 
         this.sendContents(who);
     }

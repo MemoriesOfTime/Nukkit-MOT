@@ -51,22 +51,27 @@ public class BlockCraftingTable extends BlockSolid {
     @Override
     public boolean onActivate(Item item, Player player) {
         if (player != null) {
-            CraftingTableOpenEvent ev = new CraftingTableOpenEvent(player, this);
-            player.getServer().getPluginManager().callEvent(ev);
-            if (!ev.isCancelled()) {
-                player.craftingType = Player.CRAFTING_BIG;
-                player.setCraftingGrid(player.getUIInventory().getBigCraftingGrid());
-                if (player.protocol >= 407) {
-                    ContainerOpenPacket pk = new ContainerOpenPacket();
-                    pk.windowId = -1;
-                    pk.type = 1;
-                    pk.x = (int) x;
-                    pk.y = (int) y;
-                    pk.z = (int) z;
-                    pk.entityId = player.getId();
-                    player.dataPacket(pk);
-                }
-            }
+            player.requestInventoryScreenOpen(
+                    () -> player.getLevel() == this.getLevel() && player.distanceSquared(this) <= 100
+                            && this.getLevel().getBlock(this).getId() == this.getId(),
+                    () -> {
+                        CraftingTableOpenEvent ev = new CraftingTableOpenEvent(player, this);
+                        player.getServer().getPluginManager().callEvent(ev);
+                        if (ev.isCancelled()) return;
+                        player.craftingType = Player.CRAFTING_BIG;
+                        player.setCraftingGrid(player.getUIInventory().getBigCraftingGrid());
+                        if (player.protocol >= 407) {
+                            ContainerOpenPacket pk = new ContainerOpenPacket();
+                            pk.windowId = -1;
+                            pk.type = 1;
+                            pk.x = (int) x;
+                            pk.y = (int) y;
+                            pk.z = (int) z;
+                            pk.entityId = player.getId();
+                            if (!player.dataPacket(pk)) player.resetCraftingGridType();
+                        }
+                    }, () -> { });
+
         }
         return true;
     }

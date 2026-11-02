@@ -59,7 +59,7 @@ public class BlockLoom extends BlockSolidMeta {
     @Override
     public boolean onActivate(Item item, Player player) {
         if (player != null) {
-            player.addWindow(new LoomInventory(player.getUIInventory(), this), Player.LOOM_WINDOW_ID);
+            player.requestWindowOpen(new LoomInventory(player.getUIInventory(), this), Player.LOOM_WINDOW_ID);
         }
         return true;
     }

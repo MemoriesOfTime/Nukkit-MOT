@@ -114,27 +114,55 @@ class BundleInventoryTest {
     }
 
     @Test
-    void clickAirDropsStoredItemAndUpdatesNbt() {
-        Player player = Mockito.mock(Player.class);
-        Level level = Mockito.mock(Level.class);
-        Mockito.when(player.dropItem(Mockito.any(Item.class))).thenReturn(true);
-        Mockito.when(player.getLevel()).thenReturn(level);
+    @SuppressWarnings("unchecked")
+    void clickAirDropsStoredItemAndUpdatesNbt() throws ReflectiveOperationException {
+        cn.nukkit.Server server = cn.nukkit.Server.getInstance();
+        boolean previousPrimary = server.isPrimaryThread();
+        Mockito.when(server.isPrimaryThread()).thenReturn(true);
+        try {
+            // Exercise the accepted canonical carrier and prepared native world item.
+            Class<?> fixtureType = Class.forName(
+                    "cn.nukkit.inventory.transaction.InventoryTransactionPreparedWorldDropTest$Fixture");
+            var constructor = fixtureType.getDeclaredConstructor(cn.nukkit.Server.class);
+            constructor.setAccessible(true);
+            Object fixture = constructor.newInstance(server);
+            Player player = (Player) bundleFixtureField(fixture, "source");
+            PlayerInventory held = (PlayerInventory) bundleFixtureField(fixture, "sourceInventory");
+            var entities = (java.util.Map<Long, cn.nukkit.entity.Entity>)
+                    bundleFixtureField(fixture, "levelEntities");
+            Level level = player.getLevel();
 
-        ItemBundle bundle = new ItemBundle();
-        BundleInventory inventory = bundle.getInventory();
-        assertTrue(inventory.setItem(3, Item.get(Item.DIRT, 0, 5), false));
+            ItemBundle bundle = new ItemBundle();
+            BundleInventory inventory = bundle.getInventory();
+            assertTrue(inventory.setItem(3, Item.get(Item.DIRT, 0, 5), false));
+            held.setItemForce(0, bundle);
+            assertTrue(bundle.onClickAir(player, new Vector3(0, 0, 1)));
 
-        assertTrue(bundle.onClickAir(player, new Vector3(0, 0, 1)));
+            assertEquals(1, entities.size());
+            cn.nukkit.entity.item.EntityItem dropped = entities.values().stream()
+                    .filter(cn.nukkit.entity.item.EntityItem.class::isInstance)
+                    .map(cn.nukkit.entity.item.EntityItem.class::cast).findFirst().orElseThrow();
+            assertEquals(Item.DIRT, dropped.getItem().getId());
+            assertEquals(5, dropped.getItem().getCount());
+            assertFalse(dropped.closed);
+            assertTrue(bundle.getInventory().getItem(3).isNull());
+            assertEquals(0, bundle.getNamedTag()
+                    .getList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT, CompoundTag.class).size());
+            ItemBundle canonical = (ItemBundle) held.getItemInHandFast();
+            assertTrue(canonical.getInventory().getItem(3).isNull());
+            assertEquals(0, canonical.getNamedTag()
+                    .getList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT, CompoundTag.class).size());
+            Mockito.verify(level).addSound(Mockito.eq(player), Mockito.eq(Sound.BUNDLE_DROP_CONTENTS));
+        } finally {
+            Mockito.when(server.isPrimaryThread()).thenReturn(previousPrimary);
+        }
+    }
 
-        ArgumentCaptor<Item> dropped = ArgumentCaptor.forClass(Item.class);
-        Mockito.verify(player).dropItem(dropped.capture());
-        assertEquals(Item.DIRT, dropped.getValue().getId());
-        assertEquals(5, dropped.getValue().getCount());
-        assertTrue(inventory.getItem(3).isNull());
-        assertEquals(0, bundle.getNamedTag()
-                .getList(ItemBundle.TAG_STORAGE_ITEM_COMPONENT_CONTENT, CompoundTag.class)
-                .size());
-        Mockito.verify(level).addSound(Mockito.eq(player), Mockito.eq(Sound.BUNDLE_DROP_CONTENTS));
+    private static Object bundleFixtureField(Object fixture, String name)
+            throws ReflectiveOperationException {
+        var field = fixture.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(fixture);
     }
 
     @Test
