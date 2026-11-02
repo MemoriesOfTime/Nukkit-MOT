@@ -306,11 +306,11 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             this.applyCriticalHitModifier(source);
         }
 
-        // legacy 额外排除 MAGIC(保护附魔不减免魔法);vanilla 保留以对齐基岩版
+        // Legacy keeps other MAGIC unchanged; instant potions may use Protection.
         if (source.getCause() != DamageCause.VOID
                 && source.getCause() != DamageCause.CUSTOM
                 && source.getCause() != DamageCause.HUNGER
-                && (vanillaArmor || source.getCause() != DamageCause.MAGIC)) {
+                && (vanillaArmor || source.getCause() != DamageCause.MAGIC || source.isInstantPotionDamage())) {
             int armorPoints = 0;
             int epf = 0;
 

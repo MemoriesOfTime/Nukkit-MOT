@@ -29,6 +29,8 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
     private final Map<DamageModifier, Float> modifiers;
     private final Map<DamageModifier, Float> originals;
 
+    private boolean instantPotionDamage;
+
     private boolean breakShield = false;
     private int ShieldBreakCoolDown = 100;
 
@@ -53,6 +55,16 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
 
     public DamageCause getCause() {
         return cause;
+    }
+
+    /** Server-side origin of instant potion damage; armor points still follow MAGIC rules. */
+    public boolean isInstantPotionDamage() {
+        return this.instantPotionDamage;
+    }
+
+    public EntityDamageEvent setInstantPotionDamage() {
+        this.instantPotionDamage = true;
+        return this;
     }
 
     public float getOriginalDamage() {
