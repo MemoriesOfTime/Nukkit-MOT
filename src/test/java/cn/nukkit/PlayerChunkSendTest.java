@@ -170,7 +170,7 @@ class PlayerChunkSendTest {
             Player player = mock(Player.class);
             player.chunkRadius = 12;
             player.nextChunkOrderRun = 20;
-            when(player.getViewDistance()).thenReturn(12);
+            when(player.getMaximumViewDistance()).thenReturn(12);
             RequestChunkRadiusPacket packet = new RequestChunkRadiusPacket();
             packet.radius = 3;
             RequestChunkRadiusProcessor.INSTANCE.handle(new PlayerHandle(player), packet);
@@ -183,7 +183,7 @@ class PlayerChunkSendTest {
             Player player = mock(Player.class);
             player.chunkRadius = 12;
             player.nextChunkOrderRun = 17;
-            when(player.getViewDistance()).thenReturn(12);
+            when(player.getMaximumViewDistance()).thenReturn(12);
             RequestChunkRadiusPacket packet = new RequestChunkRadiusPacket();
             packet.radius = 12;
             RequestChunkRadiusProcessor.INSTANCE.handle(new PlayerHandle(player), packet);
@@ -195,7 +195,7 @@ class PlayerChunkSendTest {
             Player player = mock(Player.class);
             player.chunkRadius = 3;
             player.nextChunkOrderRun = 17;
-            when(player.getViewDistance()).thenReturn(12);
+            when(player.getMaximumViewDistance()).thenReturn(12);
             RequestChunkRadiusPacket packet = new RequestChunkRadiusPacket();
             packet.radius = 8;
             RequestChunkRadiusProcessor.INSTANCE.handle(new PlayerHandle(player), packet);
@@ -208,7 +208,7 @@ class PlayerChunkSendTest {
             Player player = mock(Player.class);
             player.chunkRadius = 3;
             player.nextChunkOrderRun = 17;
-            when(player.getViewDistance()).thenReturn(12);
+            when(player.getMaximumViewDistance()).thenReturn(12);
             RequestChunkRadiusPacket packet = new RequestChunkRadiusPacket();
             packet.radius = 1;
             RequestChunkRadiusProcessor.INSTANCE.handle(new PlayerHandle(player), packet);
