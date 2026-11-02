@@ -18,7 +18,7 @@ public class BlockSeagrass extends BlockFlowable {
     }
     
     public BlockSeagrass(int meta) {
-        super(meta % 3);
+        super(meta);
     }
     
     @Override
@@ -60,7 +60,8 @@ public class BlockSeagrass extends BlockFlowable {
             }
             
             Block down = this.down();
-            damage = this.getDamage();
+            // palette maps a duplicate default state to meta 3; normalize like the old % 3 ctor did
+            damage = this.getDamage() % 3;
             if (damage == 0 || damage == 2) {
                 if (!down.isSolid() || down.getId() == MAGMA || down.getId() == SOUL_SAND) {
                     this.getLevel().useBreakOn(this);
@@ -90,7 +91,7 @@ public class BlockSeagrass extends BlockFlowable {
     
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (getDamage() == 0 && item.getId() == Item.DYE && item.getDamage() == DyeColor.WHITE.getDyeData()) {
+        if (getDamage() % 3 == 0 && item.getId() == Item.DYE && item.getDamage() == DyeColor.WHITE.getDyeData()) {
             Block up = this.up();
             int damage;
             if (up instanceof BlockWater && ((damage = up.getDamage()) == 0 || damage == 8)) {
