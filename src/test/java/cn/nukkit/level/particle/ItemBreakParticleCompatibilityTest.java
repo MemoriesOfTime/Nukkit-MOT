@@ -53,7 +53,8 @@ class ItemBreakParticleCompatibilityTest {
         assertEquals(31, spear.getDamage());
         assertArrayEquals(originalNbt, spear.getCompoundTag());
         if (supported) assertEquals(expected, spear.getNetworkId(version) << 16 | 31);
-        else assertThrows(IllegalArgumentException.class, () -> spear.getNetworkId(version),
+        else assertTrue(cn.nukkit.item.RuntimeItems.getMapping(version)
+                        .getNetworkIdByNamespaceId(spear.getNamespaceId()).isEmpty(),
                 "particle fallback must not install a fake global mapping");
     }
 

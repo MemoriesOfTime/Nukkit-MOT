@@ -316,7 +316,7 @@ public final class NetherNetUdpPorts {
         return new NetherNetUdpPorts(internalPort, internalPort, this.begin - internalPort, this.advertisedAddresses);
     }
 
-    /** 仅拦截非 trickle 应答的唯一出口 sendFullSdp。 Intercepts only the single non-trickle answer exit, sendFullSdp. */
+    /** 仅拦截非 trickle 应答的唯一出口 sendDescription。 Intercepts only the single non-trickle answer exit, sendDescription. */
     private final class PortRewritingSignaling extends NetherNetDelegatingSignaling {
 
         private PortRewritingSignaling(NetherNetServerSignaling delegate) {
@@ -324,8 +324,8 @@ public final class NetherNetUdpPorts {
         }
 
         @Override
-        public void sendFullSdp(String targetNetworkId, String sdp) {
-            this.delegate.sendFullSdp(targetNetworkId, NetherNetUdpPorts.this.rewriteSdp(sdp));
+        public void sendDescription(String targetNetworkId, String sdp) {
+            this.delegate.sendDescription(targetNetworkId, NetherNetUdpPorts.this.rewriteSdp(sdp));
         }
     }
 

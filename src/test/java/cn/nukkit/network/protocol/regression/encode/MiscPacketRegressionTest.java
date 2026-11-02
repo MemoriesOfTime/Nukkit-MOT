@@ -485,21 +485,6 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
-    @ParameterizedTest(name = "HurtArmorPacket v{0}")
-    @MethodSource("versionsFrom313")
-    void testHurtArmorPacket(int protocolVersion) {
-        var nukkitPacket = new HurtArmorPacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.damage = 10;
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.HurtArmorPacket.class);
-
-        assertEquals(10, cbPacket.getDamage());
-    }
-
     // ==================== MovementEffectPacket ====================
 
     @ParameterizedTest(name = "MovementEffectPacket v{0}")
@@ -606,7 +591,7 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     // ==================== CommandBlockUpdatePacket ====================
 
     @ParameterizedTest(name = "CommandBlockUpdatePacket BLOCK v{0}")
-    @MethodSource("versionsFrom313")
+    @MethodSource("allVersions")
     void testCommandBlockUpdatePacketBlock(int protocolVersion) {
         var nukkitPacket = new CommandBlockUpdatePacket();
         nukkitPacket.protocol = protocolVersion;

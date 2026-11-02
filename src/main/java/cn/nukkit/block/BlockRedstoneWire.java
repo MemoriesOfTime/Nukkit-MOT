@@ -25,6 +25,7 @@ public class BlockRedstoneWire extends BlockFlowable {
 
     private static final ThreadLocal<Integer> UPDATE_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final int MAX_UPDATE_DEPTH = 16;
+    private static final BlockFace[] ALL_FACES = BlockFace.values();
 
     public BlockRedstoneWire() {
         this(0);
@@ -78,7 +79,7 @@ public class BlockRedstoneWire extends BlockFlowable {
         if (this.level.getBlock(pos).getId() == Block.REDSTONE_WIRE) {
             this.level.updateAroundRedstone(pos, face);
 
-            for (BlockFace side : BlockFace.values()) {
+            for (BlockFace side : ALL_FACES) {
                 this.level.updateAroundRedstone(pos.getSide(side), side.getOpposite());
             }
         }
@@ -86,6 +87,10 @@ public class BlockRedstoneWire extends BlockFlowable {
 
     private void calculateCurrentChanges(boolean force, boolean stillExists) {
         if (UPDATE_DEPTH.get() >= MAX_UPDATE_DEPTH) {
+            // Keep the stack bound without losing this cell's recomputation.
+            if (stillExists && !this.level.isUpdateScheduled(this, this)) {
+                this.level.scheduleUpdate(this, this, 1);
+            }
             return;
         }
         UPDATE_DEPTH.set(UPDATE_DEPTH.get() + 1);
@@ -139,13 +144,15 @@ public class BlockRedstoneWire extends BlockFlowable {
 
             if (meta != maxStrength) {
                 if (stillExists) {
-                    this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, meta, maxStrength));
+                    if (BlockRedstoneEvent.getHandlers().getRegisteredListeners().length != 0) {
+                        this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, meta, maxStrength));
+                    }
                     this.setDamage(maxStrength);
                     this.level.setBlock(this, this, false, false);
                 }
 
                 this.level.updateAroundRedstone(this, null);
-                for (BlockFace face : BlockFace.values()) {
+                for (BlockFace face : ALL_FACES) {
                     this.level.updateAroundRedstone(pos.getSide(face), face.getOpposite());
                 }
 
@@ -158,7 +165,7 @@ public class BlockRedstoneWire extends BlockFlowable {
                     scheduledDecay = false;
                 }
             } else if (force) {
-                for (BlockFace face : BlockFace.values()) {
+                for (BlockFace face : ALL_FACES) {
                     this.level.updateAroundRedstone(pos.getSide(face), face.getOpposite());
                 }
             }
@@ -227,11 +234,13 @@ public class BlockRedstoneWire extends BlockFlowable {
             return Level.BLOCK_UPDATE_NORMAL;
         }
 
-        // Redstone event
-        RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
-        getLevel().getServer().getPluginManager().callEvent(ev);
-        if (ev.isCancelled()) {
-            return 0;
+        // This event has its own handler list, separate from BlockUpdateEvent.
+        if (RedstoneUpdateEvent.getHandlers().getRegisteredListeners().length != 0) {
+            RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
+            getLevel().getServer().getPluginManager().callEvent(ev);
+            if (ev.isCancelled()) {
+                return 0;
+            }
         }
 
         this.calculateCurrentChanges(false, true);
@@ -292,8 +301,8 @@ public class BlockRedstoneWire extends BlockFlowable {
         Vector3 v = pos.getSide(side);
         Block block = this.level.getBlock(v);
         boolean flag = block.isNormalBlock();
-        boolean flag1 = this.level.getBlock(pos.up()).isNormalBlock();
-        return !flag1 && flag && canConnectUpwardsTo(this.level, v.up()) || (canConnectTo(block, side) || !flag && canConnectUpwardsTo(this.level, block.down()));
+        boolean flag1 = flag && this.level.getBlock(pos.up()).isNormalBlock();
+        return !flag1 && flag && canConnectUpwardsTo(this.level, v.up()) || (canConnectTo(block, side) || !flag && canConnectUpwardsTo(block.down()));
     }
 
     protected static boolean canConnectUpwardsTo(Level level, Vector3 pos) {
@@ -324,7 +333,7 @@ public class BlockRedstoneWire extends BlockFlowable {
         int power = 0;
         Vector3 pos = getLocation();
 
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : ALL_FACES) {
             int blockPower = this.getIndirectPower(pos.getSide(face), face);
 
             if (blockPower >= 15) {
@@ -346,7 +355,7 @@ public class BlockRedstoneWire extends BlockFlowable {
         }
         if (block.isNormalBlock()) {
             int power = 0;
-            for (BlockFace side : BlockFace.values()) {
+            for (BlockFace side : ALL_FACES) {
                 power = Math.max(power, getStrongPower(pos.getSide(side), side));
                 if (power >= 15) {
                     return power;

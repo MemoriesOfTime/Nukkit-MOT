@@ -58,13 +58,7 @@ public class SetPlayerInventoryOptionsPacket extends DataPacket {
         this.putBoolean(this.filtering);
         this.putVarInt(this.layout.ordinal());
         this.putVarInt(this.craftingLayout.ordinal());
-        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_124) {
-            // v860 起（3.9 提取）网易必带匿名尾部 varint；按 8 字节批量读 varint，缺失触发
-            // read-overflow 断言断连——永不省略，无捕获值时写中性 0
-            //
-            // since v860 (per the 3.9 extraction) NetEase always carries the anonymous trailing
-            // varint; bulk varint reads trip a read-overflow assert when missing — never omit,
-            // neutral 0 when no captured value exists
+        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_21_124 && this.protocol < ProtocolInfo.v1_21_130) {
             this.putUnsignedVarInt(this.trailingVarint != null ? this.trailingVarint : 0);
         }
     }

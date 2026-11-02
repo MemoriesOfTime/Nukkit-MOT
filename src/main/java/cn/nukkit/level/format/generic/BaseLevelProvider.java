@@ -11,7 +11,7 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.ChunkException;
 import cn.nukkit.utils.LevelException;
-import com.google.common.collect.ImmutableMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.*;
 import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
@@ -136,7 +137,25 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        return ImmutableMap.copyOf(chunks);
+        Long2ObjectOpenHashMap<BaseFullChunk> snapshot = new Long2ObjectOpenHashMap<>(this.chunks);
+        if (snapshot.containsValue(null)) {
+            throw new NullPointerException("Loaded chunk snapshot contains a null chunk");
+        }
+        return Collections.unmodifiableMap(snapshot);
+    }
+
+    @Override
+    public long[] getLoadedChunkHashes() {
+        LongArrayList hashes = new LongArrayList(this.chunks.size());
+        for (Long hash : this.chunks.keySet()) {
+            hashes.add(hash.longValue());
+        }
+        return hashes.toLongArray();
+    }
+
+    @Override
+    public int getLoadedChunkCount() {
+        return this.chunks.size();
     }
 
     @Override
@@ -329,6 +348,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
             if (chunk.getChanges() != 0) {
                 this.saveChunk(chunk.getX(), chunk.getZ());
                 chunk.setChanged(false);
+                Server.getInstance().touchShutdownProgress();
             }
         }
     }
