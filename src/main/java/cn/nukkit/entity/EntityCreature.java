@@ -13,7 +13,11 @@ import cn.nukkit.nbt.tag.CompoundTag;
 public abstract class EntityCreature extends EntityLiving {
 
     public EntityCreature(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
+        this(chunk, nbt, false);
+    }
+
+    protected EntityCreature(FullChunk chunk, CompoundTag nbt, boolean prepared) {
+        super(chunk, nbt, prepared);
     }
 
     @Override

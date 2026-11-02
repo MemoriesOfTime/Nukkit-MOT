@@ -14,7 +14,6 @@ import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.math.SimpleAxisAlignedBB;
-import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.PluginManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -69,17 +68,23 @@ class PlayerPickupTraversalTest {
     }
 
     @Test
-    void pickupDelayAndDurableCombatLockStillPreventConsumption() throws Exception {
+    void pickupDelayAndDeferredPublicationStillPreventConsumption() throws Exception {
         Fixture f = new Fixture();
         EntityItem delayed = f.add(EntityItem.class, 1);
         when(delayed.getPickupDelay()).thenReturn(10);
-        EntityItem locked = f.add(EntityItem.class, 2);
-        locked.namedTag = new CompoundTag().putByte("km_combat_drop_locked", 1);
+        EntityItem deferred = f.add(EntityItem.class, 2);
+        when(deferred.isPublicationDeferred()).thenCallRealMethod();
+        Field publicationDeferred = Entity.class.getDeclaredField("publicationDeferred");
+        publicationDeferred.setAccessible(true);
+        publicationDeferred.setBoolean(deferred, true);
         f.player.checkNearEntities();
         verify(delayed, never()).close();
-        verify(locked, never()).close();
+        verify(deferred, never()).close();
+        verify(delayed, never()).getItem();
+        verify(deferred, never()).getItem();
         verify(f.plugins, never()).callEvent(any(InventoryPickupItemEvent.class));
-        verifyNoInteractions(f.inventory);
+        verify(f.inventory).getHolder();
+        verifyNoMoreInteractions(f.inventory);
     }
 
     @Test
@@ -134,11 +139,16 @@ class PlayerPickupTraversalTest {
             doReturn(true).when(player).isOnline();
             doReturn(false).when(player).isSpectator();
             when(level.getChunkIfLoaded(0, 0)).thenReturn(chunk);
+            when(inventory.getHolder()).thenReturn(player);
         }
         <T extends Entity> T add(Class<T> kind, long id) {
             T entity = mock(kind);
             when(entity.getId()).thenReturn(id);
             when(entity.isAlive()).thenReturn(true);
+            entity.level = level;
+            entity.chunk = chunk;
+            when(entity.getLevel()).thenReturn(level);
+            when(level.getEntity(id)).thenReturn(entity);
             entity.boundingBox = player.boundingBox;
             when(entity.getBoundingBox()).thenReturn(entity.boundingBox);
             chunk.addEntity(entity);

@@ -39,7 +39,11 @@ import java.util.*;
 public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     public EntityLiving(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
+        this(chunk, nbt, false);
+    }
+
+    protected EntityLiving(FullChunk chunk, CompoundTag nbt, boolean prepared) {
+        super(chunk, nbt, prepared);
         // Players defer initEntity until login; mobs have already loaded their effects in super.
         this.initializeMovementState();
     }

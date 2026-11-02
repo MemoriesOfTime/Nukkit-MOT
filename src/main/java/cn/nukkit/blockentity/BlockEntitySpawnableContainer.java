@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.inventory.ContainerInventory;
+import cn.nukkit.inventory.NativeContainerBreak;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -16,6 +17,13 @@ import java.util.HashSet;
 
 public abstract class BlockEntitySpawnableContainer extends BlockEntitySpawnable implements InventoryHolder, BlockEntityContainer {
     protected ContainerInventory inventory;
+    private NativeContainerBreak containerBreak;
+
+    private NativeContainerBreak containerBreak() {
+        if (containerBreak == null) containerBreak = new NativeContainerBreak(() -> inventory, this::onBreak, this::close);
+        return containerBreak;
+    }
+
 
     public BlockEntitySpawnableContainer(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -38,6 +46,7 @@ public abstract class BlockEntitySpawnableContainer extends BlockEntitySpawnable
 
     @Override
     public void close() {
+        if (containerBreak().deferLifecycle(false)) return;
         if (!closed) {
             for (Player player : new HashSet<>(this.getInventory().getViewers())) {
                 player.removeWindow(this.getInventory());
@@ -46,12 +55,13 @@ public abstract class BlockEntitySpawnableContainer extends BlockEntitySpawnable
         }
     }
 
+    protected final boolean deferContainerLifecycle(boolean breaking) {
+        return containerBreak().deferLifecycle(breaking);
+    }
+
     @Override
     public void onBreak() {
-        for (Item content : inventory.getContents().values()) {
-            level.dropItem(this, content);
-        }
-        inventory.clearAll(); // Stop items from being moved around by another player in the inventory
+        containerBreak().breakContents(this, () -> {});
     }
 
     @Override

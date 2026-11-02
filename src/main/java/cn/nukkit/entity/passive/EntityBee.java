@@ -23,8 +23,85 @@ public class EntityBee extends EntityFlyingMob implements EntityArthropod { // A
 
     private boolean angry;
 
+    private CompoundTag preparedExplosionTag;
+    private float preparedExplosionMaxHealth;
+
     public EntityBee(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
+        this(chunk, nbt, false);
+    }
+
+    private EntityBee(FullChunk chunk, CompoundTag nbt, boolean prepared) {
+        super(chunk, nbt, prepared);
+    }
+
+    /** All actors remain sealed until the exact occupants have been debited from their hive. */
+    public static PreparedBee prepareExplosionBee(String identifier, FullChunk chunk, CompoundTag nbt) {
+        if (!resolvesToImplementation(identifier, EntityBee.class) || chunk == null
+                || chunk.getProvider() == null || chunk.getProvider().getLevel() == null) return null;
+        EntityBee actor = new EntityBee(chunk, nbt.copy(), true);
+        PreparedBee ticket = new PreparedBee(actor, chunk);
+        if (!ticket.isValid()) { ticket.close(); return null; }
+        return ticket;
+    }
+
+    public static final class PreparedBee implements AutoCloseable {
+        private final EntityBee actor;
+        private final FullChunk chunk;
+        private final CompoundTag authored;
+        private final float maxHealth;
+        private boolean released, discarded;
+
+        private PreparedBee(EntityBee actor, FullChunk chunk) {
+            this.actor = actor; this.chunk = chunk;
+            this.authored = actor.preparedExplosionTag;
+            this.maxHealth = actor.preparedExplosionMaxHealth;
+        }
+
+        public boolean isValid() {
+            if (released || discarded || authored == null || !actor.isDeferredPublicationIntact()
+                    || !actor.isAlive() || actor.chunk != chunk || actor.level != chunk.getProvider().getLevel()
+                    || actor.level.getChunkIfLoaded(chunk.getX(), chunk.getZ()) != chunk
+                    || chunk.getEntities().get(actor.getId()) != actor || actor.level.getEntity(actor.getId()) != actor
+                    || !actor.saveWithChunk
+                    || actor.getMaxHealth() != maxHealth || actor.getHealth() != maxHealth
+                    || !authored.equals(actor.namedTag)) return false;
+            var pos = authored.getList("Pos", cn.nukkit.nbt.tag.DoubleTag.class);
+            var motion = authored.getList("Motion", cn.nukkit.nbt.tag.DoubleTag.class);
+            var rotation = authored.getList("Rotation", cn.nukkit.nbt.tag.FloatTag.class);
+            return pos.size() == 3 && motion.size() == 3 && rotation.size() == 2
+                    && actor.x == pos.get(0).data && actor.y == pos.get(1).data && actor.z == pos.get(2).data
+                    && actor.motionX == motion.get(0).data && actor.motionY == motion.get(1).data && actor.motionZ == motion.get(2).data
+                    && actor.yaw == rotation.get(0).data && actor.pitch == rotation.get(1).data;
+        }
+
+        /** Assignment only: every sibling is validated and debited before the first release. */
+        public void release() {
+            if (!released && !discarded) { actor.releaseDeferredPublication(); released = true; }
+        }
+
+        public void notifyPublished(boolean angry) {
+            if (released && !discarded) {
+                actor.setAngry(angry); actor.scheduleUpdate(); actor.spawnToAll();
+            }
+        }
+
+        @Override public void close() {
+            if (!released && !discarded) { discarded = true; actor.discardDeferredPublication(); }
+        }
+    }
+
+    /** Unfunded occupants cannot emit a Living death event, loot or experience. */
+    @Override public void kill() {
+        if (isPublicationDeferred()) {
+            this.health=0;
+            discardDeferredPublication();
+            return;
+        }
+        super.kill();
+    }
+
+    @Override public boolean onUpdate(int tick) {
+        return isPublicationDeferred() || super.onUpdate(tick);
     }
 
     @Override
@@ -59,6 +136,10 @@ public class EntityBee extends EntityFlyingMob implements EntityArthropod { // A
 
         super.initEntity();
         this.setDamage(new int[]{0, 2, 2, 3});
+        if (isPublicationDeferred()) {
+            this.preparedExplosionTag = this.namedTag.copy();
+            this.preparedExplosionMaxHealth = this.getMaxHealth();
+        }
     }
 
     @Override

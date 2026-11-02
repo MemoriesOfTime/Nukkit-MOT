@@ -3,11 +3,11 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
-import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.entity.projectile.EntityBlueWitherSkull;
 import cn.nukkit.entity.projectile.EntityWitherSkull;
+import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
@@ -31,7 +31,11 @@ import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.Set;
 import java.util.UUID;
 
@@ -242,37 +246,49 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
         if (this.wasExplosion) {
             this.wasExplosion = false;
-        } else if (r && ev instanceof EntityDamageByEntityEvent && ((EntityDamageByEntityEvent) ev).getDamager() instanceof Player && !this.closed && this.isAlive() && Utils.rand() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
+        } else if (r && !ev.isCancelled() && ev instanceof EntityDamageByEntityEvent && ((EntityDamageByEntityEvent) ev).getDamager() instanceof Player && !this.closed && this.isAlive() && Utils.rand() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
             this.wasExplosion = true;
-            this.level.addSound(this, Sound.MOB_WITHER_BREAK_BLOCK);
-            int fx = this.getFloorX();
-            int fy = this.getFloorY();
-            int fz = this.getFloorZ();
-            Vector3 pos = new Vector3(0, 0, 0);
-            Item tool = Item.get(Item.DIAMOND_PICKAXE);
-            for (int x = fx - 2; x <= fx + 2; x++) {
-                for (int y = fy; y <= fy + 4; y++) {
-                    for (int z = fz - 2; z <= fz + 2; z++) {
-                        Block block = this.level.getBlock(x, y, z);
-                        if (block.isBreakable(tool)) {
-                            pos.setComponents(x, y, z);
-                            this.level.setBlock(pos, Block.get(Block.AIR));
-                            BlockEntity blockEntity = this.level.getBlockEntityIfLoaded(pos);
-                            if (blockEntity != null) {
-                                blockEntity.onBreak();
-                                blockEntity.close();
-                            }
-                            if (this.level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS) && Math.random() * 100 < 14) {
-                                for (Item drop : block.getDrops(tool)) {
-                                    this.level.dropItem(block, drop);
-                                }
-                            }
-                        }
-                    }
+            this.breakBlocksOnDamage();
+        }
+        return r;
+    }
+
+    private void breakBlocksOnDamage() {
+        if (!this.server.explosionBreakBlocks) return;
+        EntityExplosionPrimeEvent prime = new EntityExplosionPrimeEvent(this, 1);
+        this.server.getPluginManager().callEvent(prime);
+        if (prime.isCancelled() || !prime.isBlockBreaking()) return;
+
+        Item tool = Item.get(Item.DIAMOND_PICKAXE);
+        List<Block> selected = new ArrayList<>();
+        for (int x = getFloorX() - 2; x <= getFloorX() + 2; x++) {
+            for (int y = getFloorY(); y <= getFloorY() + 4; y++) {
+                for (int z = getFloorZ() - 2; z <= getFloorZ() + 2; z++) {
+                    Block block = this.level.getBlock(x, y, z);
+                    if (!block.isAir() && block.isBreakable(tool)) selected.add(block);
                 }
             }
         }
-        return r;
+        EntityExplodeEvent blast = new EntityExplodeEvent(this, this, new ArrayList<>(selected), 14);
+        blast.setIgnitions(new LinkedHashSet<>());
+        this.server.getPluginManager().callEvent(blast);
+        if (blast.isCancelled() || blast.getBlockList() == null) return;
+        this.level.addSound(this, Sound.MOB_WITHER_BREAK_BLOCK);
+        new WitherBlockBurst(this).remove(blast, selected, tool);
+    }
+
+    /** Use accepted source receipts without adding rays, damage or a second physical explosion. */
+    private static final class WitherBlockBurst extends Explosion {
+        WitherBlockBurst(EntityWither wither) { super(wither, 1, wither); }
+
+        void remove(EntityExplodeEvent event, List<Block> selected, Item tool) {
+            beginBlockProcessing(event.getBlockProcessing(), event.getBlockList(), selected);
+            boolean drops = event.getPosition().getLevel().getGameRules().getBoolean(GameRule.DO_TILE_DROPS);
+            double yield = drops ? event.getYield() : 0;
+            for (Block block : event.getBlockList()) {
+                acceptExplosionBlock(block, tool, yield, ThreadLocalRandom.current(), drops, false);
+            }
+        }
     }
 
     private void updateBossBars() {
