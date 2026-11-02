@@ -195,6 +195,9 @@ public class Server {
 
     private int autoSaveTicker;
     private int autoSaveTicks;
+    /** Guard pathological scheduled-update buckets; ordinary deadlines are unchanged below the cap. */
+    public boolean scheduledBlockUpdateBudget = true;
+    public int scheduledBlockUpdatesPerTick = 10000;
 
     private final BaseLang baseLang;
     private boolean forceLanguage;
@@ -550,6 +553,8 @@ public class Server {
      * 异步区块发送、加载与保存(实验性)
      */
     public volatile boolean asyncChunkSending;
+    /** Publish typed chunk load results only after fresh, successful main-thread mounting. */
+    public boolean asyncChunkLoadCompletion = true;
     /**
      * 每世界挂起区块写上限,超限暂停卸载(背压)
      * <p>
@@ -4170,6 +4175,8 @@ public class Server {
         // Performance
         this.networkCompressionLevel = Math.max(Math.min(config.networkSettings().compressionLevel(), 9), 0);
         this.chunkCompressionLevel = Math.max(Math.min(config.networkSettings().chunkCompressionLevel(), 9), 1);
+        this.scheduledBlockUpdateBudget = config.performanceSettings().scheduledBlockUpdateBudget();
+        this.scheduledBlockUpdatesPerTick = Math.max(1, config.performanceSettings().scheduledBlockUpdatesPerTick());
         this.autoTickRate = config.performanceSettings().autoTickRate();
         this.autoTickRateLimit = config.performanceSettings().autoTickRateLimit();
         this.alwaysTickPlayers = config.performanceSettings().alwaysTickPlayers();
@@ -4206,6 +4213,7 @@ public class Server {
         this.lightUpdates = config.chunkSettings().lightUpdates();
         this.cacheChunks = config.chunkSettings().cacheChunks();
         this.asyncChunkSending = config.chunkSettings().asyncChunks();
+        this.asyncChunkLoadCompletion = config.chunkSettings().asyncChunkLoadCompletion();
         this.maxPendingChunkWrites = Math.max(1, config.chunkSettings().maxPendingChunkWrites());
 
         // Entity
