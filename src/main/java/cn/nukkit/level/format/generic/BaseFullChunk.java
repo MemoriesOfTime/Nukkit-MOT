@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 
 /**
  * @author MagicDroidX
@@ -127,6 +128,10 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected AtomicLong changes = new AtomicLong();
 
+    private static final AtomicLongFieldUpdater<BaseFullChunk> NETWORK_REVISION =
+            AtomicLongFieldUpdater.newUpdater(BaseFullChunk.class, "networkRevision");
+    private volatile long networkRevision;
+
     protected boolean isInit;
 
     protected boolean lightPopulated;
@@ -148,7 +153,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
      */
     protected boolean legacyConnectionsFixed;
 
-    protected Map<GameVersion, BatchPacket> chunkPackets;
+    protected volatile Map<GameVersion, BatchPacket> chunkPackets;
 
     @Override
     public BaseFullChunk clone() {
@@ -219,11 +224,19 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public void setChunkPacket(GameVersion protocol, BatchPacket packet) {
         if (packet != null) {
             packet.trim();
-            if (this.chunkPackets == null) {
-                this.chunkPackets = new Object2ObjectOpenHashMap<>();
+            Map<GameVersion, BatchPacket> packets = this.chunkPackets;
+            if (packets == null) {
+                packets = new Object2ObjectOpenHashMap<>();
+                this.chunkPackets = packets;
             }
-            this.chunkPackets.put(protocol, packet);
+            packets.put(protocol, packet);
         }
+    }
+
+    /** Remove only the packet published by a now-stale network snapshot. */
+    public void invalidateChunkPacket(GameVersion protocol, BatchPacket packet) {
+        Map<GameVersion, BatchPacket> packets = this.chunkPackets;
+        if (packets != null) packets.remove(protocol, packet);
     }
 
     @Deprecated
@@ -232,10 +245,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     public BatchPacket getChunkPacket(GameVersion protocol) {
-        if (this.chunkPackets == null) {
+        Map<GameVersion, BatchPacket> packets = this.chunkPackets;
+        if (packets == null) {
             return null;
         }
-        BatchPacket pk = this.chunkPackets.get(protocol);
+        BatchPacket pk = packets.get(protocol);
         if (pk != null) {
             pk.trim();
         }
@@ -482,8 +496,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void setBiomeId(int x, int z, byte biomeId) {
-        this.setChanged();
         this.biomes[(x << 4) | z] = biomeId;
+        this.setChanged();
     }
 
     @Override
@@ -1033,10 +1047,21 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return this.changes.get() != 0;
     }
 
+    /** Unlike the save counter, this revision never resets when a chunk is saved. */
+    public long getNetworkRevision() {
+        return this.networkRevision;
+    }
+
+    /** Retire network snapshots after a write without changing the save-counter contract. */
+    protected final void invalidateNetworkSnapshot() {
+        NETWORK_REVISION.incrementAndGet(this);
+        this.chunkPackets = null;
+    }
+
     @Override
     public void setChanged() {
         this.changes.incrementAndGet();
-        chunkPackets = null;
+        this.invalidateNetworkSnapshot();
     }
 
     @Override

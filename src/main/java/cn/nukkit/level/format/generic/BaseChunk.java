@@ -121,6 +121,8 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             }
             return this.getSection(Y).getAndSetBlock(x, y & 0x0f, z, layer, block);
         } finally {
+            // The writer may have waited for a section lock after its earlier dirty mark.
+            this.invalidateNetworkSnapshot();
             removeInvalidTile(x, y, z);
         }
     }
@@ -143,6 +145,8 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             }
             return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
         } finally {
+            // The writer may have waited for a section lock after its earlier dirty mark.
+            this.invalidateNetworkSnapshot();
             removeInvalidTile(x, y, z);
         }
     }
@@ -165,6 +169,8 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             }
             return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
         } finally {
+            // The writer may have waited for a section lock after its earlier dirty mark.
+            this.invalidateNetworkSnapshot();
             removeInvalidTile(x, y, z);
         }
     }
@@ -187,6 +193,8 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             }
             this.getSection(Y).setBlockId(x, y & 0x0f, z, layer, id);
         } finally {
+            // The writer may have waited for a section lock after its earlier dirty mark.
+            this.invalidateNetworkSnapshot();
             removeInvalidTile(x, y, z);
         }
     }
@@ -229,6 +237,8 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
             }
             this.getSection(Y).setBlockData(x, y & 0x0f, z, layer, data);
         } finally {
+            // The writer may have waited for a section lock after its earlier dirty mark.
+            this.invalidateNetworkSnapshot();
             removeInvalidTile(x, y, z);
         }
     }

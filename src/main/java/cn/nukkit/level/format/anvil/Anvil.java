@@ -7,6 +7,7 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.BaseRegionLoader;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.generic.serializer.ChunkRequestSnapshot;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -122,13 +123,16 @@ public class Anvil extends BaseLevelProvider {
         }
 
         long timestamp = chunk.getChanges();
+        ChunkRequestSnapshot snapshot = this.level.getClass() == Level.class ? new ChunkRequestSnapshot(chunk) : null;
 
         // 池可能为 null（配置关，或世界早于热重载打开开关而创建）：回退同步序列化，与 SubChunkRequestProcessor 一致
         // The executor can be null (config off, or the world predates a hot reload turning it on):
         // serialize synchronously, same fallback as SubChunkRequestProcessor
-        ExecutorService executor = this.getServer().asyncChunkSending ? this.level.getAsyncChuckExecutor() : null;
+        ExecutorService executor = this.getServer().asyncChunkSending
+                && (snapshot == null || !this.level.shouldSerializeChunkSynchronously(protocols, x, z))
+                ? this.level.getAsyncChuckExecutor() : null;
         if (executor == null) {
-            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z, sequence);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z, sequence, snapshot);
             return;
         }
 
@@ -146,7 +150,7 @@ public class Anvil extends BaseLevelProvider {
                                 networkChunkSerializerCallback.getSubChunkBlobs(),
                                 networkChunkSerializerCallback.getBiomes(),
                                 networkChunkSerializerCallback.getBlockEntities(),
-                                sequence
+                                sequence, snapshot
                         );
                     }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
@@ -158,7 +162,7 @@ public class Anvil extends BaseLevelProvider {
             });
         } catch (RejectedExecutionException e) {
             // 关服中池已停：同步兜底，不让请求丢失 / pool already down during shutdown: sync fallback
-            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z, sequence);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, x, z, sequence, snapshot);
         }
     }
 
@@ -167,7 +171,7 @@ public class Anvil extends BaseLevelProvider {
      * <p>
      * Main-thread serialization (async-chunks off / world predates the setting / executor shut down)
      */
-    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, Chunk chunk, long timestamp, int x, int z, long sequence) {
+    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, Chunk chunk, long timestamp, int x, int z, long sequence, ChunkRequestSnapshot snapshot) {
         try {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
                 this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
@@ -179,7 +183,7 @@ public class Anvil extends BaseLevelProvider {
                         networkChunkSerializerCallback.getSubChunkBlobs(),
                         networkChunkSerializerCallback.getBiomes(),
                         networkChunkSerializerCallback.getBlockEntities(),
-                        sequence
+                        sequence, snapshot
                 );
             }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
         } catch (Throwable t) {
