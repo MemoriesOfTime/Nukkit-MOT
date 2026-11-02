@@ -187,6 +187,9 @@ public class ListTag<T extends Tag> extends Tag {
     public Tag copy() {
         ListTag<T> res = new ListTag<>(getName());
         res.type = type;
+        if (list != null && list.getClass() == ArrayList.class) {
+            ((ArrayList<T>) res.list).ensureCapacity(list.size());
+        }
         for (T t : list) {
             @SuppressWarnings("unchecked")
             T copy = (T) t.copy();
