@@ -287,6 +287,11 @@ public class PlayerSubChunkRequestState {
                 && this.responseBytesThisTick >= MAX_RESPONSE_TICK_BYTES;
     }
 
+    /** Whether response work has already reserved any bytes in this tick. */
+    public boolean hasResponseBytes(int tick) {
+        return this.responseBytesTick == tick && this.responseBytesThisTick > 0;
+    }
+
     /**
      * 当前 tick 剩余响应字节预算（子区块应答与 miss 补发共用同一账本，跨 tick 自动重置）。
      * <p>
@@ -379,6 +384,15 @@ public class PlayerSubChunkRequestState {
         this.columnWaitingSince.remove(index);
         this.columnOutstanding.remove(index);
         this.columnDelivered.remove(index);
+    }
+
+    /** An accepted pull shell remains serviceable even after pull mode is disabled. */
+    public boolean hasPullChunk(long index) {
+        return this.columnWaitingSince.containsKey(index);
+    }
+
+    public boolean hasPullChunks() {
+        return !this.columnWaitingSince.isEmpty();
     }
 
     public void addOutstandingOffsets(long index, int count) {

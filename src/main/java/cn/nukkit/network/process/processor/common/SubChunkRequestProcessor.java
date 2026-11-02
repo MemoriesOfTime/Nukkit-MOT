@@ -101,10 +101,10 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull SubChunkRequestPacket pk) {
         Player player = playerHandle.player;
-        if (!player.isSubChunkPullMode()) {
+        PlayerSubChunkRequestState state = playerHandle.getSubChunkRequestState();
+        if (!player.isSubChunkPullMode() && (state == null || !state.hasPullChunks())) {
             return;
         }
-        PlayerSubChunkRequestState state = playerHandle.getSubChunkRequestState();
         // 构造器可被 mock 框架绕过，状态对象未必已初始化 / constructors can be bypassed
         // (mocks), the state object may be uninitialized
         if (state == null) {
@@ -137,16 +137,22 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         if (state == null) {
             return;
         }
+        Player player = playerHandle.player;
+        Level sourceLevel = player.getLevel();
+        int sourceEpoch = state.epoch();
         sendCompletions(playerHandle, state);
+        if (state.epoch() != sourceEpoch || player.getLevel() != sourceLevel) {
+            return;
+        }
         if (!state.hasDeferred()) {
             return;
         }
-        Player player = playerHandle.player;
         int tick = player.getServer().getTick();
         state.drain(
                 (pk, budget) -> submitSubChunkRequest(playerHandle, pk, budget),
                 state.remainingInFlightOffsets(),
-                () -> !state.responseBytesExceeded(tick)
+                () -> state.epoch() == sourceEpoch && player.getLevel() == sourceLevel
+                        && !state.responseBytesExceeded(tick)
                         && state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) > 0,
                 // serve the request nearest the player first
                 pk -> {
@@ -286,7 +292,7 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 dispatchAnswer(playerHandle, state, buildAnswerSafely(task));
             }
         }
-        if (granted < offsets.size()) {
+        if (state.epoch() == requestEpoch && player.getLevel() == level && granted < offsets.size()) {
             requeueSubChunkRequestResidual(state, pk, offsets, granted);
         }
         return granted;
@@ -327,7 +333,8 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             long chunkHash = Level.chunkHash(chunkX, chunkZ);
             boolean inView = player.usedChunks instanceof Long2ObjectMap<?> chunks
                     ? chunks.containsKey(chunkHash) : player.usedChunks.containsKey(chunkHash);
-            BaseFullChunk chunk = inView
+            boolean issued = player.isSubChunkPullMode() || state.hasPullChunk(chunkHash);
+            BaseFullChunk chunk = inView && issued
                     ? level.getChunkIfLoaded(chunkX, chunkZ) : null;
             if (!(chunk instanceof BaseChunk baseChunk)) {
                 data[i] = SubChunkOffsetData.cheap(offset, subIndex, SubChunkRequestResult.CHUNK_NOT_FOUND);
@@ -469,8 +476,11 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
      */
     private static void sendCompletions(PlayerHandle playerHandle, PlayerSubChunkRequestState state) {
         Player player = playerHandle.player;
+        Level sourceLevel = player.getLevel();
+        int sourceEpoch = state.epoch();
         int tick = player.getServer().getTick();
-        while (!state.responseBytesExceeded(tick)
+        while (state.epoch() == sourceEpoch && player.getLevel() == sourceLevel
+                && !state.responseBytesExceeded(tick)
                 && state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) > 0) {
             PlayerSubChunkRequestState.CompletedSubChunkAnswer answer = state.pollCompletion();
             if (answer == null) {
@@ -479,7 +489,9 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             if (answer.epoch != state.epoch()) {
                 continue;
             }
-            dispatchAnswer(playerHandle, state, answer);
+            if (!dispatchAnswer(playerHandle, state, answer)) {
+                return;
+            }
         }
     }
 
@@ -487,19 +499,25 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
      * 派发一个完成应答：cache 模式先做 blob 跟踪（成功→条目改 blob 形态；pending 打满→
      * 降级 raw，翻包是粘性的），随后按原字节预算/包级缓存一致性拆包发送。条目预算只对
      * 昂贵条目生效；预算中途耗尽的剩余条目构造残余应答推回队头，已发送部分归还 in-flight
-     * 额度。全廉价应答在预算 0 时也整包发送（与原同步路径一致——廉价条目不占预算）。
+     * 额度。廉价条目不占条目预算，但仍受共享字节预算约束。
      * <p>
      * Dispatches one completion: cache mode tracks blobs first (success rewrites the
      * entry into blob form; a full pending cap degrades to raw, and the flip is sticky),
      * then sends under the original byte budget and packet-level cache consistency. The
      * entry budget applies to expensive entries only; entries left over when it runs out
      * form a residual answer pushed back to the head, and the sent portion releases its
-     * in-flight credit. An all-cheap answer still sends in full at budget 0 (matching the
-     * old synchronous path — cheap entries cost no budget).
+     * in-flight credit. Cheap entries consume no entry budget, but their wire bytes
+     * remain subject to the shared per-tick response byte budget.
+     *
+     * @return whether the answer was fully consumed; false stops draining when a residual cannot fit
      */
-    private static void dispatchAnswer(PlayerHandle playerHandle, PlayerSubChunkRequestState state,
+    private static boolean dispatchAnswer(PlayerHandle playerHandle, PlayerSubChunkRequestState state,
                                        PlayerSubChunkRequestState.CompletedSubChunkAnswer answer) {
         Player player = playerHandle.player;
+        Level sourceLevel = player.getLevel();
+        if (answer.epoch != state.epoch()) {
+            return true;
+        }
         int tick = player.getServer().getTick();
         int stopAt = state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player));
         List<SubChunkPacket.SubChunkData> entries = answer.entries;
@@ -508,11 +526,19 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         int sent = 0;
         int spent = 0;
         for (; sent < entries.size(); sent++) {
+            if (state.epoch() != answer.epoch || player.getLevel() != sourceLevel) {
+                return false;
+            }
             SubChunkPacket.SubChunkData entry = entries.get(sent);
-            if (entry.result == SubChunkRequestResult.SUCCESS && (spent >= stopAt || state.responseBytesExceeded(tick))) {
+            if (state.responseBytesExceeded(tick)
+                    || (entry.result == SubChunkRequestResult.SUCCESS
+                    && (spent >= stopAt || state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) == 0))) {
                 break;
             }
             boolean trackBlob = buffer.isCacheMode();
+            byte[] originalData = entry.data;
+            long originalBlobId = entry.blobId;
+            boolean originalHasBlobId = entry.hasBlobId;
             if (trackBlob && entry.result == SubChunkRequestResult.SUCCESS && answer.blobHashes[sent] != 0) {
                 if (player.tryTrackClientCacheBlob(answer.blobHashes[sent], answer.blobSections[sent])) {
                     entry.blobId = answer.blobHashes[sent];
@@ -524,23 +550,44 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 // else: pending 超限降级 raw —— data 已是 section+entities 拼接形态 / pending
                 // over cap degrades to raw — data already holds the section+entities assembly
             }
+            int entryBytes = subChunkEntryWireBytes(entry);
+            if (entryBytes > state.remainingResponseBytes(tick) && state.hasResponseBytes(tick)) {
+                // A later tick may need raw fallback if this attempted cache pin expires.
+                entry.data = originalData;
+                entry.blobId = originalBlobId;
+                entry.hasBlobId = originalHasBlobId;
+                break;
+            }
+            // Both ledgers must be reserved before either add() or degradeToRaw() can flush.
+            state.accountResponseBytes(tick, entryBytes);
             if (entry.result == SubChunkRequestResult.SUCCESS) {
                 spent++;
+                // Reserve before a cache-to-raw flush can invoke packet listeners.
+                state.accountSpentEntries(tick, 1);
                 if (trackBlob && !entry.hasBlobId) {
                     buffer.degradeToRaw();
+                    if (state.epoch() != answer.epoch || player.getLevel() != sourceLevel) {
+                        return false;
+                    }
                 }
             }
-            state.accountResponseBytes(tick, buffer.add(entry));
+            buffer.add(entry);
+            if (state.epoch() != answer.epoch || player.getLevel() != sourceLevel) {
+                return false;
+            }
             // only shipped entries count as delivered
             state.completeOutstandingOffsets(columnHashOf(answer.request, entry.offset), 1);
         }
         buffer.flush();
-        state.accountSpentEntries(tick, spent);
+        if (state.epoch() != answer.epoch || player.getLevel() != sourceLevel) {
+            return false;
+        }
         state.releaseInFlightOffsets(sent == entries.size() ? answer.offsets : sent);
 
         if (sent < entries.size()) {
             state.pushCompletionFront(residual(answer, sent));
         }
+        return sent == entries.size();
     }
 
     /**
