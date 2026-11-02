@@ -465,6 +465,14 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected final Map<Integer, Effect> effects = new ConcurrentHashMap<>();
 
+    private static final ThreadLocal<EffectTickSnapshot> EFFECT_TICK_SNAPSHOT =
+            ThreadLocal.withInitial(EffectTickSnapshot::new);
+
+    private static final class EffectTickSnapshot {
+        private final Effect[] effects = new Effect[16];
+        private boolean inUse;
+    }
+
     protected UUID entityUniqueId;
 
     protected long id;
@@ -2187,14 +2195,34 @@ public abstract class Entity extends Location implements Metadatable {
         updatePassengers();
 
         if (!this.effects.isEmpty()) {
-            for (Effect effect : this.effects.values().toArray(new Effect[0])) {
-                if (effect.canTick()) {
-                    effect.applyEffect(this);
-                }
-                effect.setDuration(effect.getDuration() - tickDiff);
+            EffectTickSnapshot lease = EFFECT_TICK_SNAPSHOT.get();
+            boolean ownsBuffer = !lease.inUse;
+            if (ownsBuffer) {
+                lease.inUse = true;
+            }
+            Effect[] snapshot = null;
+            try {
+                snapshot = this.effects.values().toArray(ownsBuffer ? lease.effects : new Effect[0]);
+                for (Effect effect : snapshot) {
+                    if (snapshot == lease.effects && effect == null) {
+                        break;
+                    }
+                    if (effect.canTick()) {
+                        effect.applyEffect(this);
+                    }
+                    effect.setDuration(effect.getDuration() - tickDiff);
 
-                if (effect.getDuration() <= 0) {
-                    this.removeEffect(effect.getId(), EntityPotionEffectEvent.Cause.EXPIRATION);
+                    if (effect.getDuration() <= 0) {
+                        this.removeEffect(effect.getId(), EntityPotionEffectEvent.Cause.EXPIRATION);
+                    }
+                }
+            } finally {
+                if (snapshot != null && snapshot != lease.effects) {
+                    Arrays.fill(snapshot, null);
+                }
+                if (ownsBuffer) {
+                    Arrays.fill(lease.effects, null);
+                    lease.inUse = false;
                 }
             }
         }
