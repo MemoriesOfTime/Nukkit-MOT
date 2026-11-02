@@ -71,13 +71,17 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
         int levelCost = 0;
         List<Item> expectedConsumes = new ArrayList<>(2);
         if (inventory instanceof AnvilInventory anvilInventory) {
+            if (!CraftRecipeActionProcessor.reserveWorkstationRecipe(context)) {
+                return context.error();
+            }
             AnvilResult pair = updateAnvilResult(player, anvilInventory, filterString);
             if (pair == null || pair.result.isNull()) {
                 return context.error();
             }
             result = pair.result;
             levelCost = pair.levelCost;
-            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getInputSlot(), 1);
+            CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getInputSlot(),
+                    anvilInventory.getInputSlot().getCount());
             CraftRecipeActionProcessor.addExpectedConsumeItem(expectedConsumes, anvilInventory.getMaterialSlot(), pair.materialCost);
 
             // Mirror legacy RepairItemTransaction: fire RepairItemEvent before any
@@ -98,10 +102,8 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             }
             result = eventOutput.clone();
             int finalCost = repairEvent.getCost();
-            if (!player.isCreative() && finalCost > 0) {
-                if (player.getExperienceLevel() < finalCost) {
-                    return context.error();
-                }
+            if (finalCost < 0 || !player.isCreative() && finalCost > player.getExperienceLevel()) {
+                return context.error();
             }
             final int commitCost = finalCost;
             context.onCommit(() -> {
@@ -209,7 +211,9 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
             int repair;
             int repair2;
             int repair3;
-            if (result.getMaxDurability() != -1 && sacrifice.getId() == repairMaterial) {
+            if (result.getMaxDurability() != -1 && (sacrifice.getId() == repairMaterial
+                    || target.getId() == Item.SHIELD
+                    && ItemTag.getTagSet(sacrifice.getNamespaceId()).contains(ItemTag.PLANKS.toString()))) {
                 // Anvil - repair via material
                 repair = Math.min(result.getDamage(), result.getMaxDurability() / 4);
                 if (repair <= 0) {
@@ -323,7 +327,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
                 extraCost += costHelper;
                 result.clearCustomName();
             }
-        } else {
+        } else if (!filterString.equals(target.getCustomName())) {
             if (filterString.length() > 50) {
                 return null;
             }
@@ -430,7 +434,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
 
     private static int getRepairMaterial(Item target) {
         return switch (target.getId()) {
-            case Item.WOODEN_SWORD, Item.WOODEN_PICKAXE, Item.WOODEN_SHOVEL, Item.WOODEN_AXE, Item.WOODEN_HOE ->
+            case Item.WOODEN_SWORD, Item.WOODEN_PICKAXE, Item.WOODEN_SHOVEL, Item.WOODEN_AXE, Item.WOODEN_HOE, Item.SHIELD ->
                     Item.PLANKS;
             case Item.IRON_SWORD, Item.IRON_PICKAXE, Item.IRON_SHOVEL, Item.IRON_AXE, Item.IRON_HOE,
                  Item.IRON_HELMET, Item.IRON_CHESTPLATE, Item.IRON_LEGGINGS, Item.IRON_BOOTS,
@@ -450,6 +454,7 @@ public class CraftRecipeOptionalProcessor implements ItemStackRequestActionProce
                  Item.NETHERITE_HELMET, Item.NETHERITE_CHESTPLATE, Item.NETHERITE_LEGGINGS, Item.NETHERITE_BOOTS ->
                     Item.NETHERITE_INGOT;
             case Item.ELYTRA -> Item.PHANTOM_MEMBRANE;
+            case Item.TURTLE_SHELL -> Item.SCUTE;
             default -> Item.AIR;
         };
     }

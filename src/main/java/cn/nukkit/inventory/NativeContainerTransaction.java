@@ -63,7 +63,13 @@ public final class NativeContainerTransaction {
             event.call();
             // A callback may perform an independent inventory operation. Never replay a stale
             // source or refund that accepted effect; only this transaction's writes are rolled back.
-            if (event.isCancelled() || !matches(before) || !intact(contexts, actorContext, routeIntact)) return false;
+            if (event.isCancelled()) {
+                if (hopper instanceof cn.nukkit.block.BlockHopper.IHopper nativeHopper) {
+                    nativeHopper.requestTransferRetry();
+                }
+                return false;
+            }
+            if (!matches(before) || !intact(contexts, actorContext, routeIntact)) return false;
             Item approved = event.getItem();
             if (approved == null || approved.isNull() || approved.getCount() <= 0) return false;
             approved = approved.clone();

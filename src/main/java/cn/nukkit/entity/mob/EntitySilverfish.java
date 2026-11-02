@@ -8,6 +8,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.potion.Effect;
 
 import java.util.HashMap;
 
@@ -71,5 +72,10 @@ public class EntitySilverfish extends EntityWalkingMob implements EntityArthropo
     @Override
     public int getKillExperience() {
         return 5;
+    }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        return effectId != Effect.INFESTED && super.canBeAffected(effectId);
     }
 }

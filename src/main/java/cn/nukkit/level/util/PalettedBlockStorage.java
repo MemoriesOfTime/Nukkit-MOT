@@ -15,6 +15,7 @@ import java.util.Arrays;
 public class PalettedBlockStorage {
 
     protected static final int SIZE = 4096; // 16 * 16 * 16
+    private static final int MAX_VAR_INT_BYTES = 5;
     public static final byte COPY_LAST_MARKER = (byte) ((0x7F << 1) | 1);
 
     protected IntList palette;
@@ -221,7 +222,12 @@ public class PalettedBlockStorage {
         stream.putByte((byte) getPaletteHeader(bitArray.getVersion()));
 
         if (bitArray.getVersion() != BitArrayVersion.V0) {
-            for (int word : bitArray.getWords()) {
+            // Bound converted varints without invoking a possibly stateful converter twice.
+            int[] words = bitArray.getWords();
+            int wordBytes = Math.multiplyExact(words.length, Integer.BYTES);
+            int paletteBytes = Math.multiplyExact(Math.addExact(palette.size(), 1), MAX_VAR_INT_BYTES);
+            stream.reserve(Math.addExact(wordBytes, paletteBytes));
+            for (int word : words) {
                 stream.putLInt(word);
             }
 

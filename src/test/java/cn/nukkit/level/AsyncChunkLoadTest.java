@@ -17,7 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * 异步区块加载管线测试:pending 去重、失效丢弃、挂载判定
@@ -52,6 +56,10 @@ public class AsyncChunkLoadTest {
     }
 
     private Level newLevel(ExecutorService executor) throws Exception {
+        return newLevel(executor, 16);
+    }
+
+    private Level newLevel(ExecutorService executor, int inFlightCap) throws Exception {
         Level level = Mockito.mock(Level.class, Mockito.CALLS_REAL_METHODS);
         // CALLS_REAL_METHODS 不执行构造器,手动初始化本测试路径依赖的字段
         // CALLS_REAL_METHODS skips constructors; init the fields this test path depends on
@@ -59,6 +67,11 @@ public class AsyncChunkLoadTest {
         setField(level, "provider", this.provider);
         setField(level, "asyncChuckExecutor", executor);
         setField(level, "asyncChunkLoadExecutor", executor);
+        setField(level, "asyncChunkLoadSlots", new Semaphore(inFlightCap));
+        setField(level, "runningAsyncChunkLoads", new AtomicInteger());
+        // mock 不跑字段初始化器,排空超时须显式给值否则为 0 立即超时
+        // The mock skips field initializers; the drain timeout needs an explicit value or it is 0
+        setField(level, "asyncChunkLoadDrainTimeoutMillis", 10_000L);
         setField(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
         setField(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
@@ -67,6 +80,16 @@ public class AsyncChunkLoadTest {
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
         setField(level, "loaderCounter", new Int2IntOpenHashMap());
         return level;
+    }
+
+    /** 捕获任务而不执行的 executor,用于精确控制任务完成时机 / Captures tasks without running them, for precise completion control */
+    private static ExecutorService capturingExecutor(List<Runnable> sink) {
+        ExecutorService executor = Mockito.mock(ExecutorService.class);
+        Mockito.doAnswer(invocation -> {
+            sink.add(invocation.getArgument(0));
+            return null;
+        }).when(executor).execute(Mockito.any(Runnable.class));
+        return executor;
     }
 
     private static void setField(Object target, String name, Object value) throws Exception {
@@ -112,26 +135,49 @@ public class AsyncChunkLoadTest {
     }
 
     @Test
-    public void requestChunkLoadAsyncRejectsWhenBoundedQueueIsFull() throws Exception {
-        CountDownLatch releaseWorker = new CountDownLatch(1);
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(1));
-        executor.execute(() -> {
-            try {
-                releaseWorker.await();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
-        Level level = newLevel(executor);
+    public void requestChunkLoadAsyncRejectsWhenInFlightCapReached() throws Exception {
+        List<Runnable> tasks = new CopyOnWriteArrayList<>();
+        Level level = newLevel(capturingExecutor(tasks), 2);
         try {
             Assertions.assertTrue(level.requestChunkLoadAsync(1, 1));
-            Assertions.assertFalse(level.requestChunkLoadAsync(2, 2));
-            Assertions.assertFalse(level.pendingChunkLoads.containsKey(Level.chunkHash(2, 2)));
+            Assertions.assertTrue(level.requestChunkLoadAsync(2, 2));
+            // 在飞上限 2 已满:第三笔被拒,回退同步路径且不留 pending 条目
+            // The in-flight cap of 2 is full: the third request is rejected,
+            // falls back to the sync path and leaves no pending entry
+            Assertions.assertFalse(level.requestChunkLoadAsync(3, 3));
+            Assertions.assertFalse(level.pendingChunkLoads.containsKey(Level.chunkHash(3, 3)));
+
+            // 一笔任务完成归还许可后恢复受理
+            // One completed task releases its permit, so submissions resume
+            tasks.get(0).run();
+            Assertions.assertTrue(level.requestChunkLoadAsync(3, 3));
         } finally {
-            releaseWorker.countDown();
-            executor.shutdownNow();
+            for (Runnable task : tasks) {
+                task.run();
+            }
         }
+    }
+
+    @Test
+    public void requestChunkLoadAsyncReleasesSlotOnRejection() throws Exception {
+        ExecutorService executor = Mockito.mock(ExecutorService.class);
+        List<Runnable> sink = new CopyOnWriteArrayList<>();
+        Mockito.doThrow(new RejectedExecutionException())
+                .doAnswer(invocation -> {
+                    sink.add(invocation.getArgument(0));
+                    return null;
+                })
+                .when(executor).execute(Mockito.any(Runnable.class));
+        Level level = newLevel(executor, 1);
+
+        // 池拒绝(关停)时受理失败,但许可必须归还,否则该世界加载通道永久卡死
+        // A pool rejection (shutdown) fails the request, but the permit must be
+        // released or this level's load lane wedges forever
+        Assertions.assertFalse(level.requestChunkLoadAsync(1, 1));
+        Assertions.assertTrue(level.pendingChunkLoads.isEmpty());
+
+        Assertions.assertTrue(level.requestChunkLoadAsync(1, 1));
+        Assertions.assertEquals(1, sink.size());
     }
 
     @Test
@@ -378,6 +424,117 @@ public class AsyncChunkLoadTest {
         level.unregisterChunkLoader(first, 3, 5);
 
         Assertions.assertFalse(pending.invalidated);
+    }
+
+    @Test
+    public void drainAsyncChunkLoadsWaitsForRunningReads() throws Exception {
+        CountDownLatch readStarted = new CountDownLatch(1);
+        CountDownLatch releaseRead = new CountDownLatch(1);
+        Mockito.when(this.provider.readChunkOffThread(1, 1)).thenAnswer(invocation -> {
+            readStarted.countDown();
+            releaseRead.await();
+            return newChunk();
+        });
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Level level = newLevel(executor);
+        try {
+            Assertions.assertTrue(level.requestChunkLoadAsync(1, 1));
+            Assertions.assertTrue(readStarted.await(5, TimeUnit.SECONDS), "the read task should start");
+
+            CountDownLatch finished = new CountDownLatch(1);
+            Thread drainer = new Thread(() -> {
+                level.drainAsyncChunkLoads();
+                finished.countDown();
+            });
+            drainer.start();
+
+            // 原生读仍在跑,排空不得提前返回
+            // The native read is still running; the drain must not return early
+            Assertions.assertFalse(finished.await(200, TimeUnit.MILLISECONDS), "drain must wait while a read is running");
+
+            releaseRead.countDown();
+            Assertions.assertTrue(finished.await(5, TimeUnit.SECONDS), "drain should return once the running read finishes");
+        } finally {
+            releaseRead.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void drainAsyncChunkLoadsAbandonsAfterTimeout() throws Exception {
+        CountDownLatch readStarted = new CountDownLatch(1);
+        Mockito.when(this.provider.readChunkOffThread(1, 1)).thenAnswer(invocation -> {
+            readStarted.countDown();
+            try {
+                Thread.sleep(60_000L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return newChunk();
+        });
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Level level = newLevel(executor);
+        try {
+            Assertions.assertTrue(level.requestChunkLoadAsync(1, 1));
+            Assertions.assertTrue(readStarted.await(5, TimeUnit.SECONDS), "the read task should start");
+            setField(level, "asyncChunkLoadDrainTimeoutMillis", 200L);
+
+            long start = System.currentTimeMillis();
+            Assertions.assertFalse(level.drainAsyncChunkLoads());
+            Assertions.assertTrue(System.currentTimeMillis() - start >= 200L, "drain should respect its timeout");
+        } finally {
+            executor.shutdownNow();
+            // 被中断的读必须真正退出，否则线程会残留到后续用例
+            // The interrupted read must actually exit, or its thread leaks into later tests
+            Assertions.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "the wedged read should be released");
+        }
+    }
+
+    /**
+     * close() 必须走排空路径：在飞上限与等待逻辑都挂在它上面，漏接等于关世界不等在飞读取。
+     * <p>
+     * close() must go through the drain: the in-flight wait hangs off it, so a missing call would
+     * close a world without waiting for running reads.
+     */
+    @Test
+    public void closeDrainsAsyncChunkLoads() throws Exception {
+        Level level = newLevel(MoreExecutors.newDirectExecutorService());
+        setField(level, "autoSave", false);
+        setField(level, "providerLock", new ReentrantReadWriteLock());
+        setField(level, "generators", new HashMap<>());
+        Mockito.when(this.server.getLevels()).thenReturn(new HashMap<>());
+        Mockito.doReturn(false).when(level).drainAsyncChunkLoads();
+
+        level.close();
+
+        Mockito.verify(level).drainAsyncChunkLoads();
+    }
+
+    @Test
+    public void drainAsyncChunkLoadsSkipsQueuedTasksForDyingWorld() throws Exception {
+        List<Runnable> tasks = new CopyOnWriteArrayList<>();
+        Level level = newLevel(capturingExecutor(tasks));
+        Assertions.assertTrue(level.requestChunkLoadAsync(1, 1));
+        Assertions.assertTrue(level.requestChunkLoadAsync(2, 2));
+        // 超时给足余量:若排空误等排队任务,elapsed 会顶满超时而失败
+        // A generous timeout: if the drain wrongly waited on queued tasks,
+        // the elapsed time would hit the full timeout and fail
+        setField(level, "asyncChunkLoadDrainTimeoutMillis", 2_000L);
+
+        long start = System.currentTimeMillis();
+        Assertions.assertFalse(level.drainAsyncChunkLoads());
+        Assertions.assertTrue(System.currentTimeMillis() - start < 2_000L,
+                "queued (unstarted) tasks must not delay the drain");
+
+        // 排队任务已被批量失效:close 后执行也不触碰 provider
+        // Queued tasks were bulk-invalidated: running them post-close touches no provider
+        for (Level.PendingChunkLoad pending : level.pendingChunkLoads.values()) {
+            Assertions.assertTrue(pending.invalidated);
+        }
+        for (Runnable task : tasks) {
+            task.run();
+        }
+        Mockito.verify(this.provider, Mockito.never()).readChunkOffThread(Mockito.anyInt(), Mockito.anyInt());
     }
 
     @Test
