@@ -141,7 +141,9 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void configuredExternalMappingStillStartsTheInterface() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("203.0.113.10:19132:39000");
+        // 203.0.113.10 等 TEST-NET 地址自 CR6 起被上游 requireUsable 拒绝，改用可路由公网地址
+        // TEST-NET addresses like 203.0.113.10 are rejected by upstream's requireUsable since CR6
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("8.8.8.8:19132:39000");
         NetherNetInterface mapped = new NetherNetInterface(server, new NetherNetSettings());
         assertNotNull(mapped);
         mapped.shutdown();

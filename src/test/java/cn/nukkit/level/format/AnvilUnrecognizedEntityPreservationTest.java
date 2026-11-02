@@ -57,6 +57,12 @@ public class AnvilUnrecognizedEntityPreservationTest {
         provider = mock(LevelProvider.class);
         // 先获取 defaultLevel，避免在 when() 内部调用引起 Mockito 状态混乱
         cn.nukkit.level.Level defaultLevel = Server.getInstance().getDefaultLevel();
+        // initChunk 守卫要求 provider 的 level 存活；MockServer 无默认世界时用独立 mock 兜底
+        // The initChunk guard requires a live provider level; fall back to a standalone mock
+        // when MockServer has no default level
+        if (defaultLevel == null) {
+            defaultLevel = mock(cn.nukkit.level.Level.class);
+        }
         lenient().when(chunk.getProvider()).thenReturn(provider);
         lenient().when(provider.getLevel()).thenReturn(defaultLevel);
     }

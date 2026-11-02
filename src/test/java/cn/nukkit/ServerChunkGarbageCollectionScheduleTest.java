@@ -41,6 +41,11 @@ class ServerChunkGarbageCollectionScheduleTest {
         set("tickAverage", new float[20]);
         set("useAverage", new float[20]);
         set("autoSaveTicks", Integer.MAX_VALUE);
+        try {
+            set("pendingPlayerCloses", new java.util.concurrent.ConcurrentHashMap<Player, Runnable>());
+        } catch (NoSuchFieldException legacyServer) {
+            // The standalone spawn scheduler also supports Server versions without deferred closes.
+        }
         doCallRealMethod().when(this.server).tick(anyLong(), any());
     }
 

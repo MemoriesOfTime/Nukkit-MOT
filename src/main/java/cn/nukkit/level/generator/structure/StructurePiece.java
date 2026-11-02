@@ -254,6 +254,9 @@ public abstract class StructurePiece {
         final int worldZ = getWorldZ(x, z);
         if (boundingBox.isInside(new BlockVector3(worldX, worldY, worldZ))) {
             final BaseFullChunk chunk = level.getChunk(worldX >> 4, worldZ >> 4);
+            if (chunk == null) {
+                return;
+            }
             final int cx = worldX & 0xf;
             final int cz = worldZ & 0xf;
             int blockId = chunk.getBlockId(cx, worldY, cz);

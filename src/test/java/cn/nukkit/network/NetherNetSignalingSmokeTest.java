@@ -70,7 +70,7 @@ class NetherNetSignalingSmokeTest {
                 .setServeHttp(true)
                 .setIceOnLocalPort(false)
                 .setTokenTrust(TokenTrust.ANY)
-                .setMotdProvider((host, remoteAddress) -> pong)
+                .setMotdProvider((host, remoteAddress, client) -> pong)
                 .setPlayerFilter((host, player) -> null)
                 .build();
 

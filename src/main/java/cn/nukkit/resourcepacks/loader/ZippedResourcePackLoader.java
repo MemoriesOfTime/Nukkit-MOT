@@ -100,7 +100,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
             } catch (RuntimeException e) {
                 // IllegalArgumentException = bad pack (skip); RuntimeException also covers
                 // loadDirectoryPack I/O failures, so one broken pack cannot abort the whole load
-                log.warn(baseLang.translateString("nukkit.resources.fail", pack.getName(), e.getMessage()), e);
+                log.warn(baseLang.translateString("nukkit.resources.fail", new String[]{pack.getName(), e.getMessage()}), e);
             }
         }
         return loadedResourcePacks;

@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityBrewingStand;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
@@ -23,6 +24,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
+import cn.nukkit.utils.CollisionHelper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -300,6 +302,9 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
         void setTransferCooldown(int transferCooldown);
 
+        /** Keep a cancelled transfer eligible when plugin policy changes without an inventory write. */
+        default void requestTransferRetry() { }
+
         default boolean pullItems() {
             Vector3 up = this.getPosition().up();
             BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
@@ -329,6 +334,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                     ev.call();
 
                     if (ev.isCancelled()) {
+                        this.requestTransferRetry();
                         return false;
                     }
 
@@ -342,8 +348,10 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                 }
             } else if (blockEntity instanceof InventoryHolder) {
                 Inventory inv = ((InventoryHolder) blockEntity).getInventory();
+                int start = blockEntity instanceof BlockEntityBrewingStand ? 1 : 0;
+                int end = blockEntity instanceof BlockEntityBrewingStand ? 4 : inv.getSize();
 
-                for (int i = 0; i < inv.getSize(); i++) {
+                for (int i = start; i < end; i++) {
                     Item item = inv.getItem(i);
 
                     if (!item.isNull()) {
@@ -358,6 +366,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                         ev.call();
 
                         if (ev.isCancelled()) {
+                            this.requestTransferRetry();
                             continue;
                         }
 
@@ -407,7 +416,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
 
             boolean pickedUpItem = false;
 
-            for (Entity entity : this.getPosition().getLevel().getCollidingEntities(pickupArea)) {
+            for (Entity entity : CollisionHelper.getPickupEntities(this.getPosition().getLevel(), pickupArea, true)) {
                 if (entity.isClosed() || !(entity instanceof EntityItem)) {
                     continue;
                 }

@@ -34,7 +34,7 @@ public class CameraSplinePacket extends DataPacket {
 
     @Override
     public void decode() {
-        int splineCount = (int) this.getUnsignedVarInt();
+        int splineCount = this.getUnsignedVarIntCount("camera spline count");
         this.splines = new ArrayList<>(splineCount);
 
         for (int i = 0; i < splineCount; i++) {
@@ -43,14 +43,14 @@ public class CameraSplinePacket extends DataPacket {
             CameraSplineType type = CameraSplineType.fromName(this.getString());
 
             // Read curve points
-            int curveCount = (int) this.getUnsignedVarInt();
+            int curveCount = this.getUnsignedVarIntCount("camera spline control point count");
             List<Vector3f> curve = new ArrayList<>(curveCount);
             for (int j = 0; j < curveCount; j++) {
                 curve.add(this.getVector3f());
             }
 
             // Read progress key frames
-            int progressCount = (int) this.getUnsignedVarInt();
+            int progressCount = this.getUnsignedVarIntCount("camera spline progress frame count");
             List<CameraSplineInstruction.SplineProgressOption> progressKeyFrames = new ArrayList<>(progressCount);
             for (int j = 0; j < progressCount; j++) {
                 float value = this.getLFloat();
@@ -60,7 +60,7 @@ public class CameraSplinePacket extends DataPacket {
             }
 
             // Read rotation options
-            int rotationCount = (int) this.getUnsignedVarInt();
+            int rotationCount = this.getUnsignedVarIntCount("camera spline rotation frame count");
             List<CameraSplineInstruction.SplineRotationOption> rotationOptions = new ArrayList<>(rotationCount);
             for (int j = 0; j < rotationCount; j++) {
                 Vector3f keyFrameValues = this.getVector3f();

@@ -47,7 +47,7 @@ public class PluginManager {
     /**
      * Cache: Event class -> HandlerList, avoiding repeated reflection lookups.
      */
-    private final Map<Class<? extends Event>, HandlerList> handlerListCache = new ConcurrentHashMap<>();
+    private volatile ClassValue<HandlerList> handlerListCache = newHandlerListCache();
 
     public PluginManager(Server server, SimpleCommandMap commandMap) {
         this.server = server;
@@ -521,7 +521,7 @@ public class PluginManager {
         this.permissions.clear();
         this.defaultPerms.clear();
         this.defaultPermsOp.clear();
-        this.handlerListCache.clear();
+        this.handlerListCache = newHandlerListCache();
     }
 
     public void callEvent(Event event) {
@@ -604,17 +604,39 @@ public class PluginManager {
         }
     }
 
-    private HandlerList getEventListeners(Class<? extends Event> type) throws IllegalAccessException {
-        HandlerList cached = handlerListCache.get(type);
-        if (cached != null) {
-            return cached;
+    private ClassValue<HandlerList> newHandlerListCache() {
+        return new ClassValue<>() {
+            @Override
+            protected HandlerList computeValue(Class<?> type) {
+                try {
+                    return resolveEventListeners(type.asSubclass(Event.class));
+                } catch (IllegalAccessException e) {
+                    throw new HandlerListLookupFailure(e);
+                }
+            }
+        };
+    }
+
+    private static final class HandlerListLookupFailure extends RuntimeException {
+        private HandlerListLookupFailure(IllegalAccessException cause) {
+            super(cause);
         }
+    }
+
+    private HandlerList getEventListeners(Class<? extends Event> type) throws IllegalAccessException {
+        try {
+            return handlerListCache.get(type);
+        } catch (HandlerListLookupFailure e) {
+            throw (IllegalAccessException) e.getCause();
+        }
+    }
+
+    private HandlerList resolveEventListeners(Class<? extends Event> type) throws IllegalAccessException {
         try {
             Method method = getRegistrationClass(type).getDeclaredMethod("getHandlers");
             method.setAccessible(true);
             HandlerList handlerList = (HandlerList) method.invoke(null);
-            handlerListCache.put(type, handlerList);
-            return handlerList;
+            return Objects.requireNonNull(handlerList);
         } catch (NullPointerException e) {
             throw new IllegalArgumentException("getHandlers method in " + type.getName() + " was not static!");
         } catch (Exception e) {

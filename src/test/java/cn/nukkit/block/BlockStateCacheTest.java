@@ -48,13 +48,16 @@ class BlockStateCacheTest {
 
     @Test
     /**
-     * Confirms that an invalid normalized meta value still resolves to {@link BlockUnknown}.
+     * Palette-carried junk metas (stateless duplicates such as planks 6/7) must stay readable
+     * block states; only metas absent from the palette may resolve to {@link BlockUnknown}
+     * (still covered by the lightning rod assertions below).
      */
-    void invalidNormalizedMetaStillReturnsUnknown() {
-        Block invalid = Block.get(Block.PLANKS, 6);
+    void paletteCarriedJunkMetaStaysReadable() {
+        Block junk = Block.get(Block.PLANKS, 6);
         Block valid = Block.get(Block.PLANKS, 5);
 
-        Assertions.assertInstanceOf(BlockUnknown.class, invalid);
+        Assertions.assertFalse(junk instanceof BlockUnknown);
+        Assertions.assertEquals(6, junk.getDamage());
         Assertions.assertFalse(valid instanceof BlockUnknown);
         Assertions.assertEquals(5, valid.getDamage());
     }
