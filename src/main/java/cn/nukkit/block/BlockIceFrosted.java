@@ -13,6 +13,8 @@ import org.jetbrains.annotations.NotNull;
  */
 public class BlockIceFrosted extends BlockTransparentMeta {
 
+    private static final BlockFace[] NEIGHBOR_SCAN_FACES = BlockFace.values();
+
     public BlockIceFrosted() {
         this(0);
     }
@@ -119,7 +121,7 @@ public class BlockIceFrosted extends BlockTransparentMeta {
 
     private int countNeighbors() {
         int neighbors = 0;
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : NEIGHBOR_SCAN_FACES) {
             if (getSide(face).getId() == ICE_FROSTED && ++neighbors >= 4) {
                 return neighbors;
             }
