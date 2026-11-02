@@ -45,7 +45,17 @@ public class BlockRedstoneTorch extends BlockTorch implements Faceable {
             return false;
         }
 
-        checkState();
+        if (!checkState()) {
+            // A torch that stays lit must also wake components beyond the powered adjacent blocks.
+            // checkState already sends these notifications when placement switches the torch off.
+            BlockFace attachedFace = getBlockFace().getOpposite();
+            Vector3 pos = getLocation();
+            for (BlockFace side : BlockFace.values()) {
+                if (side != attachedFace) {
+                    this.level.updateAroundRedstone(pos.getSide(side), null);
+                }
+            }
+        }
 
         return true;
     }

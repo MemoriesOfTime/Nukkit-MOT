@@ -4,6 +4,10 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.item.EntityItem;
+import cn.nukkit.entity.item.EntityXPOrb;
+import cn.nukkit.entity.projectile.EntityArrow;
+import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.util.PalettedBlockStorage;
 
@@ -207,6 +211,19 @@ public interface FullChunk extends Cloneable {
     /** Read-only membership snapshot; entity state remains live. */
     default List<Entity> getEntitySnapshot() {
         return List.copyOf(getEntities().values());
+    }
+
+    /** Conservative fallback for chunk implementations without a pickup-presence index. */
+    default boolean hasPickupEntities(boolean itemsOnly) {
+        for (Entity entity : getEntities().values()) {
+            if (isPickupEntity(entity, itemsOnly)) return true;
+        }
+        return false;
+    }
+
+    static boolean isPickupEntity(Entity entity, boolean itemsOnly) {
+        return entity instanceof EntityItem || (!itemsOnly && (entity instanceof EntityXPOrb
+                || entity instanceof EntityArrow || entity instanceof EntityThrownTrident));
     }
 
     Map<Long, BlockEntity> getBlockEntities();
