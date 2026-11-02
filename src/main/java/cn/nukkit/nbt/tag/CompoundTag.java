@@ -428,7 +428,7 @@ public class CompoundTag extends Tag implements Cloneable {
 
     @Override
     public CompoundTag clone() {
-        CompoundTag nbt = new CompoundTag();
+        CompoundTag nbt = new CompoundTag(getName());
         this.getTags().forEach((key, value) -> nbt.put(key, value.copy()));
         return nbt;
     }

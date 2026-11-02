@@ -8,6 +8,7 @@ import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterVanilla;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdater_1_26_30;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdater_1_26_50;
 import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
@@ -170,6 +171,28 @@ public class BlockStateMapping {
                 .build();
         this.runtime2State.put(runtimeId, blockState);
         this.paletteMap.put(state, blockState);
+    }
+
+    public void remapRuntimeIds(Int2IntMap runtimeIdMapping) {
+        Int2ObjectMap<BlockStateSnapshot> remapped = new Int2ObjectOpenHashMap<>(this.runtime2State.size());
+        for (Int2ObjectMap.Entry<BlockStateSnapshot> entry : this.runtime2State.int2ObjectEntrySet()) {
+            int replacement = runtimeIdMapping.getOrDefault(entry.getIntKey(), -1);
+            Preconditions.checkArgument(replacement >= 0,
+                    "Missing replacement for runtimeId " + entry.getIntKey() + " in mapping for " + this.version);
+            Preconditions.checkArgument(!remapped.containsKey(replacement),
+                    "Duplicate replacement for runtimeId " + replacement + " in mapping for " + this.version);
+            remapped.put(replacement, entry.getValue().toBuilder().runtimeId(replacement).build());
+        }
+
+        BlockStateSnapshot remappedDefault = this.defaultState == null ? null
+                : remapped.get(runtimeIdMapping.getOrDefault(this.defaultState.getRuntimeId(), -1));
+        this.clearMapping();
+        this.runtime2State.putAll(remapped);
+        for (BlockStateSnapshot state : remapped.values()) {
+            this.paletteMap.put(state.getVanillaState(), state);
+        }
+        this.defaultState = remappedDefault;
+        this.defaultRuntimeId = remappedDefault == null ? -1 : remappedDefault.getRuntimeId();
     }
 
     public void clearMapping() {

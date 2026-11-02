@@ -9,6 +9,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.ChunkException;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -223,6 +224,11 @@ public class EmptyChunkSection implements ChunkSection {
     @Override
     public boolean isEmpty() {
         return true;
+    }
+
+    @Override
+    public boolean mayContainBlockIds(IntSet blockIds) {
+        return blockIds.contains(Block.AIR);
     }
 
     @Override

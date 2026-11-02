@@ -13,13 +13,10 @@ import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.vehicle.VehicleMoveEvent;
-import cn.nukkit.event.vehicle.VehicleUpdateEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMinecart;
 import cn.nukkit.level.GameRule;
-import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -177,14 +174,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
         setRotation(yawToChange, pitch);
 
-        Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
-        Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
-
-        this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
-
-        if (!from.equals(to)) {
-            this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
-        }
+        dispatchVehicleMovementEvents();
 
         // Collisions
         if (this instanceof InventoryHolder) {
@@ -385,9 +375,11 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return 是否有漏斗被通知
      */
     private boolean checkPushHopper(AxisAlignedBB pushArea, InventoryHolder holder) {
-        int minX = NukkitMath.ceilDouble(pushArea.getMinX());
-        int minY = NukkitMath.ceilDouble(pushArea.getMinY());
-        int minZ = NukkitMath.ceilDouble(pushArea.getMinZ());
+        // The cells the cart occupies. The area is a line through the cart's centre, so the lower
+        // bound is floor: a true ceiling would pass that cell whenever the centre is fractional.
+        int minX = NukkitMath.floorDouble(pushArea.getMinX());
+        int minY = NukkitMath.floorDouble(pushArea.getMinY());
+        int minZ = NukkitMath.floorDouble(pushArea.getMinZ());
         int maxX = NukkitMath.floorDouble(pushArea.getMaxX());
         int maxY = NukkitMath.floorDouble(pushArea.getMaxY());
         int maxZ = NukkitMath.floorDouble(pushArea.getMaxZ());
@@ -415,9 +407,11 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return 是否有漏斗被通知
      */
     private boolean checkPickupHopper(AxisAlignedBB pickupArea, InventoryHolder holder) {
-        int minX = NukkitMath.ceilDouble(pickupArea.getMinX());
-        int minY = NukkitMath.ceilDouble(pickupArea.getMinY());
-        int minZ = NukkitMath.ceilDouble(pickupArea.getMinZ());
+        // The cells the cart occupies. The area is a line through the cart's centre, so the lower
+        // bound is floor: a true ceiling would pass that cell whenever the centre is fractional.
+        int minX = NukkitMath.floorDouble(pickupArea.getMinX());
+        int minY = NukkitMath.floorDouble(pickupArea.getMinY());
+        int minZ = NukkitMath.floorDouble(pickupArea.getMinZ());
         int maxX = NukkitMath.floorDouble(pickupArea.getMaxX());
         int maxY = NukkitMath.floorDouble(pickupArea.getMaxY());
         int maxZ = NukkitMath.floorDouble(pickupArea.getMaxZ());

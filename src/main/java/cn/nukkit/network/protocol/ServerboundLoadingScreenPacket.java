@@ -11,11 +11,11 @@ public class ServerboundLoadingScreenPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.SERVERBOUND_LOADING_SCREEN_PACKET;
 
-    public static final int TYPE_UNKNOWN = 1;
+    public static final int TYPE_UNKNOWN = 0;
 
-    public static final int TYPE_START_LOADING_SCREEN = 2;
+    public static final int TYPE_START_LOADING_SCREEN = 1;
 
-    public static final int TYPE_STOP_LOADING_SCREEN = 3;
+    public static final int TYPE_STOP_LOADING_SCREEN = 2;
 
     public int loadingScreenType;
 
@@ -39,6 +39,7 @@ public class ServerboundLoadingScreenPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putVarInt(this.loadingScreenType);
         this.putOptionalNull(this.loadingScreenId, this::putLInt);
     }
