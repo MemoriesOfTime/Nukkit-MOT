@@ -13,7 +13,6 @@ import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
 import cn.nukkit.utils.ChunkException;
 import cn.nukkit.utils.Utils;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
 import org.iq80.leveldb.DB;
@@ -49,7 +48,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
 
             final int capturedSectionY = ySection;
             LevelDBChunkSection.SaveToken token = section.captureSave(chunk, ySection, storages -> {
-                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                ByteBuf byteBuf = Unpooled.buffer();
                 try {
                     byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
                     ChunkSectionSerializers.serializer(byteBuf, storages, capturedSectionY, CURRENT_LEVEL_SUBCHUNK_VERSION);

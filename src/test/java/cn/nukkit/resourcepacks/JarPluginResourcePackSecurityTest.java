@@ -44,7 +44,7 @@ class JarPluginResourcePackSecurityTest {
     void setUp() {
         MockServer.reset();
         BaseLang language = mock(BaseLang.class);
-        when(language.translateString(any(String.class), any(Object[].class))).thenReturn("resource pack error");
+        when(language.translateString(any(String.class), any(String[].class))).thenReturn("resource pack error");
         when(Server.getInstance().getLanguage()).thenReturn(language);
 
         appender = new CapturingAppender();

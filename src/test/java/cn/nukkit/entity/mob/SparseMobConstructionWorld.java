@@ -24,6 +24,7 @@ final class SparseMobConstructionWorld {
   when(level.getServer()).thenReturn(server);when(level.getFolderName()).thenReturn("mob-test");when(level.getMinBlockY()).thenReturn(-64);when(level.getMaxBlockY()).thenReturn(319);
   when(level.getGameRules()).thenReturn(GameRules.getDefault());when(level.getDimensionData()).thenReturn(DimensionEnum.OVERWORLD.getDimensionData());
   when(level.getNearbyEntities(any(cn.nukkit.math.AxisAlignedBB.class), any(Entity.class), anyBoolean(), anyBoolean())).thenReturn(new Entity[0]);
+  when(level.getNearbyRideables(any(cn.nukkit.math.AxisAlignedBB.class), any(Entity.class))).thenReturn(new Entity[0]);
   when(level.getVibrationManager()).thenReturn(mock(VibrationManager.class));when(level.getPlayers()).thenReturn(Map.of());when(level.getEntities()).thenReturn(new Entity[0]);
   LevelProvider provider=mock(LevelProvider.class);when(chunk.getProvider()).thenReturn(provider);when(provider.getLevel()).thenReturn(level);
   when(level.getChunk(anyInt(),anyInt(),anyBoolean())).thenReturn(chunk);when(level.getChunkIfLoaded(anyInt(),anyInt())).thenReturn(chunk);

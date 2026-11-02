@@ -8,6 +8,8 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.utils.Hash;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -76,6 +79,59 @@ class BlockPaletteTest {
 
         Assertions.assertEquals(fullId, palette.getLegacyFullIdFromHashId(hashId));
         Assertions.assertEquals(fullId, palette.getLegacyFullId(customState));
+    }
+
+    @Test
+    void runtimeIdRemapPreservesOverwrittenAliasesAndHashWinners() {
+        BlockPalette palette = new BlockPalette(GameVersion.getFeatureVersion());
+        CompoundTag first = new CompoundTag().putString("name", "test:alias")
+                .putCompound("states", new CompoundTag().putBoolean("lit", false));
+        CompoundTag last = new CompoundTag().putString("name", "test:alias")
+                .putCompound("states", new CompoundTag().putBoolean("lit", true));
+        palette.clearStates();
+        palette.registerState(Block.STONE, 0, 10, first);
+        palette.registerState(Block.STONE, 0, 11, last);
+        palette.lock();
+        long version = palette.getNetworkVersion();
+
+        palette.remapRuntimeIds(new Int2IntOpenHashMap(Map.of(10, 11, 11, 10)), 12);
+
+        int fullId = Block.STONE << Block.DATA_BITS;
+        Assertions.assertEquals(10, palette.getRuntimeId(Block.STONE));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(10));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(11));
+        Assertions.assertEquals(Hash.hashBlock(first), palette.getHashId(Block.STONE));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(first));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(last));
+        Assertions.assertEquals(-1, palette.getNetworkVersion(), "in-progress remapping must not be cached");
+        Assertions.assertDoesNotThrow(() -> palette.registerState(Block.GRASS, 0, 0,
+                new CompoundTag().putString("name", "test:custom").putCompound("states", new CompoundTag())));
+        palette.lock();
+        Assertions.assertTrue(palette.getNetworkVersion() > version);
+        Assertions.assertThrows(IllegalStateException.class, () -> palette.registerState(Block.STONE, 0, 1, first));
+    }
+
+    @Test
+    void invalidRuntimeIdRemapLeavesThePaletteIntactAndLocked() {
+        BlockPalette palette = new BlockPalette(GameVersion.getFeatureVersion());
+        CompoundTag state = new CompoundTag().putString("name", "test:alias")
+                .putCompound("states", new CompoundTag());
+        palette.clearStates();
+        palette.registerState(Block.STONE, 0, 10, state);
+        palette.registerState(Block.STONE, 0, 11, state);
+        palette.lock();
+        long version = palette.getNetworkVersion();
+
+        // The overwritten runtime ID still needs a replacement; two distinct IDs may not collapse.
+        for (Map<Integer, Integer> invalid : List.of(Map.of(11, 0), Map.of(10, 0, 11, 0))) {
+            Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> palette.remapRuntimeIds(new Int2IntOpenHashMap(invalid), 12));
+            Assertions.assertEquals(11, palette.getRuntimeId(Block.STONE));
+            Assertions.assertEquals(Block.STONE << Block.DATA_BITS, palette.getLegacyFullId(10));
+            Assertions.assertEquals(Block.STONE << Block.DATA_BITS, palette.getLegacyFullId(11));
+            Assertions.assertEquals(version, palette.getNetworkVersion());
+            Assertions.assertThrows(IllegalStateException.class, () -> palette.registerState(Block.STONE, 0, 1, state));
+        }
     }
 
     @Test

@@ -65,7 +65,8 @@ public class BlockDoubleSlabRedSandstone extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(RED_SANDSTONE_SLAB), this.getDamage() & 0x07);
+        int damage = this.getDamage() & 0x07;
+        return new ItemBlock(Block.get(RED_SANDSTONE_SLAB, damage), damage);
     }
 
     @Override
