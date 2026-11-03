@@ -127,7 +127,7 @@ class StateBlockStorageNetworkCacheTest {
     void cachedBytesMatchReferenceAcrossTheWholeWindow() {
         StateBlockStorage storage = populated();
         for (GameVersion version : GameVersion.getValues()) {
-            if (version.getProtocol() < 589 || version.getProtocol() > 2193) continue;
+            if (version.getProtocol() < 589) continue;
             for (boolean hash : new boolean[]{false, true}) {
                 GlobalBlockPalette.setUseHashedBlockNetworkIds(hash);
                 for (boolean anti : new boolean[]{false, true}) {
@@ -137,6 +137,18 @@ class StateBlockStorageNetworkCacheTest {
                 }
             }
         }
+    }
+
+    @Test
+    void newestProtocolUsesTheCache() {
+        cleanCache();
+        StateBlockStorage storage = populated();
+        GameVersion version = GameVersion.V1_26_60;
+        byte[] expected = reference(storage, version, false);
+        assertArrayEquals(expected, encoded(storage, version, false));
+        assertEquals(1, cacheSize(), "1.26.60 sections must be served from the layer cache");
+        assertArrayEquals(expected, encoded(storage.copy(), version, false));
+        assertEquals(1, cacheSize());
     }
 
     @Test
