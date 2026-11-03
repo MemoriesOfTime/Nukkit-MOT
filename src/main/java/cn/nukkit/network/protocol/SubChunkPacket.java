@@ -36,6 +36,7 @@ public class SubChunkPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        this.reservePayload();
 
         if (this.protocol >= ProtocolInfo.v1_26_40) {
             this.encodeV2168();
@@ -44,6 +45,64 @@ public class SubChunkPacket extends DataPacket {
         } else {
             this.encodeV471();
         }
+    }
+
+    private void reservePayload() {
+        long size = varIntSize((this.dimension << 1) ^ (this.dimension >> 31));
+        boolean optionalFields = this.protocol >= ProtocolInfo.v1_26_40;
+        if (this.protocol >= ProtocolInfo.v1_18_10) {
+            size += 1 + (optionalFields ? 12 : positionSize(this.centerPosition))
+                    + (optionalFields ? varIntSize(this.subChunks.size()) : Integer.BYTES);
+        } else if (this.protocol >= ProtocolInfo.v1_18_0) {
+            size++;
+        }
+        for (SubChunkData subChunk : this.subChunks) {
+            if (this.protocol < ProtocolInfo.v1_18_10) {
+                size += positionSize(subChunk.position) + varIntSize(subChunk.result.ordinal() << 1) + 1;
+            } else {
+                size += optionalFields ? 10 : 5; // Offsets, result, map types and presence flags.
+                if (!optionalFields && this.protocol >= ProtocolInfo.v1_21_90) size++;
+            }
+            if (optionalFields ? subChunk.data != null : this.protocol < ProtocolInfo.v1_18_10
+                    || subChunk.result != SubChunkRequestResult.SUCCESS_ALL_AIR || !this.cacheEnabled) {
+                int length = subChunk.data == null ? 0 : subChunk.data.length;
+                size += (long) varIntSize(length) + length;
+            }
+            if (subChunk.heightMapType == HeightMapDataType.HAS_DATA) {
+                size += this.heightMapSize(subChunk.heightMapData);
+            } else if (this.protocol < ProtocolInfo.v1_18_0) {
+                size += HEIGHT_MAP_LENGTH;
+            }
+            if (this.protocol >= ProtocolInfo.v1_21_90
+                    && subChunk.renderHeightMapType == HeightMapDataType.HAS_DATA) {
+                size += this.heightMapSize(subChunk.renderHeightMapData);
+            }
+            if (optionalFields ? subChunk.hasBlobId : this.protocol >= ProtocolInfo.v1_18_0 && this.cacheEnabled) {
+                size += Long.BYTES;
+            }
+            if (this.protocol < ProtocolInfo.v1_18_10) break;
+        }
+        if (size > Integer.MAX_VALUE - (long) this.getCount()) {
+            throw new OutOfMemoryError("Sub-chunk packet is too large");
+        }
+        this.reserve((int) size);
+    }
+
+    private static int positionSize(BlockVector3 position) {
+        return varIntSize((position.x << 1) ^ (position.x >> 31))
+                + varIntSize((position.y << 1) ^ (position.y >> 31))
+                + varIntSize((position.z << 1) ^ (position.z >> 31));
+    }
+
+    private static int varIntSize(int value) {
+        int size = 1;
+        for (int remaining = value >>> 7; remaining != 0; remaining >>>= 7) size++;
+        return size;
+    }
+
+    private int heightMapSize(byte[] data) {
+        return this.protocol >= ProtocolInfo.v1_26_50_27
+                ? HEIGHT_MAP_LENGTH + HEIGHT_MAP_LENGTH / 16 : data == null ? 0 : data.length;
     }
 
     private void encodeV2168() {

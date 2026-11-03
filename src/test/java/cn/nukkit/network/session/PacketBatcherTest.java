@@ -132,6 +132,38 @@ class PacketBatcherTest {
     }
 
     @Test
+    void largeBatchesReuseScratchWithoutDoublingPastTheRetentionLimit() throws Exception {
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            executor.submit(() -> {
+                List<DataPacket> packets = new ArrayList<>();
+                for (int i = 0; i < 6; i++) packets.add(new RawPacket(500 * 1024, 0));
+                byte[] expected = collect(packets, false).get(0);
+                AtomicReference<byte[]> previous = new AtomicReference<>();
+                PacketBatcher.send(packets, stream -> {
+                    assertArrayEquals(expected, stream.getBuffer());
+                    previous.set(stream.getBufferUnsafe());
+                });
+                int[] replacements = {0};
+                for (int i = 0; i < 8; i++) {
+                    PacketBatcher.send(packets, stream -> {
+                        assertArrayEquals(expected, stream.getBuffer());
+                        if (previous.getAndSet(stream.getBufferUnsafe()) != stream.getBufferUnsafe()) {
+                            replacements[0]++;
+                        }
+                    });
+                }
+                System.out.println("PacketBatcher scratch replacements/8 warm sends: " + replacements[0]
+                        + ", capacity=" + previous.get().length);
+                assertEquals(0, replacements[0], "large batches must keep their warmed scratch");
+                assertTrue(previous.get().length <= PacketBatcher.MAX_BATCH_BYTES + 5);
+            }).get();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void throwingSendAndEncodingFailureReleaseCleanScratch() {
         assertThrows(IllegalStateException.class, () -> PacketBatcher.send(List.of(new RawPacket(500, 0)),
                 ignored -> { throw new IllegalStateException("send failed"); }));
