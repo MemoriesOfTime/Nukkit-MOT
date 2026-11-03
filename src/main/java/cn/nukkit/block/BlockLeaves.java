@@ -21,6 +21,8 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class BlockLeaves extends BlockTransparentMeta {
 
+    private static final BlockFace[] SEARCH_FACES = BlockFace.values();
+
     public static final int OAK = 0;
     public static final int SPRUCE = 1;
     public static final int BIRCH = 2;
@@ -225,7 +227,7 @@ public class BlockLeaves extends BlockTransparentMeta {
 
     private boolean findLog() {
         Set<Block> visited = new HashSet<>();
-        Queue<Block> queue = new LinkedList<>();
+        Queue<Block> queue = new ArrayDeque<>(1);
         Map<Block, Integer> distance = new HashMap<>();
 
         queue.offer(this);
@@ -240,7 +242,7 @@ public class BlockLeaves extends BlockTransparentMeta {
                 return false;
             }
 
-            for (BlockFace face : BlockFace.values()) {
+            for (BlockFace face : SEARCH_FACES) {
                 Block nextBlock = currentBlock.getSideIfLoadedOrNull(face); // If side chunk not loaded, do not load or decay
                 if (nextBlock == null || isLog(nextBlock.getId(), nextBlock.getDamage())) {
                     return true;
