@@ -68,6 +68,61 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         }
     }
 
+    /** Inspect nested extension points before choosing native assignment instead of virtual hooks. */
+    public final boolean supportsNativeFallingCell(int x, int y, int z, int layer) {
+        if (getClass() != cn.nukkit.level.format.leveldb.structure.LevelDBChunk.class
+                && getClass() != cn.nukkit.level.format.anvil.Chunk.class) return false;
+        var mapper = cn.nukkit.level.format.leveldb.BlockStateMapping.get().getLegacyMapper();
+        if (mapper == null || mapper.getClass() != cn.nukkit.level.format.leveldb.NukkitLegacyMapper.class
+                || !((cn.nukkit.level.format.leveldb.NukkitLegacyMapper) mapper).hasNativeFallingMapping()) return false;
+        int sectionIndex = this.getSectionOffset() + (y >> 4);
+        // Native expiration may transfer an actor below/above the terrain array to an item.
+        if (sectionIndex < 0 || sectionIndex >= this.sections.length) return true;
+        ChunkSection section = getSection(y >> 4);
+        if (section instanceof EmptyChunkSection
+                || section.getClass() == cn.nukkit.level.format.anvil.ChunkSection.class) return true;
+        if (section.getClass() != cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection.class) return false;
+        var nativeSection = (cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection) section;
+        if (nativeSection.getParent() != this) return false;
+        var storages = nativeSection.getStorages();
+        for (var storage : storages) {
+            if (storage != null && storage.getClass() != cn.nukkit.level.format.leveldb.structure.StateBlockStorage.class) return false;
+        }
+        return layer >= 0 && (layer >= storages.length || storages[layer] == null
+                || storages[layer].supportsNativeFallingCell(x, y & 15, z));
+    }
+
+    private void materializeSectionIfEmpty(int sectionY) {
+        synchronized (this.sections) {
+            if (this.getSection(sectionY) instanceof EmptyChunkSection) {
+                ChunkSection materialized = this.materializeSection(sectionY);
+                if (materialized != null) this.setInternalSection(sectionY, materialized);
+            }
+        }
+    }
+
+    /** Only native section implementations may participate in a callback-free falling write. */
+    public final boolean prepareFallingCell(int x, int y, int z) {
+        if (getClass() != cn.nukkit.level.format.leveldb.structure.LevelDBChunk.class
+                && getClass() != cn.nukkit.level.format.anvil.Chunk.class) return false;
+        if (getTile(x, y, z) != null || !supportsNativeFallingCell(x, y, z, 0)) return false;
+        materializeSectionIfEmpty(y >> 4);
+        ChunkSection section = getSection(y >> 4);
+        return section.getClass() == cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection.class
+                || section.getClass() == cn.nukkit.level.format.anvil.ChunkSection.class;
+    }
+
+    /** Used only after a native receipt was checked on the main thread. No lifecycle callbacks. */
+    public final boolean writeFallingCell(int x, int y, int z, int layer, int fullId) {
+        boolean changed = getSection(y >> 4).setFullBlockId(x, y & 15, z, layer, fullId);
+        if (changed) setChanged();
+        return changed;
+    }
+
+    public final void notifyFallingCell(int x, int y, int z) {
+        removeInvalidTile(x, y, z);
+    }
+
     private void removeInvalidTile(int x, int y, int z) {
         BlockEntity entity = getTile(x, y, z);
         if (entity != null && !entity.isBlockEntityValid()) {

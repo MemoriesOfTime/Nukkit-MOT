@@ -1,7 +1,6 @@
 package cn.nukkit.block;
 
 import cn.nukkit.entity.item.EntityFallingBlock;
-import cn.nukkit.event.block.BlockFallEvent;
 import cn.nukkit.level.Level;
 import cn.nukkit.nbt.tag.*;
 
@@ -22,16 +21,7 @@ public abstract class BlockFallable extends BlockSolid {
 
         Block down = this.down();
         if (this.canFallInto(down)) {
-            BlockFallEvent event = new BlockFallEvent(this);
-            this.level.getServer().getPluginManager().callEvent(event);
-
-            if (event.isCancelled()) {
-                return type;
-            }
-
-            this.level.setBlock(this, Block.get(Block.AIR), true, true);
-            EntityFallingBlock fall = this.createFallingEntity(new CompoundTag());
-            fall.spawnToAll();
+            EntityFallingBlock.startFalling(this, () -> this.createFallingEntity(new CompoundTag()));
         }
         return type;
     }
