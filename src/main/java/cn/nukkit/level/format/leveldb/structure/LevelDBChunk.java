@@ -694,6 +694,9 @@ public class LevelDBChunk extends BaseChunk {
     @Override
     public LevelDBChunk cloneForChunkSending() {
         LevelDBChunk chunk = (LevelDBChunk) super.cloneForChunkSending();
+        if (this.biomes != null) {
+            chunk.biomes = this.biomes.clone();
+        }
 
         for (int i = 0; i < chunk.sections.length; i++) {
             ChunkSection section = chunk.sections[i];
