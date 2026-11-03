@@ -240,6 +240,7 @@ public class LevelHopperPolicyRetryTest {
         field(level, "chunkTickList", new Long2IntOpenHashMap());
         field(level, "changedBlocks", new Long2ObjectOpenHashMap<>());
         field(level, "pendingChunkRequests", new Object2ObjectOpenHashMap<>());
+        field(level, "asyncChunkRequestCallbackQueue", new ConcurrentLinkedQueue<>());
         field(level, "asyncChunkRequestFailedQueue", new ConcurrentLinkedQueue<>());
         field(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
         field(level, "chunkPackets", new ConcurrentHashMap<>());

@@ -319,6 +319,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private int chunksSent = 0;
     private long chunkDeliveryEpoch;
+    private long chunkOrderEpoch;
+    private boolean chunkPublisherUpdatePending;
+    private ChunkSubmissionGuard chunkSubmissionGuard;
+    private PublisherSubmissionGuard publisherSubmissionGuard;
+
+    private record ChunkSubmissionGuard(DataPacket packet, Level sourceLevel, long sourceEpoch,
+                                        long index, boolean tracked) { }
+
+    private record PublisherSubmissionGuard(DataPacket packet, Level sourceLevel, long sourceEpoch,
+                                             long orderEpoch, int radius, double x, double y, double z) { }
+
     private boolean hasSpawnChunks;
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
     protected int nextChunkOrderRun = 1;
@@ -1269,12 +1280,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void unloadChunk(int x, int z, Level level) {
         level = level == null ? this.level : level;
+        Level sourceLevel = this.level;
+        long sourceEpoch = this.chunkDeliveryEpoch;
+        long sourceOrderEpoch = this.chunkOrderEpoch;
         long index = Level.chunkHash(x, z);
         if (this.usedChunks.containsKey(index)) {
             // Only live entities have viewers; abandoning a chunk must not reload it from storage.
             for (Entity entity : level.getChunkEntities(x, z, false).values()) {
                 if (entity != this) {
                     entity.despawnFrom(this);
+                    if (this.level != sourceLevel || this.chunkDeliveryEpoch != sourceEpoch
+                            || this.chunkOrderEpoch != sourceOrderEpoch) return;
                 }
             }
 
@@ -1287,6 +1303,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private void unloadChunks(boolean online) {
         ++this.chunkDeliveryEpoch;
+        this.chunkPublisherUpdatePending = false;
         // 切世界后旧事务引用的 blob 全部作废 / old transaction blob refs are void after a world switch
         this.clearBlobCacheState();
         for (long index : this.usedChunks.keySet()) {
@@ -1352,9 +1369,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         long sourceEpoch = this.chunkDeliveryEpoch;
         boolean tracked = this.usedChunks.containsKey(index);
         boolean submitted = false;
+        ChunkSubmissionGuard previousGuard = this.chunkSubmissionGuard;
+        this.chunkSubmissionGuard = new ChunkSubmissionGuard(packet, sourceLevel, sourceEpoch, index, tracked);
         try {
             submitted = this.dataPacket(packet);
         } finally {
+            this.chunkSubmissionGuard = previousGuard;
             if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
                     && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
                 this.usedChunks.put(index, Boolean.FALSE);
@@ -1515,6 +1535,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!this.connected) {
             return;
         }
+        Level sourceLevel = this.level;
+        long sourceEpoch = this.chunkDeliveryEpoch;
+        long sourceOrderEpoch = this.chunkOrderEpoch;
 
         if (!loadQueue.isEmpty()) {
             int count = 0;
@@ -1586,8 +1609,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 PlayerChunkRequestEvent ev = new PlayerChunkRequestEvent(this, chunkX, chunkZ);
                 this.server.getPluginManager().callEvent(ev);
+                if (!this.connected || this.level != sourceLevel || this.chunkDeliveryEpoch != sourceEpoch
+                        || this.chunkOrderEpoch != sourceOrderEpoch) {
+                    return;
+                }
                 if (!ev.isCancelled()) {
-                    this.level.requestChunk(chunkX, chunkZ, this);
+                    sourceLevel.requestChunk(chunkX, chunkZ, this);
                 }
             }
         }
@@ -1747,6 +1774,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        long sourceOrderEpoch = ++this.chunkOrderEpoch;
+        Level sourceLevel = this.level;
+        long sourceEpoch = this.chunkDeliveryEpoch;
         this.nextChunkOrderRun = 20;
         this.lastOrderChunkX = (int) this.x >> 4;
         this.lastOrderChunkZ = (int) this.z >> 4;
@@ -1817,18 +1847,43 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         while (keys.hasNext()) {
             index = keys.nextLong();
             this.unloadChunk(Level.getHashX(index), Level.getHashZ(index));
+            if (!this.connected || this.level != sourceLevel || this.chunkDeliveryEpoch != sourceEpoch
+                    || this.chunkOrderEpoch != sourceOrderEpoch) return true;
         }
 
         if (this.protocol >= 313) {
-            if (!loadQueue.isEmpty()) {
+            if (this.chunkPublisherUpdatePending || !loadQueue.isEmpty() || !lastChunk.isEmpty()) {
                 NetworkChunkPublisherUpdatePacket packet = new NetworkChunkPublisherUpdatePacket();
                 packet.position = this.asBlockVector3();
                 packet.radius = this.chunkRadius << 4;
-                this.dataPacket(packet);
+                this.sendChunkPublisherUpdate(packet);
             }
         }
 
         return true;
+    }
+
+    private void sendChunkPublisherUpdate(NetworkChunkPublisherUpdatePacket packet) {
+        PublisherSubmissionGuard previousGuard = this.publisherSubmissionGuard;
+        PublisherSubmissionGuard guard = new PublisherSubmissionGuard(packet, this.level, this.chunkDeliveryEpoch,
+                this.chunkOrderEpoch, this.chunkRadius, this.x, this.y, this.z);
+        this.publisherSubmissionGuard = guard;
+        this.chunkPublisherUpdatePending = true;
+        boolean submitted = false;
+        try {
+            submitted = this.dataPacket(packet);
+        } finally {
+            this.publisherSubmissionGuard = previousGuard;
+            if (this.isPublisherSubmissionContextCurrent(guard)) this.chunkPublisherUpdatePending = !submitted;
+            if (this.chunkPublisherUpdatePending) this.nextChunkOrderRun = 0;
+        }
+    }
+
+    private boolean isPublisherSubmissionContextCurrent(PublisherSubmissionGuard guard) {
+        return this.connected && this.level == guard.sourceLevel && this.chunkDeliveryEpoch == guard.sourceEpoch
+                && this.chunkOrderEpoch == guard.orderEpoch && this.chunkRadius == guard.radius
+                && Double.compare(this.x, guard.x) == 0 && Double.compare(this.y, guard.y) == 0
+                && Double.compare(this.z, guard.z) == 0;
     }
 
     private void classifyChunkForFov(long index, int dx, int dz, double dirX, double dirZ, double cosFov,
@@ -1874,6 +1929,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        ChunkSubmissionGuard chunkGuard = this.chunkSubmissionGuard;
+        if (chunkGuard != null && chunkGuard.packet != packet) chunkGuard = null;
+        if (chunkGuard == null && packet instanceof SubChunkPacket) {
+            chunkGuard = new ChunkSubmissionGuard(packet, this.level, this.chunkDeliveryEpoch, 0L, false);
+        }
+        PublisherSubmissionGuard publisherGuard = this.publisherSubmissionGuard;
+        if (publisherGuard != null && publisherGuard.packet != packet) publisherGuard = null;
         packet = packet.clone();
         packet.protocol = this.protocol;
         packet.gameVersion = this.gameVersion;
@@ -1884,6 +1946,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (ev.isCancelled()) {
                 return false;
             }
+        }
+
+        if (chunkGuard != null && !this.isChunkSubmissionContextCurrent(chunkGuard.sourceLevel,
+                chunkGuard.sourceEpoch, chunkGuard.index, chunkGuard.tracked)) {
+            return false;
+        }
+        if (publisherGuard != null && !this.isPublisherSubmissionContextCurrent(publisherGuard)) {
+            return false;
         }
 
         if (Nukkit.DEBUG > 2 /*&& !server.isIgnoredPacket(packet.getClass())*/) {
@@ -6897,6 +6967,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setViewDistance(int distance) {
+        this.viewDistance = distance;
         if (this.chunkRadius != distance) {
             this.nextChunkOrderRun = 0;
         }
@@ -6910,6 +6981,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public int getViewDistance() {
         return this.chunkRadius;
+    }
+
+    public int getMaximumViewDistance() {
+        return this.viewDistance;
     }
 
     @Override
@@ -8998,7 +9073,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             NetworkChunkPublisherUpdatePacket pk0 = new NetworkChunkPublisherUpdatePacket();
             pk0.position = new BlockVector3((int) this.x, (int) this.y, (int) this.z);
             pk0.radius = this.chunkRadius << 4;
-            this.dataPacket(pk0);
+            this.sendChunkPublisherUpdate(pk0);
         }
 
         if (this.protocol >= ProtocolInfo.v1_19_50_20) {

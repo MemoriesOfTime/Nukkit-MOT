@@ -38,9 +38,11 @@ jobs:
       id: time
       if: github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
       run: printf 'time=%s\n' "$(TZ=Asia/Shanghai git show -s --date=format-local:'%Y/%m/%d-%H:%M:%S' --format=%cd HEAD)" >> "$GITHUB_OUTPUT"
-    # 推送到minebbs
+    # 推送到minebbs；第三方服务任何故障只标记本步骤，不影响 CI 结果
+    # Push to MineBBS; third-party outages must only mark this step, never fail the job
     - name: Update MineBBS information
       if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
+      continue-on-error: true
       env:
         MINEBBS_API_KEY: ${{ secrets.MINEBBS_API_KEY }}
         MINEBBS_RESOURCE_ID: '5934'

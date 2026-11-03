@@ -22,6 +22,44 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class PlayerSubChunkRequestStateTest {
 
+    @Test
+    void failedSectionIsNotDeliveredByItsSuccessfulNeighbor() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(1, 2);
+        state.onColumnSent(column, 100, true);
+        state.addOutstandingOffsets(column, 2);
+        state.releaseOutstandingOffsets(column, 1, -4);
+        state.completeOutstandingOffsets(column, 1, 4);
+        assertFalse(state.isColumnDataReady(column, 101, 200));
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1, 0);
+        assertFalse(state.isColumnDataReady(column, 102, 200), "another absolute section cannot clear -4");
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1, -4);
+        assertTrue(state.isColumnDataReady(column, 103, 200));
+    }
+
+    @Test
+    void replacementShellAndLifecycleResetRetireMissingSectionReceipts() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(1, 2);
+        state.onColumnSent(column, 100, true);
+        Object first = state.columnReceipt(column);
+        state.addOutstandingOffsets(column, 1);
+        state.releaseOutstandingOffsets(column, 1, -4);
+        state.onColumnSent(column, 110, true);
+        assertNotSame(first, state.columnReceipt(column));
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1, 4);
+        assertTrue(state.isColumnDataReady(column, 111, 200));
+        state.forgetColumn(column);
+        assertNull(state.columnReceipt(column));
+        state.onColumnSent(column, 120, true);
+        state.clear();
+        assertNull(state.columnReceipt(column));
+        assertTrue(state.isColumnDataReady(column, 121, 200));
+    }
+
     private static SubChunkRequestPacket request(int offsets) {
         SubChunkRequestPacket pk = new SubChunkRequestPacket();
         pk.dimension = 0;
