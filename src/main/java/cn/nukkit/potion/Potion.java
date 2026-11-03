@@ -233,7 +233,7 @@ public class Potion implements Cloneable {
                     break;
                 }
                 if (entity instanceof EntitySmite) {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (intensity * (6 << applyEffect.getAmplifier()))));
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (intensity * (6 << applyEffect.getAmplifier()))).setInstantPotionDamage());
                 } else {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (intensity * (4 << applyEffect.getAmplifier())), EntityRegainHealthEvent.CAUSE_MAGIC));
                 }
@@ -246,7 +246,7 @@ public class Potion implements Cloneable {
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (intensity * (4 << applyEffect.getAmplifier())), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (intensity * (6 << applyEffect.getAmplifier()))));
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (intensity * (6 << applyEffect.getAmplifier()))).setInstantPotionDamage());
                 }
                 break;
             case TURTLE_MASTER:

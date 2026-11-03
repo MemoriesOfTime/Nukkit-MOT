@@ -265,9 +265,9 @@ public class EntityArrow extends EntitySlenderProjectile {
                     }
                     if (entity instanceof EntitySmite) {
                         if (shootingEntity != null) {
-                            entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
+                            entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())).setInstantPotionDamage());
                         } else {
-                            entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
+                            entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())).setInstantPotionDamage());
                         }
                     } else {
                         entity.heal(new EntityRegainHealthEvent(entity, (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
@@ -280,9 +280,9 @@ public class EntityArrow extends EntitySlenderProjectile {
                     if (entity instanceof EntitySmite) {
                         entity.heal(new EntityRegainHealthEvent(entity, (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
                     } else if (shootingEntity != null) {
-                        entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
+                        entity.attack(new EntityDamageByEntityEvent(shootingEntity, entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())).setInstantPotionDamage());
                     } else {
-                        entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())));
+                        entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, (6 << effect.getAmplifier())).setInstantPotionDamage());
                     }
                     break;
                 case Effect.SATURATION:
