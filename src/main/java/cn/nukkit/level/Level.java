@@ -3375,13 +3375,7 @@ public class Level implements ChunkManager, Metadatable {
 
 
         if (!hand.canPassThrough() && hand.getBoundingBox() != null) {
-            List<Entity> entities = CollisionHelper.getCollidingEntities(this, hand.getBoundingBox());
-            //int realCount = 0;
-            for (Entity e : entities) {
-                if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator() || !e.canCollide())) {
-                    continue;
-                }
-                //++realCount;
+            if (this.isBlockPlacementObstructed(hand.getBoundingBox(), player)) {
                 return null;
             }
 
@@ -3554,6 +3548,24 @@ public class Level implements ChunkManager, Metadatable {
 
     public Entity[] getEntities() {
         return entities.values().toArray(new Entity[0]);
+    }
+
+    /**
+     * Checks whether an entity stands in the way of a block that would fill the given box.
+     * Arrows, dropped items, spectators, entities without collision and the placing player never block a placement.
+     *
+     * @param bb     the box the placed block would fill
+     * @param player the player placing the block, or {@code null}
+     * @return {@code true} when at least one entity blocks the placement
+     */
+    public boolean isBlockPlacementObstructed(AxisAlignedBB bb, @Nullable Player player) {
+        for (Entity e : CollisionHelper.getCollidingEntities(this, bb)) {
+            if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator()) || !e.canCollide()) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
