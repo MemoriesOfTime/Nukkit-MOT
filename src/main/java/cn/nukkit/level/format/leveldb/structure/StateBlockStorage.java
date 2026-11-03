@@ -62,6 +62,7 @@ public class StateBlockStorage {
 
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
+    private volatile boolean shared;
     // Snapshot acknowledgements must also notice public storage mutations that bypass section setters.
 
     /**
@@ -143,6 +144,7 @@ public class StateBlockStorage {
             return;
         }
 
+        this.ensureWritable();
         this.palette.clear();
         this.version++;
 
@@ -246,6 +248,7 @@ public class StateBlockStorage {
 
     public synchronized void set(int index, BlockStateSnapshot value) {
         try {
+            this.ensureWritable();
             int paletteIndex = this.getOrAdd(value);
             this.bitArray.set(index, paletteIndex);
             if(this.blockIds != null && this.blockData != null) {
@@ -598,6 +601,7 @@ public class StateBlockStorage {
 
 //            Arrays.fill(this.bitArray.getWords(), 0);
             this.bitArray = BitArrayVersion.V1.createPalette(SECTION_SIZE);
+            this.shared = false;
             this.version++;
             return true;
         }
@@ -643,6 +647,7 @@ public class StateBlockStorage {
         newPalette.trim();
         this.bitArray = newArray;
         this.palette = newPalette;
+        this.shared = false;
         this.version++;
         return true;
     }
@@ -660,15 +665,32 @@ public class StateBlockStorage {
         }
     }
 
+    private void ensureWritable() {
+        if (this.shared) {
+            this.bitArray = this.bitArray.copy();
+            this.palette = new ObjectArrayList<>(this.palette);
+            this.shared = false;
+        }
+    }
+
     public synchronized StateBlockStorage copy() {
+        // External constructor aliases and subclass hooks cannot participate in COW.
+        boolean share = this.networkCacheable && getClass() == StateBlockStorage.class;
         StateBlockStorage copy = new StateBlockStorage(
-                this.bitArray.copy(),
-                new ObjectArrayList<>(this.palette),
+                share ? this.bitArray : this.bitArray.copy(),
+                share ? this.palette : new ObjectArrayList<>(this.palette),
                 this.blockIds != null ? this.blockIds.clone() : null,
                 this.blockData != null ? this.blockData.copy(): null
         );
-        // copy() runs under the section read lock and hands out deep copies of every array,
-        // so a worker's clone stays valid and self-contained after live block edits.
+        // The storage monitor orders snapshot creation with live writes. Both owners detach
+        // before touching shared cells/palette; legacy arrays remain private deep copies.
+        // Executor submission publishes the initialized clone (including the volatile flag)
+        // to the serializer: all pre-submit writes happen-before its reads. Later live writes
+        // touch only detached arrays, so the worker never reads partially changed words.
+        if (share) {
+            this.shared = true;
+            copy.shared = true;
+        }
         copy.networkCacheable = true;
         return copy;
     }

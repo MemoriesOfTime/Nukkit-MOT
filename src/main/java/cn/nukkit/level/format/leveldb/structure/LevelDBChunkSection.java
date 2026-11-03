@@ -970,8 +970,10 @@ public class LevelDBChunkSection implements ChunkSection {
             this.skyLightLock.lock();
             try {
                 byte[] copiedSkyLight = this.skyLight == null ? null : this.skyLight.clone();
-                return new LevelDBChunkSection(null, this.y, storages, this.blockLight, copiedSkyLight,
-                        this.compressedLight, this.hasBlockLight, this.hasSkyLight);
+                return new LevelDBChunkSection(null, this.y, storages,
+                        this.blockLight == null ? null : this.blockLight.clone(), copiedSkyLight,
+                        this.compressedLight == null ? null : this.compressedLight.clone(),
+                        this.hasBlockLight, this.hasSkyLight);
             } finally {
                 this.skyLightLock.unlock();
             }
