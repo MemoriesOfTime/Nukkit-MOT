@@ -954,6 +954,8 @@ public class Server {
                 this.forceShutdown();
                 return;
             }
+        } else if (this.maximumProtocol >= ProtocolInfo.v1_26_60) {
+            log.warn(this.baseLang.translateString("nukkit.nethernet.disabled.hint"));
         }
 
         EntityProperty.init();

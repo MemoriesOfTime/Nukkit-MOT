@@ -593,6 +593,8 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ, long sequence) {
+        Level.ChunkRequestOwner owner = getLevel().getClass() == Level.class
+                ? getLevel().captureChunkRequestOwner(protocols, chunkX, chunkZ) : null;
         LevelDBChunk chunk = (LevelDBChunk) this.getChunk(chunkX, chunkZ, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -605,7 +607,7 @@ public class LevelDBProvider implements LevelProvider {
         // serialize synchronously, same fallback as SubChunkRequestProcessor
         ExecutorService executor = this.getServer().asyncChunkSending ? this.level.getAsyncChuckExecutor() : null;
         if (executor == null) {
-            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence, owner);
             return;
         }
 
@@ -623,19 +625,19 @@ public class LevelDBProvider implements LevelProvider {
                                 networkChunkSerializerCallback.getSubChunkBlobs(),
                                 networkChunkSerializerCallback.getBiomes(),
                                 networkChunkSerializerCallback.getBlockEntities(),
-                                sequence
+                                sequence, owner
                         );
                     }, level.antiXrayEnabled(), getLevel().getDimensionData(), getLevel().isClientCacheDeliveryWanted());
                 } catch (Throwable t) {
                     getLevel().getServer().getLogger().error("Async chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
                     for (GameVersion gv : protocols) {
-                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
+                        getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence, owner);
                     }
                 }
             });
         } catch (RejectedExecutionException e) {
             // 关服中池已停：同步兜底，不让请求丢失 / pool already down during shutdown: sync fallback
-            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence);
+            this.requestChunkTaskSync(protocols, chunk, timestamp, chunkX, chunkZ, sequence, owner);
         }
     }
 
@@ -644,7 +646,7 @@ public class LevelDBProvider implements LevelProvider {
      * <p>
      * Main-thread serialization (async-chunks off / world predates the setting / executor shut down)
      */
-    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, BaseChunk chunk, long timestamp, int chunkX, int chunkZ, long sequence) {
+    private void requestChunkTaskSync(ObjectSet<GameVersion> protocols, BaseChunk chunk, long timestamp, int chunkX, int chunkZ, long sequence, Level.ChunkRequestOwner owner) {
         try {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
                 this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
@@ -655,14 +657,13 @@ public class LevelDBProvider implements LevelProvider {
                         networkChunkSerializerCallback.getStream().getBuffer(),
                         networkChunkSerializerCallback.getSubChunkBlobs(),
                         networkChunkSerializerCallback.getBiomes(),
-                        networkChunkSerializerCallback.getBlockEntities(),
-                        sequence
+                        networkChunkSerializerCallback.getBlockEntities(), sequence, owner
                 );
             }, level.antiXrayEnabled(), this.level.getDimensionData(), this.level.isClientCacheDeliveryWanted());
         } catch (Throwable t) {
             getLevel().getServer().getLogger().error("Sync chunk serialization failed for chunk (" + chunkX + ", " + chunkZ + ")", t);
             for (GameVersion gv : protocols) {
-                getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence);
+                getLevel().onAsyncChunkRequestFailed(gv, chunkX, chunkZ, sequence, owner);
             }
         }
     }
