@@ -6217,6 +6217,8 @@ public class Level implements ChunkManager, Metadatable {
         return (int) block.getY() >= this.getHighestBlockAt((int) block.getX(), (int) block.getZ());
     }
 
+    private static final BlockFace[] REDSTONE_POWER_FACES = BlockFace.values();
+
     public int getStrongPower(Vector3 pos, BlockFace direction) {
         return this.getBlock(pos).getStrongPower(direction);
     }
@@ -6224,7 +6226,7 @@ public class Level implements ChunkManager, Metadatable {
     public int getStrongPower(Vector3 pos) {
         int i = 0;
 
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             i = Math.max(i, this.getStrongPower(pos.getSideVec(face), face));
 
             if (i >= 15) {
@@ -6245,7 +6247,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean isBlockPowered(Vector3 pos) {
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             if (this.getRedstonePower(pos.getSideVec(face), face) > 0) {
                 return true;
             }
@@ -6256,7 +6258,7 @@ public class Level implements ChunkManager, Metadatable {
     public int isBlockIndirectlyGettingPowered(Vector3 pos) {
         int power = 0;
 
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             int blockPower = this.getRedstonePower(pos.getSideVec(face), face);
 
             if (blockPower >= 15) {
