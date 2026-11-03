@@ -171,10 +171,10 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                 && this.fireTicks <= 0 && this.effects.isEmpty()
                 && this.noDamageTicks <= 0 && this.attackTime <= 0
                 && this.inLoveTicks <= 0
-                // Wool regrowth counts updates, not tickDiff; keep its existing cadence while sheared.
-                && !(this instanceof cn.nukkit.entity.passive.EntitySheep sheep && sheep.isSheared())
                 && !this.isLeashed()
                 && this.server.getTick() - this.lastDamageTick > ACTIVATION_DAMAGE_GRACE_TICKS
+                // Wool regrowth counts updates, not tickDiff; keep its existing cadence while sheared.
+                && !(this instanceof cn.nukkit.entity.passive.EntitySheep sheep && sheep.isSheared())
                 && !this.hasCustomName()
                 && !(this instanceof EntityOwnable ownable && ownable.getOwnerName() != null && !ownable.getOwnerName().isEmpty());
     }
