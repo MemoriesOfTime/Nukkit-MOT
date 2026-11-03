@@ -123,14 +123,18 @@ class LevelIdleChunkRequestAllocationTest {
             }
             queue.put(hash, recipients);
         }
-        fixture.buckets.started.put(hash, 99L);
+        fixture.buckets.started(VERSION).put(hash, 99L);
 
         process(fixture.level);
 
         assertTrue(pending.isEmpty(), "Rejected requests must not remain pending after the drain");
         assertFalse(queue.containsKey(hash), "Empty or disconnected recipient owners must be removed");
         assertTrue(tasks(fixture.level, VERSION).isEmpty());
-        assertEquals(99L, fixture.buckets.started.get(hash), "Recipient rejection precedes timeout handling");
+        if (kind.equals("missing")) {
+            assertEquals(99L, fixture.buckets.started(VERSION).get(hash), "a missing cohort has no accepted owner to release");
+        } else {
+            assertFalse(fixture.buckets.started(VERSION).containsKey(hash), "retiring the last empty or disconnected cohort clears its timestamp");
+        }
         fixture.assertNoRequestSubmission();
     }
 
@@ -143,14 +147,14 @@ class LevelIdleChunkRequestAllocationTest {
         Int2ObjectMap<Player> owner = queue(fixture.level, VERSION).get(hash);
         LongSet tasks = tasks(fixture.level, VERSION);
         tasks.add(hash);
-        fixture.buckets.started.put(hash, 99L);
+        fixture.buckets.started(VERSION).put(hash, 99L);
 
         process(fixture.level);
 
         assertTrue(pending(fixture.level, VERSION).isEmpty());
         assertTrue(tasks.contains(hash));
         assertSame(owner, queue(fixture.level, VERSION).get(hash));
-        assertEquals(99L, fixture.buckets.started.get(hash));
+        assertEquals(99L, fixture.buckets.started(VERSION).get(hash));
         fixture.assertNoRequestSubmission();
         verify(player, never()).sendChunk(anyInt(), anyInt(), any(DataPacket.class));
     }
@@ -164,13 +168,13 @@ class LevelIdleChunkRequestAllocationTest {
         Int2ObjectMap<Player> owner = queue(fixture.level, VERSION).get(hash);
         LongSet tasks = tasks(fixture.level, VERSION);
         tasks.add(hash);
-        fixture.buckets.started.put(hash, 99L);
+        fixture.buckets.started(VERSION).put(hash, 99L);
         when(fixture.server.getTick()).thenReturn(300);
         MainLogger logger = mock(MainLogger.class);
         when(fixture.server.getLogger()).thenReturn(logger);
         BaseFullChunk chunk = mock(BaseFullChunk.class);
         doAnswer(call -> {
-            assertFalse(fixture.buckets.started.containsKey(hash), "Expired timestamp is removed before lookup");
+            assertFalse(fixture.buckets.started(VERSION).containsKey(hash), "Expired timestamp is removed before lookup");
             assertTrue(tasks.contains(hash), "The retry has reserved a new task before lookup");
             return chunk;
         }).when(fixture.level).getChunk(3, 5);
@@ -179,8 +183,12 @@ class LevelIdleChunkRequestAllocationTest {
 
         assertTrue(pending(fixture.level, VERSION).isEmpty());
         assertTrue(tasks.contains(hash));
-        assertSame(owner, queue(fixture.level, VERSION).get(hash));
-        assertEquals(300L, fixture.buckets.started.get(hash));
+        Int2ObjectMap<Player> retryOwner = queue(fixture.level, VERSION).get(hash);
+        assertNotSame(owner, retryOwner, "an accepted retry needs a fresh cohort identity against late callbacks");
+        assertEquals(owner, retryOwner, "retry membership must stay unchanged");
+        assertIterableEquals(owner.values(), retryOwner.values(), "retain native recipient iteration order");
+        assertSame(player, retryOwner.get(1));
+        assertEquals(300L, fixture.buckets.started(VERSION).get(hash));
         ArgumentCaptor<Long> submission = ArgumentCaptor.forClass(Long.class);
         verify(fixture.level).getChunk(3, 5);
         verify(fixture.provider).requestChunkTask(
@@ -225,7 +233,7 @@ class LevelIdleChunkRequestAllocationTest {
             for (long hash : new long[]{firstHash, secondHash}) {
                 assertTrue(tasks(fixture.level, version).contains(hash));
                 assertSame(player, queue(fixture.level, version).get(hash).get(player.getLoaderId()));
-                assertEquals(100L, fixture.buckets.started.get(hash));
+                assertEquals(100L, fixture.buckets.started(version).get(hash));
                 assertEquals(fixture.buckets.epochs.get(VERSION).get(hash),
                         fixture.buckets.epochs.get(secondVersion).get(hash),
                         "Both versions of one coordinate share the submission id");
@@ -270,8 +278,12 @@ class LevelIdleChunkRequestAllocationTest {
         final Object2ObjectMap<GameVersion, LongSet> tasks = new Object2ObjectOpenHashMap<>();
         final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> queues =
                 new Object2ObjectOpenHashMap<>();
-        final Long2LongOpenHashMap started = new Long2LongOpenHashMap();
+        final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> started = new Object2ObjectOpenHashMap<>();
         final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> epochs = new Object2ObjectOpenHashMap<>();
+
+        Long2LongOpenHashMap started(GameVersion version) {
+            return started.computeIfAbsent(version, ignored -> new Long2LongOpenHashMap());
+        }
 
         void install(Level level) throws Exception {
             set(level, "pendingChunkRequests", pending);
