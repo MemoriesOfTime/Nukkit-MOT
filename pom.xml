@@ -699,7 +699,9 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.5</version>
                 <configuration>
-                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                    <!-- 隐式异常（NPE/AIOOBE）不走 fast-throw 预分配，测试才可比异常消息文本 -->
+                    <!-- Keep implicit-exception messages intact so tests can compare them -->
+                    <argLine>@{argLine} -XX:-OmitStackTraceInFastThrow -javaagent:${org.mockito:mockito-core:jar}</argLine>
                 </configuration>
             </plugin>
             <plugin>

@@ -386,6 +386,9 @@ tasks {
 
     test {
         useJUnitPlatform()
+        // 隐式异常（NPE/AIOOBE）不走 fast-throw 预分配，测试才可比异常消息文本
+        // Keep implicit-exception messages intact so tests can compare them
+        jvmArgs("-XX:-OmitStackTraceInFastThrow")
         jvmArgumentProviders.add(
             objects.newInstance<JavaAgentArgumentProvider>().apply {
                 classpath.from(mockitoAgent)

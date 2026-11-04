@@ -131,8 +131,14 @@ class BinaryStreamFixedWidthReadTest {
         } else {
             assertNotNull(actualFailure);
             assertEquals(expectedFailure.getClass(), actualFailure.getClass());
-            // HotSpot may omit the message and stack of repeatedly thrown array bounds exceptions.
-            if (!omittedArrayBoundsMessage(expectedFailure) && !omittedArrayBoundsMessage(actualFailure)) {
+            // HotSpot 可将同一 PC 上反复抛出的隐式异常（AIOOBE/NPE）换成无消息无栈的预分配异常，
+            // 旧/新两条内联路径的异常 PC 各自计数，可能一侧已省略一侧仍保留，消息文本不可比。
+            // 构建 JVM 已传 -XX:-OmitStackTraceInFastThrow 根除此现象，此处仅兜底不经构建的入口（IDE/main）。
+            // HotSpot may swap repeatedly thrown implicit exceptions (AIOOBE/NPE) at one PC for a
+            // preallocated one without message or stack; the two inlined sides can diverge. Build JVMs
+            // pass -XX:-OmitStackTraceInFastThrow to prevent it; this guard only covers entry points
+            // without the flag (IDE runs, the main method below).
+            if (!omittedByFastThrow(expectedFailure) && !omittedByFastThrow(actualFailure)) {
                 assertEquals(expectedFailure.getMessage(), actualFailure.getMessage());
             }
         }
@@ -141,8 +147,14 @@ class BinaryStreamFixedWidthReadTest {
         assertArrayEquals(bytes, actual.getBufferUnsafe());
     }
 
-    private static boolean omittedArrayBoundsMessage(Throwable failure) {
-        return failure.getClass() == ArrayIndexOutOfBoundsException.class
+    private static boolean omittedByFastThrow(Throwable failure) {
+        // 同一 PC 反复抛出的隐式异常（含 copyOfRange 的 null 数组 NPE）会被 HotSpot
+        // 以无消息、无栈的预分配异常替代，此时消息文本不参与一致性比较。
+        // Implicit exceptions thrown repeatedly at one PC (including the null-array NPE
+        // from copyOfRange) get replaced by a preallocated message-less, stack-less
+        // exception whose text must not take part in the comparison.
+        return (failure.getClass() == ArrayIndexOutOfBoundsException.class
+                || failure.getClass() == NullPointerException.class)
                 && failure.getMessage() == null && failure.getStackTrace().length == 0;
     }
 
