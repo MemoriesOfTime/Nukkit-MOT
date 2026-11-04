@@ -68,6 +68,7 @@ class PlayerMendingCandidatesTest {
             when(f.inventory.getSize()).thenReturn(36, 35, 34, 33);
             when(f.inventory.getHeldItemIndex()).thenReturn(36);
             Item replacement = Item.get(Item.DIAMOND_SWORD, 100, 1);
+            replacement.addEnchantment(Enchantment.get(Enchantment.ID_MENDING));
             when(f.inventory.getItem(36)).thenReturn(replacement);
             ThreadLocalRandom random = mock(ThreadLocalRandom.class);
             when(random.nextInt(6)).thenReturn(selected);
@@ -101,13 +102,63 @@ class PlayerMendingCandidatesTest {
         assertFalse(f.player.pickupEntity(f.orb,true));verify(f.player,times(1)).addExperience(3);
     }
 
+    @Test
+    void leftoverExperienceAfterRepairIsReturnedToThePlayer() throws Exception {
+        Fixture f = new Fixture(1 << 4);
+        Item sword = Item.get(Item.DIAMOND_SWORD, 4, 1);
+        sword.addEnchantment(Enchantment.get(Enchantment.ID_MENDING));
+        when(f.inventory.getItemInHandFast()).thenReturn(sword);
+        when(f.inventory.getItem(7)).thenReturn(sword.clone());
+        when(f.orb.getExp()).thenReturn(10);
+        assertTrue(f.player.pickupEntity(f.orb, true));
+        verify(f.inventory).setItem(eq(7), argThat(item -> item.getDamage() == 0));
+        verify(f.player).addExperience(8);
+    }
+
+    @Test
+    void cancelledRepairKeepsTheWholeOrb() throws Exception {
+        Fixture f = new Fixture(1 << 4);
+        doReturn(false).when(f.inventory).setItem(anyInt(), any(Item.class));
+        assertTrue(f.player.pickupEntity(f.orb, true));
+        verify(f.player).addExperience(3);
+    }
+
+    @Test
+    void undamagedAndUnbreakableItemsAreNotCandidates() throws Exception {
+        Fixture f = new Fixture(0);
+        Item undamaged = Item.get(Item.DIAMOND_SWORD, 0, 1);
+        undamaged.addEnchantment(Enchantment.get(Enchantment.ID_MENDING));
+        Item unbreakable = Item.get(Item.DIAMOND_HELMET, 100, 1);
+        unbreakable.addEnchantment(Enchantment.get(Enchantment.ID_MENDING));
+        unbreakable.setUnbreakable(true);
+        when(f.inventory.getItemInHandFast()).thenReturn(undamaged);
+        when(f.inventory.getArmorItem(0)).thenReturn(unbreakable);
+        try (MockedStatic<ThreadLocalRandom> current = mockStatic(ThreadLocalRandom.class)) {
+            assertTrue(f.player.pickupEntity(f.orb, true));
+            current.verifyNoInteractions();
+        }
+        verify(f.inventory, never()).setItem(anyInt(), any(Item.class));
+        verify(f.player).addExperience(3);
+    }
+
+    @Test
+    void damagedMendingOffhandItemIsRepairedEvenWhenNotAShield() throws Exception {
+        Fixture f = new Fixture(0);
+        Item totemSlotSword = Item.get(Item.DIAMOND_SWORD, 100, 1);
+        totemSlotSword.addEnchantment(Enchantment.get(Enchantment.ID_MENDING));
+        when(f.offhand.getItem(0)).thenReturn(totemSlotSword);
+        assertTrue(f.player.pickupEntity(f.orb, true));
+        verify(f.offhand).setItem(eq(0), argThat(item -> item.getDamage() == 94));
+        verify(f.player, never()).addExperience(anyInt());
+    }
+
     private static final class Fixture {
         final Server server=mock(Server.class);final Level level=mock(Level.class);
         final Player player=mock(Player.class,CALLS_REAL_METHODS);final PlayerInventory inventory=mock(PlayerInventory.class);final PlayerOffhandInventory offhand=mock(PlayerOffhandInventory.class);final EntityXPOrb orb=mock(EntityXPOrb.class);
         final Item[] equipment=new Item[6];
         Fixture(int mask)throws Exception {
             set(player,"server",server);set(player,"inventory",inventory);set(player,"offhandInventory",offhand);player.spawned=true;player.boundingBox=new SimpleAxisAlignedBB(-1,-1,-1,1,1,1);
-            when(server.getTick()).thenReturn(1);doReturn(true).when(player).isAlive();doReturn(true).when(player).isOnline();doReturn(false).when(player).isSpectator();doReturn(level).when(player).getLevel();doNothing().when(player).addExperience(anyInt());when(orb.getExp()).thenReturn(3);when(inventory.getSize()).thenReturn(36);when(inventory.getHeldItemIndex()).thenReturn(7);
+            when(server.getTick()).thenReturn(1);doReturn(true).when(player).isAlive();doReturn(true).when(player).isOnline();doReturn(false).when(player).isSpectator();doReturn(level).when(player).getLevel();doNothing().when(player).addExperience(anyInt());when(orb.getExp()).thenReturn(3);when(inventory.getSize()).thenReturn(36);when(inventory.getHeldItemIndex()).thenReturn(7);doReturn(true).when(inventory).setItem(anyInt(),any(Item.class));doReturn(true).when(offhand).setItem(anyInt(),any(Item.class));
             int[] ids={Item.DIAMOND_HELMET,Item.DIAMOND_CHESTPLATE,Item.DIAMOND_LEGGINGS,Item.DIAMOND_BOOTS,Item.DIAMOND_SWORD,Item.SHIELD};
             for(int i=0;i<6;i++){equipment[i]=(mask&(1<<i))==0?Item.AIR_ITEM:Item.get(ids[i],100,1);if(!equipment[i].isNull())equipment[i].addEnchantment(Enchantment.get(Enchantment.ID_MENDING));if(i<4)when(inventory.getArmorItem(i)).thenReturn(equipment[i]);else if(i==4)when(inventory.getItemInHandFast()).thenReturn(equipment[i]);else when(offhand.getItem(0)).thenReturn(equipment[i]);if(i<5)when(inventory.getItem(slot(i))).thenReturn(equipment[i].clone());}
         }

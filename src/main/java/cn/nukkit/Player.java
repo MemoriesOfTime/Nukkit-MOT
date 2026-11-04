@@ -9385,25 +9385,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.getLevel().addSound(new ExperienceOrbSound(this));
                 pickedXPOrb = server.getTick();
 
-                // Four armor slots, hand and offhand shield; keep discovery order.
+                // Four armor slots, main hand and offhand; only damaged repairable items are candidates.
                 int[] itemsWithMending = null;
                 int mendingCount = 0;
                 for (int i = 0; i < 4; i++) {
                     Item item = inventory.getArmorItem(i);
-                    if (item.getDamage() != 0 && item.hasEnchantment(Enchantment.ID_MENDING)) {
+                    if (isMendingCandidate(item)) {
                         if (itemsWithMending == null) itemsWithMending = new int[6];
                         itemsWithMending[mendingCount++] = inventory.getSize() + i;
                     }
                 }
 
                 Item hand = inventory.getItemInHandFast();
-                if (hand.getDamage() != 0 && hand.hasEnchantment(Enchantment.ID_MENDING)) {
+                if (isMendingCandidate(hand)) {
                     if (itemsWithMending == null) itemsWithMending = new int[6];
                     itemsWithMending[mendingCount++] = inventory.getHeldItemIndex();
                 }
 
                 Item offhand = this.getOffhandInventory().getItem(0);
-                if (offhand.getId() == Item.SHIELD && offhand.getDamage() != 0 && offhand.hasEnchantment(Enchantment.ID_MENDING)) {
+                if (isMendingCandidate(offhand)) {
                     if (itemsWithMending == null) itemsWithMending = new int[6];
                     itemsWithMending[mendingCount++] = -1;
                 }
@@ -9413,29 +9413,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     boolean isOffhand = itemToRepair == -1;
 
                     Item toRepair = isOffhand ? offhand : this.inventory.getItem(itemToRepair);
-                    if (toRepair instanceof ItemDurable) {
-                        if (toRepair.getDamage() > 0) {
-                            int dmg = toRepair.getDamage() - (exp << 1); // repair 2 points per xp
-                            if (dmg < 0) {
-                                dmg = 0;
-                            }
-                            toRepair.setDamage(dmg);
-                            if (isOffhand) {
-                                this.getOffhandInventory().setItem(0, toRepair);
-                            } else {
-                                this.inventory.setItem(itemToRepair, toRepair);
-                            }
-                            return true;
+                    if (isMendingCandidate(toRepair)) {
+                        int damage = toRepair.getDamage();
+                        // Vanilla: 1 XP repairs 2 durability; XP left after the repair goes to the player
+                        int repaired = (int) Math.min(damage, (long) exp << 1);
+                        toRepair.setDamage(damage - repaired);
+                        boolean applied = isOffhand
+                                ? this.getOffhandInventory().setItem(0, toRepair)
+                                : this.inventory.setItem(itemToRepair, toRepair);
+                        if (applied) {
+                            exp -= repaired >> 1;
                         }
                     }
                 }
 
-                this.addExperience(exp);
+                if (exp > 0) {
+                    this.addExperience(exp);
+                }
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static boolean isMendingCandidate(Item item) {
+        return item instanceof ItemDurable
+                && item.getDamage() > 0
+                && !item.isUnbreakable()
+                && item.hasEnchantment(Enchantment.ID_MENDING);
     }
 
     @Override
