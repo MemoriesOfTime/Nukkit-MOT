@@ -1716,9 +1716,13 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void sendData(Player[] players, EntityMetadata data) {
+        if (players.length == 0 && !(this instanceof Player)) {
+            return;
+        }
+
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.id;
-        // One snapshot is enough: the packet only reads it and every viewer gets the same data
+        // encode() only reads the snapshot, so the same metadata can go to every viewer
         pk.metadata = data == null ? this.dataProperties.clone() : data;
         pk.syncedProperties = this.propertySyncData();
 

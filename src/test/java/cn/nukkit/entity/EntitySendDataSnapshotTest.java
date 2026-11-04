@@ -5,10 +5,11 @@ import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.SetEntityDataPacket;
 import cn.nukkit.network.protocol.types.PropertySyncData;
+import org.junit.jupiter.api.Test;
+
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,14 +19,10 @@ class EntitySendDataSnapshotTest {
 
     @Test
     void viewersShareOneSnapshotDetachedFromEntityMetadata() throws Exception {
-        Entity entity = mock(Entity.class, CALLS_REAL_METHODS);
-        entity.id = 42;
         EntityMetadata source = new EntityMetadata()
                 .putLong(Entity.DATA_FLAGS, 7L)
                 .putString(Entity.DATA_NAMETAG, "name");
-        Field field = Entity.class.getDeclaredField("dataProperties");
-        field.setAccessible(true);
-        field.set(entity, source);
+        Entity entity = entityWith(source);
         doReturn(new PropertySyncData(new int[0], new float[0])).when(entity).propertySyncData();
 
         List<SetEntityDataPacket> sent = new ArrayList<>();
@@ -50,10 +47,29 @@ class EntitySendDataSnapshotTest {
             assertEquals("name", pk.metadata.getString(Entity.DATA_NAMETAG));
         }
 
-        // Later entity changes must not leak into the already queued packets, and vice versa
+        // clone() is a shallow map copy: replacing an entry on either side stays invisible to the
+        // other, while the shared EntityData values themselves are not isolated
         source.putString(Entity.DATA_NAMETAG, "renamed");
         assertEquals("name", snapshot.getString(Entity.DATA_NAMETAG));
         snapshot.putLong(Entity.DATA_FLAGS, 0L);
         assertEquals(7L, source.getLong(Entity.DATA_FLAGS));
+    }
+
+    @Test
+    void noViewersSkipsPacketBuild() throws Exception {
+        Entity entity = entityWith(new EntityMetadata());
+        doThrow(new AssertionError("propertySyncData must not run without viewers"))
+                .when(entity).propertySyncData();
+
+        assertDoesNotThrow(() -> entity.sendData(Player.EMPTY_ARRAY));
+    }
+
+    private static Entity entityWith(EntityMetadata metadata) throws Exception {
+        Entity entity = mock(Entity.class, CALLS_REAL_METHODS);
+        entity.id = 42;
+        Field field = Entity.class.getDeclaredField("dataProperties");
+        field.setAccessible(true);
+        field.set(entity, metadata);
+        return entity;
     }
 }
