@@ -33,6 +33,7 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
 
     @Override
     public void close() {
+        if (deferContainerLifecycle(false)) return;
         if (!closed) {
             if (this.doubleInventory != null) {
                 for (Player player : new HashSet<>(this.doubleInventory.getViewers())) {
@@ -52,6 +53,12 @@ public class BlockEntityChest extends BlockEntitySpawnableContainer implements B
 
     @Override
     public void onBreak() {
+        if (deferContainerLifecycle(true)) return;
+        if (this.doubleInventory != null) {
+            for (Player player : new HashSet<>(this.doubleInventory.getViewers())) {
+                player.removeWindow(this.doubleInventory);
+            }
+        }
         this.unpair();
         super.onBreak();
     }

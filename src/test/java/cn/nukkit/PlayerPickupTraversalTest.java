@@ -14,7 +14,6 @@ import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.math.SimpleAxisAlignedBB;
-import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.PluginManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -68,17 +67,17 @@ class PlayerPickupTraversalTest {
     }
 
     @Test
-    void pickupDelayAndDurableCombatLockStillPreventConsumption() throws Exception {
+    void pickupDelayAndMissingStackStillPreventConsumption() throws Exception {
         Fixture f = new Fixture();
         EntityItem delayed = f.add(EntityItem.class, 1);
         when(delayed.getPickupDelay()).thenReturn(10);
-        EntityItem locked = f.add(EntityItem.class, 2);
-        locked.namedTag = new CompoundTag().putByte("km_combat_drop_locked", 1);
+        EntityItem missingStack = f.add(EntityItem.class, 2);
         f.player.checkNearEntities();
         verify(delayed, never()).close();
-        verify(locked, never()).close();
+        verify(missingStack, never()).close();
         verify(f.plugins, never()).callEvent(any(InventoryPickupItemEvent.class));
-        verifyNoInteractions(f.inventory);
+        verify(f.inventory, atLeastOnce()).getHolder();
+        verifyNoMoreInteractions(f.inventory);
     }
 
     @Test
@@ -133,10 +132,15 @@ class PlayerPickupTraversalTest {
             doReturn(true).when(player).isOnline();
             doReturn(false).when(player).isSpectator();
             when(level.getChunkIfLoaded(0, 0)).thenReturn(chunk);
+            when(level.getEntity(anyLong())).thenAnswer(call -> chunk.getEntities().get(call.<Long>getArgument(0)));
+            when(inventory.getHolder()).thenReturn(player);
         }
         <T extends Entity> T add(Class<T> kind, long id) {
             T entity = mock(kind);
             when(entity.getId()).thenReturn(id);
+            entity.level = level;
+            entity.chunk = chunk;
+            when(entity.getLevel()).thenReturn(level);
             when(entity.isAlive()).thenReturn(true);
             entity.boundingBox = player.boundingBox;
             when(entity.getBoundingBox()).thenReturn(entity.boundingBox);
