@@ -2069,7 +2069,14 @@ public class Level implements ChunkManager, Metadatable {
     public void updateAround(Vector3 pos, int layer) {
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
-            this.queueNormalUpdate(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+            Block side = block.getSideAtLayer(layer, face);
+            // Layer 1 only holds waterlogging and is air almost everywhere. Updating that air
+            // fires a BlockUpdateEvent and a no-op onUpdate, so skip it. If water reaches the
+            // cell before the queue is drained, the setBlock that puts it there updates it.
+            if (layer == 1 && side.getId() == Block.AIR) {
+                continue;
+            }
+            this.queueNormalUpdate(new QueuedUpdate(side, face));
         }
     }
 
