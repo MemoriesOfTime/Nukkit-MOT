@@ -285,8 +285,10 @@ public class StateBlockStorage {
     }
 
     public synchronized void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
-        if (!this.networkCacheable || getClass() != StateBlockStorage.class || protocol.getProtocol() < ProtocolInfo.v1_20_0_23
-                || protocol.getProtocol() > ProtocolInfo.v1_26_50) {
+        // No upper protocol bound: from v1_16_100 on the layer bytes depend on the protocol only through the
+        // block palette, the hash-ID mode and the network ids, and all three are part of the cache key below.
+        // A future protocol that changes the layer encoding itself must add its own key component.
+        if (!this.networkCacheable || getClass() != StateBlockStorage.class || protocol.getProtocol() < ProtocolInfo.v1_20_0_23) {
             this.writeToUncached(protocol, stream, antiXray);
             return;
         }
