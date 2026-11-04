@@ -5982,7 +5982,8 @@ public class Level implements ChunkManager, Metadatable {
             pk2.x = (float) x;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_X;
         }
-        if (entity.lastY != y) {
+        // lastY is the raw position, while y may include the entity's base offset
+        if (entity.lastY != entity.y) {
             pk2.y = (float) y;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_Y;
         }
