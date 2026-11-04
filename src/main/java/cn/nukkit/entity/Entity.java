@@ -1716,20 +1716,23 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void sendData(Player[] players, EntityMetadata data) {
+        if (players.length == 0 && !(this instanceof Player)) {
+            return;
+        }
+
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.id;
-        //pk.metadata = data == null ? this.dataProperties : data;
+        // encode() only reads the snapshot, so the same metadata can go to every viewer
+        pk.metadata = data == null ? this.dataProperties.clone() : data;
         pk.syncedProperties = this.propertySyncData();
 
         for (Player player : players) {
             if (player == this) {
                 continue;
             }
-            pk.metadata = data == null ? this.dataProperties.clone() : data;
             player.dataPacket(pk);
         }
         if (this instanceof Player player) {
-            pk.metadata = data == null ? this.dataProperties.clone() : data;
             player.dataPacket(pk);
         }
     }
