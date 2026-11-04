@@ -16,7 +16,9 @@ import java.util.Set;
  * server.properties 的 server-udp-ports（BDS 同名语法）解析结果：
  * 0=系统自动分配；{@code [ip:]internal[-internal]}=钉住本地端口/窗口；
  * {@code [ip:]external[-external]:internal[-internal]}=另发布对端可达的外部映射，
- * 冒号两侧范围长度必须一致。逗号分隔多条目：IP 累计，窗口与偏移须一致。
+ * 冒号两侧范围长度必须一致。逗号分隔多条目：地址累计，窗口与偏移须一致。
+ * 地址前缀为 IP 字面量或主机名（仅无括号形式，方括号专属 IPv6）：主机名原样传递，
+ * 由信令栈在启动绑定时解析一次（解析记录数上限 32），DDNS 变更需重启生效。
  * 钉住的单个端口正是某个 RakNet 监听端口（server-port 或 IPv6，{@link #pinsOnly}）或单端口映射到它
  * （{@link #publishesOn}）时，媒体与 RakNet 共用该端口，前者的内部回环端口由操作系统分配。
  * <p>
@@ -24,7 +26,10 @@ import java.util.Set;
  * {@code [ip:]internal[-internal]} pins the local port/window;
  * {@code [ip:]external[-external]:internal[-internal]} additionally publishes an
  * externally reachable mapping, range lengths on each side of the colon must match.
- * Comma-separated entries accumulate IPs while window and offset must agree.
+ * Comma-separated entries accumulate addresses while window and offset must agree.
+ * The address prefix is an IP literal or, unbracketed only (brackets belong to IPv6),
+ * a host name passed through verbatim for the signaling stack to resolve once at bind
+ * time, capped at 32 resolved records — a DDNS change needs a restart to apply.
  * A single port pinned exactly on a RakNet listener port (server-port or the IPv6 listener,
  * {@link #pinsOnly}) or a single-port mapping onto one ({@link #publishesOn}) shares that
  * port with RakNet, the former leaving the internal loopback port for the OS to assign.
@@ -36,7 +41,7 @@ public final class NetherNetUdpPorts {
     private final int end;
     /** 外部端口 = 本地端口 + offset，0 表示无端口映射。 External port = local port + offset, 0 means no port mapping. */
     private final int offset;
-    /** 发布给对端的外部地址（裸 IP 字面量）。 External addresses (bare IP literals) announced to peers. */
+    /** 发布给对端的外部地址（规范化 IP 字面量或原样主机名）。 External addresses (canonical IP literals or verbatim host names) announced to peers. */
     private final Set<String> advertisedAddresses;
 
     private NetherNetUdpPorts(int begin, int end, int offset, Set<String> advertisedAddresses) {
@@ -89,9 +94,10 @@ public final class NetherNetUdpPorts {
     }
 
     /**
-     * 单条目语法 {@code [ip:]range[:range]}，IPv6 必须带方括号；含点的首组按 IPv4 前缀处理（端口不含点）。
-     * Single entry {@code [ip:]range[:range]}; IPv6 requires brackets, a dotted first group is
-     * an IPv4 prefix (ports never carry dots).
+     * 单条目语法 {@code [ip:]range[:range]}，IPv6 必须带方括号（方括号内只认 IP 字面量）；
+     * 含点的首组按地址前缀处理，IP 或主机名皆可（端口不含点）。
+     * Single entry {@code [ip:]range[:range]}; IPv6 requires brackets and a literal inside them;
+     * a dotted first group is an address prefix, an IP or a host name (ports never carry dots).
      */
     private static Entry parseEntry(String text, String whole, BaseLang lang) {
         String t = text.trim();
@@ -102,7 +108,7 @@ public final class NetherNetUdpPorts {
             if (close < 0 || close + 1 >= t.length() || t.charAt(close + 1) != ':') {
                 throw invalid(lang, "nukkit.nethernet.udpPorts.badIpv6", whole, t);
             }
-            address = canonicalAddress(t.substring(1, close), whole, t, lang);
+            address = bracketedLiteral(t.substring(1, close), whole, t, lang);
             t = t.substring(close + 2);
         }
 
@@ -142,12 +148,57 @@ public final class NetherNetUdpPorts {
         return new Entry(internal[0], internal[1], external[0] - internal[0], true, address);
     }
 
-    private static String canonicalAddress(String text, String whole, String entry, BaseLang lang) {
+    /** 方括号内只认 IP 字面量（方括号语法属 IPv6），失败即配置错误。 Inside brackets only an IP literal passes (brackets belong to IPv6). */
+    private static String bracketedLiteral(String text, String whole, String entry, BaseLang lang) {
         try {
             return EndpointAddress.parse(text).getHostAddress();
         } catch (UnknownHostException e) {
             throw invalid(lang, "nukkit.nethernet.udpPorts.notIpLiteral", whole, text, entry);
         }
+    }
+
+    /**
+     * 无括号前缀：IP 字面量优先（存规范化形式）；否则按主机名校验后原样直通，解析交给信令栈
+     * 在绑定时做（解析阶段零 DNS，支持多记录）。不含字母的带点串（如 999.1.1.1）视为打错的
+     * IP 字面量而非主机名，与上游"全数字名拒绝"一致。
+     * An unbracketed prefix: an IP literal wins (stored canonical); otherwise a validated host
+     * name passes through verbatim, left for the signaling stack to resolve at bind time
+     * (no DNS at parse, multiple records supported). A dotted string without letters
+     * (999.1.1.1) counts as a mistyped literal, matching upstream's all-numeric rejection.
+     */
+    private static String canonicalAddress(String text, String whole, String entry, BaseLang lang) {
+        try {
+            return EndpointAddress.parse(text).getHostAddress();
+        } catch (UnknownHostException e) {
+            if (text.matches(".*[A-Za-z].*")) {
+                if (isHostName(text)) {
+                    return text;
+                }
+                throw invalid(lang, "nukkit.nethernet.udpPorts.badHostname", whole, text, entry);
+            }
+            throw invalid(lang, "nukkit.nethernet.udpPorts.notIpLiteral", whole, text, entry);
+        }
+    }
+
+    /**
+     * RFC 1123 主机名：点分隔的字母/数字/连字符 label（1-63 字符、不以连字符开头结尾），
+     * 总长 ≤253，允许一个结尾根点。
+     * An RFC 1123 host name: dot-separated letter/digit/hyphen labels (1-63 chars, no leading
+     * or trailing hyphen), at most 253 chars overall plus one trailing root dot.
+     */
+    private static boolean isHostName(String text) {
+        String name = text.endsWith(".") ? text.substring(0, text.length() - 1) : text;
+        if (name.isEmpty() || name.length() > 253) {
+            return false;
+        }
+        for (String label : name.split("\\.", -1)) {
+            if (label.isEmpty() || label.length() > 63
+                    || !label.matches("[A-Za-z0-9-]+")
+                    || label.startsWith("-") || label.endsWith("-")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int[] parseRange(String text, String whole, String entry, BaseLang lang) {
