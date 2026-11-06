@@ -3,11 +3,13 @@ package cn.nukkit.level;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -48,7 +51,7 @@ class LevelChunkGarbageCollectionTest {
         setField(level, "blockEntities", new Long2ObjectNonBlockingMap<>());
         setField(level, "pendingChunkLoads", new ConcurrentHashMap<>());
         setField(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
-        setField(level, "unloadQueue", new Long2ObjectNonBlockingMap<>());
+        setField(level, "unloadQueue", new Long2LongLinkedOpenHashMap());
         setField(level, "chunkLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "playerLoaders", new Long2ObjectNonBlockingMap<>());
         setField(level, "loaders", new Int2ObjectOpenHashMap<>());
@@ -67,11 +70,15 @@ class LevelChunkGarbageCollectionTest {
         return unloadQueue(level).containsKey(hash);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Long2ObjectNonBlockingMap<Long> unloadQueue(Level level) throws Exception {
+    private static Long2LongLinkedOpenHashMap unloadQueue(Level level) throws Exception {
         Field field = Level.class.getDeclaredField("unloadQueue");
         field.setAccessible(true);
-        return (Long2ObjectNonBlockingMap<Long>) field.get(level);
+        return (Long2LongLinkedOpenHashMap) field.get(level);
+    }
+
+    /** A grace period that ran out ten seconds ago. */
+    private static long due() {
+        return Level.unloadClock() - Level.CHUNK_UNLOAD_DELAY_MILLIS - 10000;
     }
 
     @Test
@@ -117,7 +124,7 @@ class LevelChunkGarbageCollectionTest {
      * @author LT_Name
      */
     @Test
-    void isChunkSaveBackloggedDelegatesToProvider() throws Exception {
+    public void isChunkSaveBackloggedDelegatesToProvider() throws Exception {
         Level level = newLevel();
 
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenReturn(true);
@@ -131,10 +138,10 @@ class LevelChunkGarbageCollectionTest {
     }
 
     @Test
-    void unloadChunksPausesAndKeepsQueueWhileBacklogged() throws Exception {
+    public void unloadChunksPausesAndKeepsQueueWhileBacklogged() throws Exception {
         Level level = newLevel();
         long hash = Level.chunkHash(3, 5);
-        unloadQueue(level).put(hash, (Long) (System.currentTimeMillis() - 30000));
+        unloadQueue(level).put(hash, due());
 
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenReturn(true);
         level.unloadChunks(50, false);
@@ -144,10 +151,10 @@ class LevelChunkGarbageCollectionTest {
     }
 
     @Test
-    void unloadChunksProceedsWhenNotBacklogged() throws Exception {
+    public void unloadChunksProceedsWhenNotBacklogged() throws Exception {
         Level level = newLevel();
         long hash = Level.chunkHash(3, 5);
-        unloadQueue(level).put(hash, (Long) (System.currentTimeMillis() - 30000));
+        unloadQueue(level).put(hash, due());
 
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenReturn(false);
         Mockito.when(this.provider.isChunkLoaded(Mockito.anyInt(), Mockito.anyInt())).thenReturn(false);
@@ -157,10 +164,10 @@ class LevelChunkGarbageCollectionTest {
     }
 
     @Test
-    void forceUnloadBypassesBackpressure() throws Exception {
+    public void forceUnloadBypassesBackpressure() throws Exception {
         Level level = newLevel();
         long hash = Level.chunkHash(3, 5);
-        unloadQueue(level).put(hash, (Long) (System.currentTimeMillis() - 30000));
+        unloadQueue(level).put(hash, due());
 
         Mockito.when(this.provider.isChunkSaveBacklogged()).thenReturn(true);
         Mockito.when(this.provider.isChunkLoaded(Mockito.anyInt(), Mockito.anyInt())).thenReturn(false);
@@ -168,4 +175,81 @@ class LevelChunkGarbageCollectionTest {
 
         Assertions.assertFalse(unloadQueue(level).containsKey(hash), "force must bypass backpressure");
     }
+
+    private AtomicInteger queueUntilBacklogged(Level level, int pending) throws Exception {
+        for (int x = 0; x < 3; x++) {
+            unloadQueue(level).put(Level.chunkHash(x * 5, 10), due());
+        }
+        AtomicInteger writes = new AtomicInteger(pending);
+        Mockito.when(this.provider.isChunkSaveBacklogged()).thenAnswer(ignored -> writes.get() >= 128);
+        Mockito.doAnswer(ignored -> {
+            writes.incrementAndGet();
+            return true;
+        }).when(level).unloadChunk(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyBoolean());
+        return writes;
+    }
+
+    @Test
+    public void countLimitedUnloadStopsAsSoonAsWriterReachesCapacityAndResumes() throws Exception {
+        Level level = newLevel();
+        AtomicInteger writes = queueUntilBacklogged(level, 127);
+        level.unloadChunks(50, false);
+        Assertions.assertEquals(128, writes.get(), "only one more unload fits in the pending-write window");
+        Assertions.assertEquals(2, unloadQueue(level).size(), "deferred chunks remain queued");
+
+        writes.set(0);
+        level.unloadChunks(50, false);
+        Assertions.assertEquals(2, writes.get());
+        Assertions.assertTrue(unloadQueue(level).isEmpty(), "deferred unloads resume after the writer drains");
+    }
+
+    @Test
+    public void timeLimitedUnloadStopsAsSoonAsWriterReachesCapacity() throws Exception {
+        Level level = newLevel();
+        AtomicInteger writes = queueUntilBacklogged(level, 127);
+        level.doGarbageCollection(10000);
+        Assertions.assertEquals(128, writes.get());
+        Assertions.assertEquals(2, unloadQueue(level).size());
+        Mockito.verify(this.provider).doGarbageCollection(Mockito.anyLong());
+    }
+
+    @Test
+    public void forcedUnloadDrainsWholeQueueAfterReachingCapacity() throws Exception {
+        Level level = newLevel();
+        AtomicInteger writes = queueUntilBacklogged(level, 127);
+        level.unloadChunks(50, true);
+        Assertions.assertEquals(130, writes.get());
+        Assertions.assertTrue(unloadQueue(level).isEmpty(), "shutdown must not leave chunks waiting for another tick");
+    }
+
+    @Test
+    public void overloadAfterPrimarySaveDoesNotSplitChangedNeighbours() throws Exception {
+        Level level = newLevel();
+        setField(level, "autoSave", true);
+        AtomicInteger writes = new AtomicInteger(127);
+        Mockito.when(this.provider.isChunkSaveBacklogged()).thenAnswer(ignored -> writes.get() >= 128);
+        // A border save and all eight dirty neighbours form the existing indivisible unload pass.
+        for (int x = 9; x <= 11; x++) {
+            for (int z = 9; z <= 11; z++) {
+                BaseFullChunk chunk = Mockito.mock(BaseFullChunk.class);
+                Mockito.when(chunk.hasChanged()).thenReturn(true);
+                Mockito.when(this.provider.isChunkLoaded(x, z)).thenReturn(true);
+                Mockito.doReturn(chunk).when(level).getChunk(x, z);
+                Mockito.doReturn(chunk).when(level).getChunk(x, z, false);
+            }
+        }
+        Mockito.doAnswer(ignored -> {
+            writes.incrementAndGet();
+            return null;
+        }).when(this.provider).saveChunk(Mockito.anyInt(), Mockito.anyInt());
+        unloadQueue(level).put(Level.chunkHash(10, 10), due());
+
+        level.unloadChunks(50, false);
+
+        Assertions.assertEquals(136, writes.get(), "backpressure gates the next unload, never half of a border save");
+        Assertions.assertTrue(unloadQueue(level).isEmpty());
+        Mockito.verify(this.provider, Mockito.times(9)).saveChunk(Mockito.anyInt(), Mockito.anyInt());
+        Mockito.verify(this.provider).unloadChunk(10, 10, true);
+    }
+
 }
