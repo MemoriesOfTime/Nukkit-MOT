@@ -37,10 +37,31 @@ public abstract class BlockFallable extends BlockSolid {
     }
 
     protected boolean canFallInto(Block block) {
-        return block.getId() == AIR
-                || block instanceof BlockLiquid
-                || block instanceof BlockFire
-                || block instanceof BlockBubbleColumn && block.getLevelBlockAtLayer(1) instanceof BlockLiquid;
+        return BlockFallable.isFallThrough(this, block);
+    }
+
+    /**
+     * Whether an unsupported gravity block falls into {@code below}.
+     * <p>
+     * Vanilla Bedrock lets sand, gravel, concrete powder and anvils fall through every block it would
+     * replace on landing (the minecraft:replaceable tag): seagrass, short and tall grass, ferns, dead
+     * bushes, vines, glow lichen, roots, sprouts and thin snow. The landing branch already replaces
+     * exactly these cells through {@link Block#canBeReplaced()}, so the start of the fall uses the same
+     * predicate; otherwise the block hangs over them. Flowers, kelp, torches and other non-replaceable
+     * plants keep supporting it, as in vanilla. A bubble column still needs its liquid layer, and a snow
+     * layer never falls into another snow layer, which the landing branch merges instead.
+     */
+    static boolean isFallThrough(Block falling, Block below) {
+        if (below.getId() == AIR || below instanceof BlockLiquid || below instanceof BlockFire) {
+            return true;
+        }
+        if (below instanceof BlockBubbleColumn) {
+            return below.getLevelBlockAtLayer(1) instanceof BlockLiquid;
+        }
+        if (falling instanceof BlockSnowLayer && below instanceof BlockSnowLayer) {
+            return false;
+        }
+        return below.canBeReplaced() && !below.isSolid();
     }
 
     protected EntityFallingBlock createFallingEntity(CompoundTag customNbt) {
