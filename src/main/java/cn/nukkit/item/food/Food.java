@@ -83,23 +83,44 @@ public abstract class Food {
     public static final Food dried_kelp = registerDefaultFood(new FoodNormal(1, 0.6F).addRelative(Item.DRIED_KELP).setEatingTick(16));
     public static final Food sweet_berries = registerDefaultFood(new FoodNormal(2, 0.4F).addRelative(Item.SWEET_BERRIES));
     public static final Food suspicious_stew_night_vision = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.NIGHT_VISION).setAmplifier(1).setDuration(80)).addRelative(Item.SUSPICIOUS_STEW, 0));
+            .addEffect(Effect.getEffect(Effect.NIGHT_VISION).setAmplifier(0).setDuration(100))
+            .addRelative(Item.SUSPICIOUS_STEW, 0).setEatingTick(32));
     public static final Food suspicious_stew_jump = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.JUMP).setAmplifier(1).setDuration(80)).addRelative(Item.SUSPICIOUS_STEW, 1));
+            .addEffect(Effect.getEffect(Effect.JUMP).setAmplifier(0).setDuration(100))
+            .addRelative(Item.SUSPICIOUS_STEW, 1).setEatingTick(32));
     public static final Food suspicious_stew_weakness = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.WEAKNESS).setAmplifier(1).setDuration(140)).addRelative(Item.SUSPICIOUS_STEW, 2));
+            .addEffect(Effect.getEffect(Effect.WEAKNESS).setAmplifier(0).setDuration(140))
+            .addRelative(Item.SUSPICIOUS_STEW, 2).setEatingTick(32));
     public static final Food suspicious_stew_blindness = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.BLINDNESS).setAmplifier(1).setDuration(120)).addRelative(Item.SUSPICIOUS_STEW, 3));
+            .addEffect(Effect.getEffect(Effect.BLINDNESS).setAmplifier(0).setDuration(140))
+            .addRelative(Item.SUSPICIOUS_STEW, 3).setEatingTick(32));
     public static final Food suspicious_stew_poison = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.POISON).setAmplifier(1).setDuration(220)).addRelative(Item.SUSPICIOUS_STEW, 4));
+            .addEffect(Effect.getEffect(Effect.POISON).setAmplifier(0).setDuration(220))
+            .addRelative(Item.SUSPICIOUS_STEW, 4).setEatingTick(32));
+    public static final Food suspicious_stew_saturation_dandelion = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
+            .addEffect(Effect.getEffect(Effect.SATURATION).setAmplifier(0).setDuration(6))
+            .addRelative(Item.SUSPICIOUS_STEW, 5).setEatingTick(32));
     public static final Food suspicious_stew_saturation = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.SATURATION).setAmplifier(1).setDuration(7)).addRelative(Item.SUSPICIOUS_STEW, 6));
+            .addEffect(Effect.getEffect(Effect.SATURATION).setAmplifier(0).setDuration(6))
+            .addRelative(Item.SUSPICIOUS_STEW, 6).setEatingTick(32));
     public static final Food suspicious_stew_fire_resistance = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.FIRE_RESISTANCE).setAmplifier(1).setDuration(40)).addRelative(Item.SUSPICIOUS_STEW, 7));
+            .addEffect(Effect.getEffect(Effect.FIRE_RESISTANCE).setAmplifier(0).setDuration(60))
+            .addRelative(Item.SUSPICIOUS_STEW, 7).setEatingTick(32));
     public static final Food suspicious_stew_regeneration = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.REGENERATION).setAmplifier(1).setDuration(120)).addRelative(Item.SUSPICIOUS_STEW, 8));
+            .addEffect(Effect.getEffect(Effect.REGENERATION).setAmplifier(0).setDuration(140))
+            .addRelative(Item.SUSPICIOUS_STEW, 8).setEatingTick(32));
     public static final Food suspicious_stew_wither = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
-            .addEffect(Effect.getEffect(Effect.WITHER).setAmplifier(1).setDuration(120)).addRelative(Item.SUSPICIOUS_STEW, 9));
+            .addEffect(Effect.getEffect(Effect.WITHER).setAmplifier(0).setDuration(140))
+            .addRelative(Item.SUSPICIOUS_STEW, 9).setEatingTick(32));
+    public static final Food suspicious_stew_torchflower = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
+            .addEffect(Effect.getEffect(Effect.NIGHT_VISION).setAmplifier(0).setDuration(100))
+            .addRelative(Item.SUSPICIOUS_STEW, 10).setEatingTick(32));
+    public static final Food suspicious_stew_open_eyeblossom = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
+            .addEffect(Effect.getEffect(Effect.BLINDNESS).setAmplifier(0).setDuration(140))
+            .addRelative(Item.SUSPICIOUS_STEW, 11).setEatingTick(32));
+    public static final Food suspicious_stew_closed_eyeblossom = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
+            .addEffect(Effect.getEffect(Effect.NAUSEA).setAmplifier(0).setDuration(140))
+            .addRelative(Item.SUSPICIOUS_STEW, 12).setEatingTick(32));
     public static final Food honey_bottle = registerDefaultFood(new FoodNormal(6, 1.2F).addRelative(Item.HONEY_BOTTLE));
     public static final Food glow_berries = registerDefaultFood(new FoodNormal(2, 0.4F).addRelative(Item.GLOW_BERRIES));
 
