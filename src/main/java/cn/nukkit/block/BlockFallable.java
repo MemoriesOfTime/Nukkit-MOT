@@ -61,7 +61,7 @@ public abstract class BlockFallable extends BlockSolid {
         if (falling instanceof BlockSnowLayer && below instanceof BlockSnowLayer) {
             return false;
         }
-        return below.canBeReplaced() && !below.isSolid();
+        return below.canBeReplaced();
     }
 
     protected EntityFallingBlock createFallingEntity(CompoundTag customNbt) {

@@ -4,7 +4,8 @@ import cn.nukkit.MockServer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Gravity blocks fall through replaceable vegetation and thin snow, as in vanilla Bedrock. */
 class FallableReplaceableBelowTest {
@@ -21,6 +22,9 @@ class FallableReplaceableBelowTest {
             assertTrue(falls(falling, Block.DEAD_BUSH, 0), "dead bush");
             assertTrue(falls(falling, Block.VINE, 0), "vine");
             assertTrue(falls(falling, Block.GLOW_LICHEN, 0), "glow lichen");
+            assertTrue(falls(falling, Block.CRIMSON_ROOTS, 0), "crimson roots");
+            assertTrue(falls(falling, Block.WARPED_ROOTS, 0), "warped roots");
+            assertTrue(falls(falling, Block.LIGHT_BLOCK, 15), "light block");
             assertTrue(falls(falling, Block.SNOW_LAYER, 0), "thin snow");
         }
     }
