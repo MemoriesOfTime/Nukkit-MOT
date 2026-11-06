@@ -38,6 +38,12 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
 
     public EntityHappyGhast(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        // BaseEntity's field initialization clears Baby after virtual initEntity returns.
+        // Restore this species only, after the complete superclass constructor.
+        if (nbt.getBoolean("Baby")) {
+            this.setBaby(true);
+            if (nbt.contains("Age")) this.age = Math.max(-24000, Math.min(0, nbt.getShort("Age")));
+        }
     }
 
     @Override
@@ -75,6 +81,15 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
     }
 
     @Override
+    public void setBaby(boolean baby) {
+        super.setBaby(baby);
+        if (baby) {
+            this.age = -24000;
+            this.setScale(0.2375f);
+        }
+    }
+
+    @Override
     public void saveNBT() {
         super.saveNBT();
         if (this.armorInventory != null) {
@@ -88,12 +103,12 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
 
     @Override
     public float getWidth() {
-        return isBaby() ? 0.95f : 4f;
+        return 4f;
     }
 
     @Override
     public float getHeight() {
-        return isBaby() ? 0.95f : 4f;
+        return 4f;
     }
 
     @Override
