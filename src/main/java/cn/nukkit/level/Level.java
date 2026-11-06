@@ -2810,7 +2810,11 @@ public class Level implements ChunkManager, Metadatable {
 
         try {
             for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
-                callback.accept(blockPrevious, block);
+                try {
+                    callback.accept(blockPrevious, block);
+                } catch (Exception e) {
+                    Server.getInstance().getLogger().error("Error while calling block set callback", e);
+                }
             }
         } catch (Exception e) {
             Server.getInstance().getLogger().error("Error while calling block set callback", e);
