@@ -27,10 +27,6 @@ public abstract class BlockMushroom extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            // Light is a placement rule only. Re-checking it on every neighbour update made
-            // every mushroom on a sunlit surface pop as soon as anything next to it changed,
-            // so breaking one mushroom chain-broke the whole row. Bedrock keeps a placed
-            // mushroom while it still has support.
             if (!hasSupport()) {
                 getLevel().useBreakOn(this);
 
