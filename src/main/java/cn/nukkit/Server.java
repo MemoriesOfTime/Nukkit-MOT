@@ -195,6 +195,10 @@ public class Server {
 
     private int autoSaveTicker;
     private int autoSaveTicks;
+    /** Per-tick budget of an autosave pass; see {@link #startAutoSave()}. */
+    private int autoSaveSavesPerTick = 32;
+    private long autoSaveTickBudgetNanos = 2_000_000L;
+    private final AutoSaveQueue autoSaveQueue = new AutoSaveQueue();
 
     private final BaseLang baseLang;
     private boolean forceLanguage;
@@ -1989,6 +1993,44 @@ public class Server {
         }
     }
 
+    /**
+     * The autosave of the tick loop. It saves what {@link #doAutoSave()} saves, but starts a pass that
+     * {@link #tickAutoSave(LongSupplier)} continues in portions over the next ticks: all of it in one tick
+     * was the heaviest tick of the server. {@link #doAutoSave()} still saves everything at once for its callers.
+     */
+    void startAutoSave() {
+        if (!this.autoSave) {
+            return;
+        }
+        if (this.autoSaveSavesPerTick <= 0) {
+            this.doAutoSave();
+            return;
+        }
+        List<Player> online = new ArrayList<>();
+        for (Player player : new ArrayList<>(this.players.values())) {
+            if (player.isOnline()) {
+                online.add(player);
+            } else if (!player.isConnected()) {
+                this.removePlayer(player);
+            }
+        }
+        List<Level> levels = new ArrayList<>();
+        for (Level level : this.levelArray) {
+            if (!nonAutoSaveWorlds.contains(level.getName())) {
+                levels.add(level);
+            }
+        }
+        if (this.autoSaveQueue.begin(online, levels)) {
+            log.warn("The previous auto save had not finished when the next one started; the new one takes over its chunks. Consider raising autosave-saves-per-tick or autosave-tick-budget-micros");
+        }
+    }
+
+    void tickAutoSave(LongSupplier nanoTime) {
+        if (this.autoSaveQueue.isActive()) {
+            this.autoSaveQueue.step(this, this.autoSaveSavesPerTick, this.autoSaveTickBudgetNanos, nanoTime);
+        }
+    }
+
     private void tick() {
         tick(System.currentTimeMillis(), System::nanoTime);
     }
@@ -2051,8 +2093,9 @@ public class Server {
 
             if (++this.autoSaveTicker >= this.autoSaveTicks) {
                 this.autoSaveTicker = 0;
-                this.doAutoSave();
+                this.startAutoSave();
             }
+            this.tickAutoSave(nanoTime);
 
             for (Level level : this.levelArray) {
                 if (!level.isBeingConverted && level.isChunkGarbageCollectionTick(this.tickCounter)) {
@@ -4158,6 +4201,8 @@ public class Server {
         this.forceResources = this.getPropertyBoolean("force-resources", false);
         this.forceResourcesAllowOwnPacks = this.getPropertyBoolean("force-resources-allow-client-packs", false);
         this.autoSaveTicks = this.serverConfig.performanceSettings().ticksPerAutosave();
+        this.autoSaveSavesPerTick = this.serverConfig.performanceSettings().autosaveSavesPerTick();
+        this.autoSaveTickBudgetNanos = Math.max(0, this.serverConfig.performanceSettings().autosaveTickBudgetMicros()) * 1_000L;
         switch (this.getPropertyString("server-authoritative-movement", "server-auth")) {
             case "client-auth" -> this.serverAuthoritativeMovementMode = 0;
             case "server-auth-with-rewind" -> this.serverAuthoritativeMovementMode = 2;

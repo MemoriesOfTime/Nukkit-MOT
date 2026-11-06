@@ -99,6 +99,7 @@ class ServerPlayerSnapshotsP03Test {
             set("players", connected); set("playerList", online); set("levelArray", new Level[0]);
             set("tickAverage", new float[20]); set("useAverage", new float[20]); set("alwaysTickPlayers", alwaysTick);
             set("autoSave", false); set("autoSaveTicks", Integer.MAX_VALUE);
+            set("autoSaveQueue", new cn.nukkit.level.AutoSaveQueue());
         }
         Player add(int id, boolean connect, boolean list) {
             Player p = mock(Player.class); if (connect) connected.put(address(id), p); if (list) online.put(uuid(id), p); return p;

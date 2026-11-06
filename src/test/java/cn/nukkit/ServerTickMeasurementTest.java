@@ -84,14 +84,14 @@ class ServerTickMeasurementTest {
         doAnswer(invocation -> { nanos.addAndGet(30_000_000); return null; })
                 .when(player).checkNetwork();
         doAnswer(invocation -> { nanos.addAndGet(43_000_000); return null; })
-                .when(server).doAutoSave();
+                .when(server).startAutoSave();
 
         server.tick(0, nanos::get);
 
         assertEquals(75_000_000, end(1).getDurationNanos());
         verify(scheduler).mainThreadHeartbeat(1);
         verify(player).checkNetwork();
-        verify(server).doAutoSave();
+        verify(server).startAutoSave();
     }
 
     @Test
