@@ -26,6 +26,18 @@ public class PlayerUIComponent extends BaseInventory {
         return size;
     }
 
+    /** Native backing shared by cursor, crafting and workstation views. */
+    @ApiStatus.Internal
+    public PlayerUIInventory getBackingInventory() {
+        return this.playerUI;
+    }
+
+    /** Translate a view-local slot before claiming or snapshotting its native backing. */
+    @ApiStatus.Internal
+    public int getBackingSlot(int index) {
+        return index + this.offset;
+    }
+
     @Override
     public int getMaxStackSize() {
         return 64;
