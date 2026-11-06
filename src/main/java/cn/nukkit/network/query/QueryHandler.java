@@ -71,6 +71,10 @@ public class QueryHandler {
     }
 
     public void handle(InetSocketAddress address, ByteBuf packet) {
+        if (!packet.isReadable(5)) {
+            return;
+        }
+
         short packetId = packet.readUnsignedByte();
         int sessionId = packet.readInt();
 
@@ -85,6 +89,10 @@ public class QueryHandler {
                 this.server.getNetwork().sendPacket(address, reply);
             }
             case STATISTICS -> {
+                if (!packet.isReadable(4)) {
+                    return;
+                }
+
                 byte[] token = new byte[4];
                 packet.readBytes(token);
 
