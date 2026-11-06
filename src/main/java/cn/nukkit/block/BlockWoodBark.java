@@ -74,6 +74,9 @@ public class BlockWoodBark extends BlockWood {
     @Override
     public Item toItem() {
         int meta = getDamage() & 0xF;
+        if (this.getClass() == BlockWoodBark.class && (meta & 7) >= 6) {
+            meta &= 8;
+        }
         return new ItemBlock(Block.get(WOOD_BARK, meta), meta);
     }
 }
