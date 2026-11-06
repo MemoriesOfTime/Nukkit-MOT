@@ -35,6 +35,6 @@ public class ItemPickaxeDiamond extends ItemTool {
 
     @Override
     public int getAttackDamage() {
-        return 5;
+        return 6;
     }
 }

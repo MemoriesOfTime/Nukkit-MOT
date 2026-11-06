@@ -28,6 +28,11 @@ public class ItemHoeNetherite extends ItemTool {
     }
 
     @Override
+    public int getAttackDamage() {
+        return 7;
+    }
+
+    @Override
     public int getMaxDurability() {
         return ItemTool.DURABILITY_NETHERITE;
     }
