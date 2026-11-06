@@ -1099,7 +1099,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void addEffect(Effect effect, EntityPotionEffectEvent.Cause cause) {
-        if (effect == null) {
+        if (effect == null || !this.isAlive()) {
             return;
         }
 
