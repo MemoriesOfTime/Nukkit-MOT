@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
@@ -156,7 +157,10 @@ public class BlockCactus extends BlockTransparentMeta {
 
                 return true;
             }
+            BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.CACTUS_ADJACENT);
+            return false;
         }
+        BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.CACTUS_SUPPORT);
         return false;
     }
 
