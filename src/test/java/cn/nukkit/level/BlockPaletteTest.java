@@ -8,17 +8,30 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.utils.Hash;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.nio.ByteOrder;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class BlockPaletteTest {
 
@@ -76,6 +89,59 @@ class BlockPaletteTest {
 
         Assertions.assertEquals(fullId, palette.getLegacyFullIdFromHashId(hashId));
         Assertions.assertEquals(fullId, palette.getLegacyFullId(customState));
+    }
+
+    @Test
+    void runtimeIdRemapPreservesOverwrittenAliasesAndHashWinners() {
+        BlockPalette palette = new BlockPalette(GameVersion.getFeatureVersion());
+        CompoundTag first = new CompoundTag().putString("name", "test:alias")
+                .putCompound("states", new CompoundTag().putBoolean("lit", false));
+        CompoundTag last = new CompoundTag().putString("name", "test:alias")
+                .putCompound("states", new CompoundTag().putBoolean("lit", true));
+        palette.clearStates();
+        palette.registerState(Block.STONE, 0, 10, first);
+        palette.registerState(Block.STONE, 0, 11, last);
+        palette.lock();
+        long version = palette.getNetworkVersion();
+
+        palette.remapRuntimeIds(new Int2IntOpenHashMap(Map.of(10, 11, 11, 10)), 12);
+
+        int fullId = Block.STONE << Block.DATA_BITS;
+        Assertions.assertEquals(10, palette.getRuntimeId(Block.STONE));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(10));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(11));
+        Assertions.assertEquals(Hash.hashBlock(first), palette.getHashId(Block.STONE));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(first));
+        Assertions.assertEquals(fullId, palette.getLegacyFullId(last));
+        Assertions.assertEquals(-1, palette.getNetworkVersion(), "in-progress remapping must not be cached");
+        Assertions.assertDoesNotThrow(() -> palette.registerState(Block.GRASS, 0, 0,
+                new CompoundTag().putString("name", "test:custom").putCompound("states", new CompoundTag())));
+        palette.lock();
+        Assertions.assertTrue(palette.getNetworkVersion() > version);
+        Assertions.assertThrows(IllegalStateException.class, () -> palette.registerState(Block.STONE, 0, 1, first));
+    }
+
+    @Test
+    void invalidRuntimeIdRemapLeavesThePaletteIntactAndLocked() {
+        BlockPalette palette = new BlockPalette(GameVersion.getFeatureVersion());
+        CompoundTag state = new CompoundTag().putString("name", "test:alias")
+                .putCompound("states", new CompoundTag());
+        palette.clearStates();
+        palette.registerState(Block.STONE, 0, 10, state);
+        palette.registerState(Block.STONE, 0, 11, state);
+        palette.lock();
+        long version = palette.getNetworkVersion();
+
+        // The overwritten runtime ID still needs a replacement; two distinct IDs may not collapse.
+        for (Map<Integer, Integer> invalid : List.of(Map.of(11, 0), Map.of(10, 0, 11, 0))) {
+            Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> palette.remapRuntimeIds(new Int2IntOpenHashMap(invalid), 12));
+            Assertions.assertEquals(11, palette.getRuntimeId(Block.STONE));
+            Assertions.assertEquals(Block.STONE << Block.DATA_BITS, palette.getLegacyFullId(10));
+            Assertions.assertEquals(Block.STONE << Block.DATA_BITS, palette.getLegacyFullId(11));
+            Assertions.assertEquals(version, palette.getNetworkVersion());
+            Assertions.assertThrows(IllegalStateException.class, () -> palette.registerState(Block.STONE, 0, 1, state));
+        }
     }
 
     @Test
@@ -229,6 +295,55 @@ class BlockPaletteTest {
     void shelfStatesHaveVariantSpecificRuntimeMappings() {
         assertShelfStatesMapped(new BlockPalette(GameVersion.V1_21_111));
         assertShelfStatesMapped(new BlockPalette(GameVersion.V1_26_10));
+    }
+
+    @AfterAll
+    static void cleanup(){MockServer.reset();}
+
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void nativeTrimCannotExposeACompletedNetworkEpoch(boolean throughLock) throws Exception {
+        BlockPalette palette=new BlockPalette(GameVersion.V1_20_0);
+        assertEquals(BlockPalette.class,palette.getClass());
+        long previous=palette.getNetworkVersion();assertTrue(previous>=0);
+        if(throughLock)palette.clearStates();
+        Field field=BlockPalette.class.getDeclaredField("legacyToRuntimeId");field.setAccessible(true);
+        Int2IntOpenHashMap original=(Int2IntOpenHashMap)field.get(palette);
+        Int2IntOpenHashMap map=spy(original);assertEquals(Int2IntOpenHashMap.class,map.getClass());field.set(palette,map);
+        CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1);
+        doAnswer(call->{entered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));return call.callRealMethod();}).when(map).trim();
+        var pool=Executors.newSingleThreadExecutor();
+        var task=pool.submit(()->{if(throughLock)palette.lock();else palette.trim();});
+        try {
+            assertTrue(entered.await(5,TimeUnit.SECONDS));
+            assertTrue(palette.getNetworkVersion()<0,"native mapping rehash is still active; cache must refuse the epoch");
+        } finally {
+            release.countDown();task.get(5,TimeUnit.SECONDS);pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));
+            field.set(palette,original);
+        }
+        assertTrue(palette.getNetworkVersion()>previous,"public trim completion must invalidate the prior retained-byte key");
+    }
+    @Test void directTrimDoesNotFreezeAnUnlockedRegistrationPhase(){
+        BlockPalette palette=new BlockPalette(GameVersion.V1_20_0);palette.clearStates();palette.trim();
+        assertEquals(-1,palette.getNetworkVersion());
+        palette.registerState(0,0,17,new CompoundTag().putString("name","minecraft:air"));
+        assertEquals(-1,palette.getNetworkVersion());palette.lock();assertTrue(palette.getNetworkVersion()>=0);
+        assertEquals(17,palette.getRuntimeId(0,0));
+    }
+    @Test void failedNativeTrimCannotPublishACompletedEpoch() throws Exception {
+        BlockPalette palette=new BlockPalette(GameVersion.V1_20_0);
+        Field field=BlockPalette.class.getDeclaredField("legacyToRuntimeId");field.setAccessible(true);
+        Int2IntOpenHashMap map=spy((Int2IntOpenHashMap)field.get(palette));field.set(palette,map);
+        var failure=new IllegalStateException("injected trim failure");doThrow(failure).when(map).trim();
+        assertSame(failure,assertThrows(IllegalStateException.class,palette::trim));assertEquals(-1,palette.getNetworkVersion());
+        doCallRealMethod().when(map).trim();palette.trim();assertTrue(palette.getNetworkVersion()>=0);
+    }
+    @Test void existingVirtualTrimHookStillObservesRegistrationLocked(){
+        HookPalette palette=new HookPalette();int before=palette.calls;palette.lock();assertEquals(before+1,palette.calls);
+    }
+    static class HookPalette extends BlockPalette {
+        int calls;
+        HookPalette(){super(GameVersion.V1_20_0);}
+        @Override public void trim(){calls++;assertThrows(IllegalStateException.class,()->registerState(0,0,0,new CompoundTag()));super.trim();}
     }
 
     private static void assertCrafterTriggeredStateMapped(BlockPalette palette) {

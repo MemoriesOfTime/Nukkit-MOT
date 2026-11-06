@@ -21,6 +21,10 @@ abstract class JavaAgentArgumentProvider : CommandLineArgumentProvider {
 group = "cn.nukkit"
 version = "MOT-SNAPSHOT"
 
+val skipTests = providers.gradleProperty("skip-tests")
+    .map { value -> value.isEmpty() || value.toBoolean() }
+    .getOrElse(false)
+
 java {
     // 用 JDK 21 构建，但字节码经下方 release=17 钉在 Java 17（与 pom.xml release=17 一致），
     // 产物仍可跑在 JRE 17+；缺了 release，字节码会直接跟 toolchain 变成 class file 65
@@ -111,11 +115,15 @@ dependencies {
         // 改用下方 arch-detect：自带全部平台原生库；Use arch-detect below, it bundles every platform's natives
         exclude("dev.opencollab", "libdatachannel-java")
     }
+    api(libs.netty.transport.common) {
+        exclude("io.netty", "netty-transport")
+    }
     api(libs.libdatachannel)
     api(libs.libdatachannel.arch.detect) {
         exclude("dev.opencollab", "libdatachannel-java")
     }
     api(libs.raknet) {
+        exclude("dev.mot.netty", "netty-transport-common")
         exclude("io.netty", "netty-common")
         exclude("io.netty", "netty-codec-base")
         exclude("io.netty", "netty-buffer")
@@ -369,8 +377,18 @@ tasks {
         dependsOn(buildTools.compileJavaTaskName)
     }
 
+    withType<Test>().configureEach {
+        enabled = !skipTests
+    }
+    named<JavaCompile>("compileTestJava") {
+        enabled = !skipTests
+    }
+
     test {
         useJUnitPlatform()
+        // 隐式异常（NPE/AIOOBE）不走 fast-throw 预分配，测试才可比异常消息文本
+        // Keep implicit-exception messages intact so tests can compare them
+        jvmArgs("-XX:-OmitStackTraceInFastThrow")
         jvmArgumentProviders.add(
             objects.newInstance<JavaAgentArgumentProvider>().apply {
                 classpath.from(mockitoAgent)

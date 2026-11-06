@@ -5,8 +5,12 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.data.EntityData;
+import cn.nukkit.entity.data.StringEntityData;
+import cn.nukkit.entity.mob.EntityCreeper;
 import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.mob.EntityZombie;
+import cn.nukkit.entity.passive.EntityOcelot;
 import cn.nukkit.entity.passive.EntityPig;
 import cn.nukkit.entity.passive.EntitySheep;
 import cn.nukkit.level.format.FullChunk;
@@ -17,8 +21,12 @@ import cn.nukkit.potion.Effect;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -99,6 +107,115 @@ class EntityActivationTest {
             }
         }
         return runs;
+    }
+
+    @Test
+    void recentDamageRejectsSheepBeforeReadingWoolMetadata() {
+        EntitySheep sheep = spy(spawn(EntitySheep::new, 200, 0));
+        when(server.getTick()).thenReturn(50);
+        clearInvocations(sheep);
+        for (int tick = 0; tick < 1000; tick++) {
+            assertFalse(sheep.isActivationThrottled(tick));
+        }
+        verify(sheep, never()).isSheared();
+        verify(sheep, never()).hasCustomName();
+    }
+
+    @Test
+    void directNameMetadataChangesWakeSleepingMobsImmediately() {
+        playerAt(0, 0);
+        EntityPig pig = spawn(EntityPig::new, 200, 0);
+        runs(pig, 1000, 20);
+        assertTrue(pig.isActivationAsleep());
+        pig.getDataProperties().putString(Entity.DATA_NAMETAG, "Piggy");
+        assertEquals(20, runs(pig, 1020, 20));
+        cn.nukkit.entity.data.StringEntityData name =
+                (cn.nukkit.entity.data.StringEntityData) pig.getDataProperty(Entity.DATA_NAMETAG);
+        name.data = "";
+        runs(pig, 1040, 20);
+        assertTrue(pig.isActivationAsleep());
+        name.setData("renamed");
+        assertEquals(20, runs(pig, 1060, 20));
+        pig.getDataProperties().remove(Entity.DATA_NAMETAG);
+        runs(pig, 1080, 20);
+        assertTrue(pig.isActivationAsleep());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void entityNameWriteApisPreservePigAndCreeperActivation(boolean creeper) throws Exception {
+        CompoundTag nbt = Entity.getDefaultNBT(new Vector3(200, 64, 0)).putString("CustomName", "loaded");
+        BaseEntity actor = creeper ? new EntityCreeper(chunk(200, 0), nbt) : new EntityPig(chunk(200, 0), nbt);
+        assertEquals("loaded", actor.getNameTag());
+        assertEquals(20, runs(actor, 1000, 20));
+
+        assertTrue(actor.setDataProperty(new StringEntityData(Entity.DATA_NAMETAG, ""), false));
+        runs(actor, 1020, 20);
+        assertTrue(actor.isActivationAsleep());
+
+        assertTrue(actor.setDataPropertyAndSendOnlyToSelf(new StringEntityData(Entity.DATA_NAMETAG, "self")));
+        assertEquals("self", actor.getNameTag());
+        assertEquals(20, runs(actor, 1040, 20));
+        EntityData entry = actor.getDataProperty(Entity.DATA_NAMETAG);
+        assertFalse(actor.setDataProperty(new StringEntityData(Entity.DATA_NAMETAG, "self"), false));
+        assertFalse(actor.setDataPropertyAndSendOnlyToSelf(new StringEntityData(Entity.DATA_NAMETAG, "self")));
+        assertSame(entry, actor.getDataProperty(Entity.DATA_NAMETAG));
+        assertEquals("self", actor.getNameTag());
+
+        Method remove = Entity.class.getDeclaredMethod("removeDataProperty", int.class);
+        remove.setAccessible(true);
+        assertEquals(true, remove.invoke(actor, Entity.DATA_NAMETAG));
+        assertEquals("", actor.getNameTag());
+        runs(actor, 1060, 20);
+        assertTrue(actor.isActivationAsleep());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"Entity, riding", "Entity, noDamageTicks", "EntityLiving, attackTime", "BaseEntity, inLoveTicks"})
+    void remainingWakeFieldsStillPreventSleep(String declaringClass, String name) throws Exception {
+        EntityPig pig = spawn(EntityPig::new, 200, 0);
+        runs(pig, 1000, 20);
+        assertTrue(pig.isActivationAsleep());
+
+        Field field = Class.forName("cn.nukkit.entity." + declaringClass).getDeclaredField(name);
+        field.setAccessible(true);
+        if (field.getType() == int.class) {
+            field.setInt(pig, 1);
+        } else if (field.getType() == short.class) {
+            field.setShort(pig, (short) 1);
+        } else {
+            field.set(pig, mock(Entity.class));
+        }
+        assertFalse(pig.isActivationThrottled(1021));
+        assertFalse(pig.isActivationAsleep());
+    }
+
+    @Test
+    void ownerNameChangesKeepTheExistingSleepRestriction() {
+        EntityOcelot ocelot = spawn(EntityOcelot::new, 200, 0);
+        assertEquals("", ocelot.getOwnerName());
+        runs(ocelot, 1000, 20);
+        assertTrue(ocelot.isActivationAsleep());
+
+        ocelot.setOwnerName("Owner");
+        assertEquals(20, runs(ocelot, 1020, 20));
+        assertFalse(ocelot.isActivationAsleep());
+
+        ocelot.setOwnerName("");
+        runs(ocelot, 1040, 20);
+        assertTrue(ocelot.isActivationAsleep());
+    }
+
+    @Test
+    void damageGraceKeepsItsExclusiveHundredTickBoundary() {
+        EntityPig pig = spawn(EntityPig::new, 200, 0);
+        when(server.getTick()).thenReturn(100);
+        assertEquals(20, runs(pig, 1000, 20));
+        assertFalse(pig.isActivationAsleep());
+
+        when(server.getTick()).thenReturn(101);
+        runs(pig, 1020, 20);
+        assertTrue(pig.isActivationAsleep());
     }
 
     @Test
@@ -252,6 +369,32 @@ class EntityActivationTest {
     }
 
     @Test
+    void movingPlayerIntoRangeImmediatelyPreventsMobDespawnWithCachedMembership() {
+        PlayerRangeMap tickingPlayers = new PlayerRangeMap();
+        when(level.getPlayers()).thenReturn(tickingPlayers);
+        Player player = mock(Player.class);
+        player.x = 200;
+        player.y = 500;
+        tickingPlayers.put(1L, player);
+        EntityPig pig = spawn(EntityPig::new, 0, 0);
+        boolean previousDespawn = server.despawnMobs;
+        server.despawnMobs = true;
+        tickingPlayers.beginTick();
+        try {
+            assertTrue(pig.canDespawn());
+            Player[] snapshot = tickingPlayers.tickSnapshot();
+            player.x = 96;
+            assertTrue(pig.canDespawn(), "the 96-block boundary remains exclusive");
+            player.x = 0;
+            assertFalse(pig.canDespawn(), "a player moving nearby must prevent despawn immediately");
+            assertSame(snapshot, tickingPlayers.tickSnapshot(), "movement keeps the reference snapshot valid");
+        } finally {
+            tickingPlayers.endTick();
+            server.despawnMobs = previousDespawn;
+        }
+    }
+
+    @Test
     void sleepingMobStillDespawnsOnCaughtUpTicks() {
         boolean despawn = server.despawnMobs;
         int despawnTicks = server.mobDespawnTicks;
@@ -278,8 +421,6 @@ class EntityActivationTest {
         EntityPig pig = spy(spawn(EntityPig::new, 200, 0));
         doReturn(true).when(pig).onUpdate(anyInt());
         doCallRealMethod().when(level).updateEntity(any(), anyInt());
-        doCallRealMethod().when(level).getActivationSkippedUpdates();
-        doCallRealMethod().when(level).getActivationRunUpdates();
         for (int tick = 1000; tick < 1100; tick++) {
             assertTrue(level.updateEntity(pig, tick), "a sleeping mob must stay in the update list");
         }
@@ -287,8 +428,6 @@ class EntityActivationTest {
         int firstPhase = 1000 + Math.floorMod(-(1000 + (int) (pig.getId() % 20)), 20);
         int expected = firstPhase - 1000 + 1 + (1099 - firstPhase) / 20;
         verify(pig, times(expected)).onUpdate(anyInt());
-        assertEquals(100 - expected, level.getActivationSkippedUpdates());
-        assertEquals(expected, level.getActivationRunUpdates());
 
         pig.close();
         assertFalse(level.updateEntity(pig, 2000), "a closed entity still leaves the list");

@@ -26,20 +26,21 @@ public class BlockCoralBlock extends BlockSolidMeta {
         return CORAL_BLOCK;
     }
     
+    private static final String[] NAMES = new String[] {
+            "Tube Coral Block",
+            "Brain Coral Block",
+            "Bubble Coral Block",
+            "Fire Coral Block",
+            "Horn Coral Block",
+            // Invalid
+            "Tube Coral Block",
+            "Tube Coral Block",
+            "Tube Coral Block"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[] {
-                "Tube Coral Block",
-                "Brain Coral Block",
-                "Bubble Coral Block",
-                "Fire Coral Block",
-                "Horn Coral Block",
-                // Invalid
-                "Tube Coral Block",
-                "Tube Coral Block",
-                "Tube Coral Block"
-        };
-        String name = names[this.getDamage() & 0x7];
+        String name = NAMES[this.getDamage() & 0x7];
         if (this.isDead()) {
             return "Dead " + name;
         } else {

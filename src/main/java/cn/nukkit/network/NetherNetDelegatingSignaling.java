@@ -1,14 +1,13 @@
 package cn.nukkit.network;
 
 import io.netty.channel.EventLoop;
-import org.cloudburstmc.netty.channel.nethernet.signaling.IceServerInfo;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
 
 import java.net.ConnectException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.util.List;
 
 /**
  * 纯委托的信令装饰器基类：子类只覆盖需要拦截的出口（应答改写、offer 改写等），其余全部透传。
@@ -29,8 +28,8 @@ abstract class NetherNetDelegatingSignaling implements NetherNetServerSignaling 
     }
 
     @Override
-    public void bind(SocketAddress localAddress, EventLoop eventLoop) throws ConnectException {
-        this.delegate.bind(localAddress, eventLoop);
+    public void bind(SocketAddress localAddress, InetSocketAddress advertisedAddress, EventLoop eventLoop) throws ConnectException {
+        this.delegate.bind(localAddress, advertisedAddress, eventLoop);
     }
 
     @Override
@@ -41,11 +40,6 @@ abstract class NetherNetDelegatingSignaling implements NetherNetServerSignaling 
     @Override
     public void setAdvertisementData(PongData pongData) {
         this.delegate.setAdvertisementData(pongData);
-    }
-
-    @Override
-    public List<IceServerInfo> getIceServers() {
-        return this.delegate.getIceServers();
     }
 
     @Override

@@ -19,12 +19,17 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -125,6 +130,64 @@ class NetherNetInterfaceTest {
     }
 
     @Test
+    void netherNetMessagesExistInEveryBundledLanguage() throws IOException {
+        // 与 nukkit.palette.* 同一约定：六语言全量键覆盖 + placeholder 集合一致，缺失键会静默回退英文
+        // Same convention as nukkit.palette.*: full key parity across the six bundled languages
+        // with matching placeholder sets; a missing key silently falls back to English.
+        Map<String, String> eng = loadLangKeys("eng");
+        Map<String, String> keys = new HashMap<>();
+        eng.forEach((key, value) -> {
+            if (key.startsWith("nukkit.nethernet.")) {
+                keys.put(key, value);
+            }
+        });
+        assertFalse(keys.isEmpty(), "eng must define nukkit.nethernet.* keys");
+        assertTrue(keys.containsKey("nukkit.nethernet.disabled.hint"),
+                "the 1.26.60+ RakNet-removal startup hint must stay translated");
+
+        for (String folder : new String[]{"chs", "deu", "jpn", "rus", "vie"}) {
+            Map<String, String> lang = loadLangKeys(folder);
+            for (Map.Entry<String, String> entry : keys.entrySet()) {
+                String translated = lang.get(entry.getKey());
+                assertNotNull(translated, folder + " lacks " + entry.getKey());
+                assertEquals(placeholders(entry.getValue()), placeholders(translated),
+                        folder + "/" + entry.getKey() + " placeholder set differs from eng");
+            }
+        }
+    }
+
+    private static Map<String, String> loadLangKeys(String folder) throws IOException {
+        try (InputStream in = NetherNetInterfaceTest.class.getClassLoader()
+                .getResourceAsStream("lang/" + folder + "/lang.ini")) {
+            assertNotNull(in, folder + "/lang.ini missing from classpath");
+            Map<String, String> map = new HashMap<>();
+            for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                line = line.trim();
+                if (line.isEmpty() || line.charAt(0) == '#') {
+                    continue;
+                }
+                String[] split = line.split("=", 2);
+                if (split.length == 2) {
+                    map.put(split[0].trim(), split[1]);
+                }
+            }
+            return map;
+        }
+    }
+
+    private static List<String> placeholders(String text) {
+        // 文本中的占位符顺序随语序合法变化，比较时按集合处理 / placeholder order may shift with
+        // the language's word order, so compare as a set
+        List<String> found = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\\{%\\d+}").matcher(text);
+        while (matcher.find()) {
+            found.add(matcher.group());
+        }
+        found.sort(null);
+        return found;
+    }
+
+    @Test
     @Timeout(30)
     void configuredMediaPortStillStartsTheInterface() {
         Server server = MockServer.get();
@@ -141,7 +204,9 @@ class NetherNetInterfaceTest {
     @Timeout(30)
     void configuredExternalMappingStillStartsTheInterface() {
         Server server = MockServer.get();
-        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("203.0.113.10:19132:39000");
+        // 203.0.113.10 等 TEST-NET 地址自 CR6 起被上游 requireUsable 拒绝，改用可路由公网地址
+        // TEST-NET addresses like 203.0.113.10 are rejected by upstream's requireUsable since CR6
+        lenient().when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn("8.8.8.8:19132:39000");
         NetherNetInterface mapped = new NetherNetInterface(server, new NetherNetSettings());
         assertNotNull(mapped);
         mapped.shutdown();

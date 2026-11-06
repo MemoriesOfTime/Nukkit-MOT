@@ -39,13 +39,13 @@ import java.nio.ByteOrder;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode.DIRECT_WRITE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class RakNetPlayerSessionTest {
@@ -563,8 +563,8 @@ class RakNetPlayerSessionTest {
 
             receiveBatch(fixture.session, encryptBatch(clientCipher, key, 1, payload));
 
-            assertEquals(1, fixture.session.queuedInboundPacketCount(),
-                    "soft backpressure must advance both the cipher stream and checksum counter");
+            assertEquals(2, fixture.session.queuedInboundPacketCount(),
+                    "soft backpressure must retain both batches and advance the cipher exactly once");
             assertNull(fixture.session.getDisconnectReason());
             verify(fixture.channel, never()).close();
         }
@@ -894,5 +894,94 @@ class RakNetPlayerSessionTest {
         long late = RakNetPlayerSession.RESOURCE_PACK_PHASE_MAX_NANOS + 1;
         assertTrue(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.RESOURCE_PACK,
                 start, start, true, late, (int) timeout));
+    }
+
+    private static final long[] COUNTERS = {0, 1, 127, 128, 255, 256, 65535, 65536,
+            0x0102030405060708L, Long.MAX_VALUE, Long.MIN_VALUE, -1};
+
+    @Test
+    void keepsKnownLittleEndianVectorAndReceivedTrailer() throws Exception {
+        byte[] key = new byte[32];
+        for (int i = 0; i < key.length; i++) key[i] = (byte) i;
+        RakNetPlayerSession session = session(key);
+        Field localField = RakNetPlayerSession.class.getDeclaredField("CHECKSUM_LOCAL");
+        localField.setAccessible(true);
+        byte[] receivedTrailer = ((ThreadLocal<byte[]>) localField.get(null)).get();
+        Arrays.fill(receivedTrailer, (byte) 0xa5);
+        byte[] expectedTrailer = receivedTrailer.clone();
+        ByteBuf payload = Unpooled.wrappedBuffer(new byte[]{0, 127, (byte) 128, (byte) 255, 1, 2, 3});
+        try {
+            byte[] actual = calculate(session, 0x0102030405060708L, payload);
+            assertEquals("4fd7df1ec998997f", HexFormat.of().formatHex(actual));
+            assertArrayEquals(expectedTrailer, receivedTrailer,
+                    "incoming verification must keep its received trailer after calculating the expected one");
+            actual[0] ^= (byte) 0xff;
+            assertEquals("4fd7df1ec998997f", HexFormat.of().formatHex(calculate(session, 0x0102030405060708L, payload)));
+        } finally {
+            payload.release();
+        }
+    }
+
+    @Test
+    void matchesIndependentDigestForCountersAndBufferViewsOnIndependentThreads() throws Exception {
+        var threads = Executors.newFixedThreadPool(3);
+        try {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int task = 0; task < 6; task++) {
+                final int seed = task;
+                futures.add(threads.submit(() -> {
+                    try {
+                        Random random = new Random(seed);
+                        byte[] key = new byte[32];
+                        random.nextBytes(key);
+                        RakNetPlayerSession session = session(key);
+                        for (int length : new int[]{0, 1, 7, 8, 31, 256, 1025}) {
+                            byte[] bytes = new byte[length];
+                            random.nextBytes(bytes);
+                            for (boolean direct : new boolean[]{false, true}) {
+                                ByteBuf backing = direct ? Unpooled.directBuffer(length + 13) : Unpooled.buffer(length + 13);
+                                try {
+                                    backing.writeZero(5).writeBytes(bytes).writeZero(8);
+                                    ByteBuf payload = backing.slice(2, length + 3).readerIndex(3);
+                                    int reader = payload.readerIndex();
+                                    int writer = payload.writerIndex();
+                                    for (long counter : COUNTERS) {
+                                        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                                        digest.update(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(counter).array());
+                                        digest.update(bytes);
+                                        digest.update(key);
+                                        assertArrayEquals(Arrays.copyOf(digest.digest(), 8), calculate(session, counter, payload));
+                                        assertEquals(reader, payload.readerIndex());
+                                        assertEquals(writer, payload.writerIndex());
+                                        assertEquals(1, backing.refCnt());
+                                    }
+                                } finally {
+                                    backing.release();
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        throw new AssertionError(e);
+                    }
+                }));
+            }
+            for (var future : futures) future.get();
+        } finally {
+            threads.shutdownNow();
+        }
+    }
+
+    private static RakNetPlayerSession session(byte[] key) throws Exception {
+        RakNetPlayerSession session = mock(RakNetPlayerSession.class, CALLS_REAL_METHODS);
+        Field field = RakNetPlayerSession.class.getDeclaredField("encryptionKey");
+        field.setAccessible(true);
+        field.set(session, new SecretKeySpec(key, "AES"));
+        return session;
+    }
+
+    private static byte[] calculate(RakNetPlayerSession session, long counter, ByteBuf payload) throws Exception {
+        Method method = RakNetPlayerSession.class.getDeclaredMethod("calculateChecksum", long.class, ByteBuf.class);
+        method.setAccessible(true);
+        return (byte[]) method.invoke(session, counter, payload);
     }
 }
