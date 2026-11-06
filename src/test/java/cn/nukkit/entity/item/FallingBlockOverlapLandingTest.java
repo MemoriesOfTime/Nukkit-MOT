@@ -105,6 +105,7 @@ class FallingBlockOverlapLandingTest {
             when(level.getBlock(any(Vector3.class))).thenAnswer(call -> cell);
             when(level.getChunkEntities(anyInt(), anyInt(), eq(false))).thenAnswer(call ->
                     (int) call.getArgument(0) == 0 && (int) call.getArgument(1) == 0 ? entities : Map.of());
+            when(level.getChunkEntitySnapshot(anyInt(), anyInt(), eq(false))).thenCallRealMethod();
             when(level.setBlock(any(Vector3.class), any(Block.class), eq(true), eq(true))).thenAnswer(call -> {
                 placements++;
                 cell = ((Block) call.getArgument(1)).clone();
