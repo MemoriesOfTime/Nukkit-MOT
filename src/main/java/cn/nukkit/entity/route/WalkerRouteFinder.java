@@ -8,6 +8,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +27,7 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
 
     private final PriorityQueue<Node> openList = new PriorityQueue<>();
     private final ArrayList<Node> closeList = new ArrayList<>();
+    private ObjectOpenHashSet<Vector3> closedPositions;
 
     private int searchLimit = 100;
 
@@ -52,6 +54,9 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
         int total = 2;
         if (array.size() > 2) {
             while (total < array.size()) {
+                if (this.isSearchClosed()) {
+                    return array;
+                }
                 if (!hasBarrier(array.get(current), array.get(total)) && total != array.size() - 1) {
                     total++;
                 } else {
@@ -116,15 +121,6 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
         return null;
     }
 
-    private Node getNodeInCloseByVector2(Vector3 vector) {
-        for (Node node : this.closeList) {
-            if (vector.equals(node.getVector3())) {
-                return node;
-            }
-        }
-        return null;
-    }
-
     private Node getNodeInOpenByVector2(Vector3 vector2) {
         for (Node node : this.openList) {
             if (vector2.equals(node.getVector3())) {
@@ -139,10 +135,12 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
         ArrayList<Node> nodes = new ArrayList<>();
         Node temp = closeList.get(closeList.size() - 1);
         nodes.add(temp);
-        while (!temp.getParent().getVector3().equals(start)) {
+        while (temp.getParent() != null && !temp.getParent().getVector3().equals(start)) {
             nodes.add(temp = temp.getParent());
         }
-        nodes.add(temp.getParent());
+        if (temp.getParent() != null) {
+            nodes.add(temp.getParent());
+        }
         Collections.reverse(nodes);
         return nodes;
     }
@@ -241,7 +239,9 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
     }
 
     private boolean noContainsInClose(Vector3 vector) {
-        return getNodeInCloseByVector2(vector) == null;
+        // The origin can be the live entity. Keep its mutable coordinates out of the hash index.
+        return (closeList.isEmpty() || !vector.equals(closeList.get(0).getVector3()))
+                && !closedPositions.contains(vector);
     }
 
     private void putNeighborNodeIntoOpen(Node node) {
@@ -383,6 +383,12 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
     private void resetTemporary() {
         this.openList.clear();
         this.closeList.clear();
+        if (this.closedPositions == null) {
+            // Allocate lazily on the search worker; open addressing adds no entries per node.
+            this.closedPositions = new ObjectOpenHashSet<>();
+        } else {
+            this.closedPositions.clear();
+        }
         this.searchLimit = 100;
     }
 
@@ -390,58 +396,66 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
     public void search() {
         this.finished = false;
         this.searching = true;
-
-        if (this.start == null) {
-            this.start = this.entity;
-        }
-
-        if (this.destination == null) {
-            Vector3 vec = entity.getTarget();
-            if (vec != null) {
-                this.destination = vec;
-            } else {
-                this.searching = false;
-                this.finished = true;
+        try {
+            if (this.isSearchClosed()) {
                 return;
             }
-        }
 
-        this.resetTemporary();
+            if (this.start == null) {
+                this.start = this.entity;
+            }
 
-        Node presentNode = new Node(start);
-        closeList.add(new Node(start));
+            if (this.destination == null) {
+                Vector3 vec = entity.getTarget();
+                if (vec != null) {
+                    this.destination = vec;
+                } else {
+                    return;
+                }
+            }
+
+            this.resetTemporary();
+
+            Node presentNode = new Node(start);
+            closeList.add(new Node(start));
 
 
-        while (!isPositionOverlap(presentNode.getVector3(), destination)) {
-            if (this.isInterrupted()) {
-                searchLimit = 0;
-                this.searching = false;
-                this.finished = true;
+            while (!isPositionOverlap(presentNode.getVector3(), destination)) {
+                if (this.isInterrupted()) {
+                    searchLimit = 0;
+                    return;
+                }
+                putNeighborNodeIntoOpen(presentNode);
+                if (openList.peek() != null && searchLimit-- > 0) {
+                    closeList.add(presentNode = openList.poll());
+                    closedPositions.add(presentNode.getVector3());
+
+                } else {
+                    this.reachable = false;
+                    this.addNode(new Node(destination));
+                    return;
+                }
+            }
+
+            if (!presentNode.getVector3().equals(destination)) {
+                closeList.add(new Node(destination, presentNode, 0, 0));
+            }
+            if (this.isSearchClosed()) {
                 return;
             }
-            putNeighborNodeIntoOpen(presentNode);
-            if (openList.peek() != null && searchLimit-- > 0) {
-                closeList.add(presentNode = openList.poll());
-
-            } else {
-                this.searching = false;
-                this.finished = true;
-                this.reachable = false;
-                this.addNode(new Node(destination));
+            ArrayList<Node> findingPath = getPathRoute();
+            findingPath = FloydSmooth(findingPath);
+            if (this.isSearchClosed()) {
                 return;
             }
+
+            this.resetNodes();
+
+            this.addNode(findingPath);
+            this.reachable = true;
+        } finally {
+            this.finished = true;
+            this.searching = false;
         }
-
-        if (!presentNode.getVector3().equals(destination)) {
-            closeList.add(new Node(destination, presentNode, 0, 0));
-        }
-        ArrayList<Node> findingPath = getPathRoute();
-        findingPath = FloydSmooth(findingPath);
-
-        this.resetNodes();
-
-        this.addNode(findingPath);
-        this.finished = true;
-        this.searching = false;
     }
 }
