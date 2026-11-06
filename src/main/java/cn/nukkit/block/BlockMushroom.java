@@ -27,7 +27,11 @@ public abstract class BlockMushroom extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (!canStay()) {
+            // Light is a placement rule only. Re-checking it on every neighbour update made
+            // every mushroom on a sunlit surface pop as soon as anything next to it changed,
+            // so breaking one mushroom chain-broke the whole row. Bedrock keeps a placed
+            // mushroom while it still has support.
+            if (!hasSupport()) {
                 getLevel().useBreakOn(this);
 
                 return Level.BLOCK_UPDATE_NORMAL;
@@ -83,6 +87,12 @@ public abstract class BlockMushroom extends BlockFlowable {
     public boolean canStay() {
         Block block = this.down();
         return block.getId() == MYCELIUM || block.getId() == PODZOL || (!block.isTransparent() && this.level.getFullLight(this) < 13);
+    }
+
+    /** Support for an already placed mushroom: the block below, without the light rule. */
+    public boolean hasSupport() {
+        Block block = this.down();
+        return block.getId() == MYCELIUM || block.getId() == PODZOL || !block.isTransparent();
     }
 
     @Override
