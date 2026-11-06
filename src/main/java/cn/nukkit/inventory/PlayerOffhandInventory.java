@@ -154,6 +154,8 @@ public class PlayerOffhandInventory extends BaseInventory {
             item = ev2.getNewItem();
         }
 
+        if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
+
         if (item instanceof cn.nukkit.item.ItemBundle bundle) {
             ensureUniqueBundleId(index, bundle);
         }
@@ -195,6 +197,8 @@ public class PlayerOffhandInventory extends BaseInventory {
                 }
                 item = ev2.getNewItem();
             }
+
+            if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
             if (item.getId() != Item.AIR) {
                 this.slots.put(index, item.clone());

@@ -216,6 +216,8 @@ public abstract class BaseInventory implements Inventory {
             item = ev.getNewItem();
         }
 
+        if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
+
         if (holder instanceof BlockEntity) {
             ((BlockEntity) holder).setDirty();
         }
@@ -606,6 +608,8 @@ public abstract class BaseInventory implements Inventory {
                 }
                 item = ev.getNewItem();
             }
+
+            if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
             if (holder instanceof BlockEntity) {
                 ((BlockEntity) holder).setDirty();
