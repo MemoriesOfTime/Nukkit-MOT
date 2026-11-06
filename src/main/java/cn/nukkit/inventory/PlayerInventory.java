@@ -304,6 +304,8 @@ public class PlayerInventory extends BaseInventory {
             item = ev.getNewItem();
         }
 
+        if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
+
         if (item instanceof cn.nukkit.item.ItemBundle bundle) {
             ensureUniqueBundleId(index, bundle);
         }
@@ -348,6 +350,8 @@ public class PlayerInventory extends BaseInventory {
                 }
                 item = ev.getNewItem();
             }
+
+            if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
             if (item.getId() != Item.AIR) {
                 this.slots.put(index, item.clone());
