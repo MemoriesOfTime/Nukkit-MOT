@@ -101,7 +101,7 @@ public final class DriedGhastOrdinarySupportTest {
             if (!"minecraft:respawn_anchor".equals(row.getString("name"))) continue;
             CompoundTag states = row.getCompound("states"); int charge = states.getInt("respawn_anchor_charge");
             if (charge < 1 || charge > 4) continue;
-            assertEquals(12792 + charge, ordinal); assertEquals(527, row.getInt("id"));
+            assertEquals(12797 + charge, ordinal); assertEquals(527, row.getInt("id"));
             assertEquals(charge, row.getShort("data")); assertEquals(1776 + charge, row.getInt("runtimeId"));
             Tag value = states.get("respawn_anchor_charge");
             assertTrue(value.getId() == 1 || value.getId() == 3, "Only the known ByteTag/IntTag variant is compatible");
@@ -109,7 +109,7 @@ public final class DriedGhastOrdinarySupportTest {
         }
         assertEquals(4, changed); assertEquals(1, variants.size(), "The four known properties use one complete variant");
         StringBuilder semantic = new StringBuilder(); appendSemantic(root, semantic);
-        assertEquals("dc62f269e66d242804c3ba364b44b25d337a94bbd0b14872ab6d3a81e43363b5",
+        assertEquals("21f2885c28759e7e1d6dc717a5b93b1b1790915e6108b528c69a6dd89e292713",
                 java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                         .digest(semantic.toString().getBytes(StandardCharsets.UTF_8))),
                 "589 row order, fields, values and tag types match the pinned projection including restored mud states");
@@ -124,7 +124,7 @@ public final class DriedGhastOrdinarySupportTest {
                 "818 row order, fields, values and tag types match the pinned projection including restored dried ghast states");
         String[] directions = {"south", "west", "north", "east"};
         for (int meta = 0; meta < 16; meta++) {
-            CompoundTag row = assertInstanceOf(CompoundTag.class, root.get(18076 + meta));
+            CompoundTag row = assertInstanceOf(CompoundTag.class, root.get(6549 + meta));
             assertEquals("minecraft:dried_ghast", row.getString("name"));
             assertEquals(Block.DRIED_GHAST, row.getInt("id")); assertEquals(meta, row.getShort("data"));
             assertEquals(3116 + meta, row.getInt("runtimeId")); assertFalse(row.getBoolean("stateOverload"));
@@ -163,8 +163,8 @@ public final class DriedGhastOrdinarySupportTest {
         ListTag<?> bytes = assertInstanceOf(ListTag.class, stockOrRepaired.copy());
         ListTag<?> ints = assertInstanceOf(ListTag.class, stockOrRepaired.copy());
         for (int charge = 1; charge <= 4; charge++) {
-            ((CompoundTag) bytes.get(12792 + charge)).getCompound("states").putByte("respawn_anchor_charge", charge);
-            ((CompoundTag) ints.get(12792 + charge)).getCompound("states").putInt("respawn_anchor_charge", charge);
+            ((CompoundTag) bytes.get(12797 + charge)).getCompound("states").putByte("respawn_anchor_charge", charge);
+            ((CompoundTag) ints.get(12797 + charge)).getCompound("states").putInt("respawn_anchor_charge", charge);
         }
         assertDoesNotThrow(() -> assertKnown589Projection(bytes));
         assertDoesNotThrow(() -> assertKnown589Projection(ints));
@@ -173,13 +173,13 @@ public final class DriedGhastOrdinarySupportTest {
     @Test void public589ProjectionRejectsUnrelatedStateOrderAndTagChanges() throws Exception {
         ListTag<?> source = assertInstanceOf(ListTag.class, palette(resource("runtime_block_states_589.dat")));
         ListTag<?> wrongState = assertInstanceOf(ListTag.class, source.copy());
-        ((CompoundTag) wrongState.get(14092)).getCompound("states").putString("stone_type", "granite");
+        ((CompoundTag) wrongState.get(14097)).getCompound("states").putString("stone_type", "granite");
         assertThrows(AssertionError.class, () -> assertKnown589Projection(wrongState));
         ListTag<Tag> wrongOrder = new ListTag<>(source.getName());
-        for (int i = 0; i < source.size(); i++) wrongOrder.add(source.get(i == 14092 ? 0 : i == 0 ? 14092 : i).copy());
+        for (int i = 0; i < source.size(); i++) wrongOrder.add(source.get(i == 14097 ? 0 : i == 0 ? 14097 : i).copy());
         assertThrows(AssertionError.class, () -> assertKnown589Projection(wrongOrder));
         ListTag<?> wrongType = assertInstanceOf(ListTag.class, source.copy());
-        ((CompoundTag) wrongType.get(12793)).getCompound("states").putShort("respawn_anchor_charge", 1);
+        ((CompoundTag) wrongType.get(12798)).getCompound("states").putShort("respawn_anchor_charge", 1);
         assertThrows(AssertionError.class, () -> assertKnown589Projection(wrongType));
     }
 
@@ -256,7 +256,7 @@ public final class DriedGhastOrdinarySupportTest {
     @Test void releasedProtocol818UsesNativeDriedGhastWireIdentity() throws Exception {
         assertEquals(818, GameVersion.V1_21_90.getProtocol());
         assertEquals(-1027, declaration(818, "minecraft:dried_ghast", "76b849ee98a7776056f43d222d01fddeff8e587212639c6caab30ed35a5101d5"));
-        CompoundTag nativeRow = nativeState(818, Block.DRIED_GHAST, 0, "22bc61f1a0b7d73b019f64092e58c31aabd8c9d0870129a6f445b5a7b481c858");
+        CompoundTag nativeRow = nativeState(818, Block.DRIED_GHAST, 0, "10d7723f67a6d275b8f2d3277635c249a614efe9564929d54bad7216cfd86c36");
         assertEquals("minecraft:dried_ghast", nativeRow.getString("name"));
         assertEquals(3116, nativeRow.getInt("runtimeId"));
         assertEquals("south", nativeRow.getCompound("states").getString("minecraft:cardinal_direction"));
