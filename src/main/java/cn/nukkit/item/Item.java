@@ -1272,7 +1272,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return get(flattenedEntry[0], meta.orElse(flattenedEntry[1]));
             }
 
-            if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
+            if (namespaceGroup != null && !namespaceGroup.equals("minecraft")) {
                 return Item.AIR_ITEM.clone();
             }
         } else if (numericIdGroup != null) {
