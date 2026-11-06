@@ -70,7 +70,7 @@ public class BlockPumpkin extends BlockSolidMeta implements Faceable {
         carvedPumpkin.setBlockFace(this.getBlockFace());
         item.useOn(this);
         this.level.setBlock(this, carvedPumpkin, true, true);
-        this.getLevel().dropItem(add(0.5, 0.5, 0.5), Item.get(ItemID.PUMPKIN_SEEDS));
+        this.getLevel().dropItemFromBlockInteraction(this, Item.get(ItemID.PUMPKIN_SEEDS));
         return true;
     }
 

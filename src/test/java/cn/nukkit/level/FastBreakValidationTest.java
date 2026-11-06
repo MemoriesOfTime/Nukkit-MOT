@@ -108,6 +108,7 @@ class FastBreakValidationTest {
         private static Level levelWith(Block block) {
             Level level = Mockito.mock(Level.class);
             setField(level, "server", MockServer.get());
+            setField(level, "automaticBlockBreakTrace", new AutomaticBlockBreakTrace());
             setField(level, "gameRules", GameRules.getDefault());
             setField(level, "vibrationManager", Mockito.mock(VibrationManager.class));
             Mockito.doCallRealMethod().when(level).useBreakOn(
