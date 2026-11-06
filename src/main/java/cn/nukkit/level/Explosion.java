@@ -311,7 +311,7 @@ public class Explosion {
             }
             entity.attack(damageEvent);
 
-            if (!(entity instanceof EntityItem || entity instanceof EntityXPOrb)) {
+            if (!damageEvent.isCancelled() && !(entity instanceof EntityItem || entity instanceof EntityXPOrb)) {
                 entity.motionX += motion.x * impact;
                 entity.motionY += motion.y * impact;
                 entity.motionZ += motion.z * impact;
