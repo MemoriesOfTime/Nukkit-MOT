@@ -34,10 +34,7 @@ public abstract class BlockFallableMeta extends BlockSolidMeta {
     }
 
     protected boolean canFallInto(Block block) {
-        return block.getId() == AIR
-                || block instanceof BlockLiquid
-                || block instanceof BlockFire
-                || block instanceof BlockBubbleColumn && block.getLevelBlockAtLayer(1) instanceof BlockLiquid;
+        return BlockFallable.isFallThrough(this, block);
     }
 
     protected EntityFallingBlock createFallingEntity(CompoundTag customNbt) {

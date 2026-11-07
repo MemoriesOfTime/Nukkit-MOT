@@ -4,6 +4,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import com.sun.management.ThreadMXBean;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -35,6 +36,7 @@ public final class NativeNeighborScanAllocationTest {
     private static final int WINDOWS = 7;
     private static volatile long sink;
 
+    @Tag("perf")
     @Test
     void pistonScanDoesNotAllocateDirectionArrays(@TempDir Path directory) throws Exception {
         for (String scene : List.of("air-full", "power-last", "wire-first", "control")) {
@@ -42,6 +44,7 @@ public final class NativeNeighborScanAllocationTest {
         }
     }
 
+    @Tag("perf")
     @Test
     void frostScanDoesNotAllocateDirectionArrays(@TempDir Path directory) throws Exception {
         for (String scene : List.of("empty", "four-late", "all", "control")) {

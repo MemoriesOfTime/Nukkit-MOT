@@ -1,11 +1,17 @@
 package cn.nukkit.network.process;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.network.protocol.PlayerActionPacket;
 import cn.nukkit.network.protocol.PlayerAuthInputPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.AuthInputAction;
+import cn.nukkit.network.protocol.types.AuthInteractionModel;
+import cn.nukkit.network.protocol.types.ClientPlayMode;
+import cn.nukkit.network.protocol.types.InputMode;
+import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -119,6 +125,59 @@ class UsingItemReceiveTest {
 
     @Test
     void netease860AuthInputStartUsingItemDecodesAndWouldSetUsingItem() {
-        assertTrue(UsingItemReceiveProbe.run().startsWith("ok "));
+        PlayerAuthInputPacket packet = decodeNetEase860StartUsingItem();
+        boolean decodedStart = UsingItemReceive.authInputStartsUsingItem(packet);
+
+        assertTrue(decodedStart, "NetEase 860 START_USING_ITEM wire bit must decode");
+        assertTrue(UsingItemReceive.shouldStartUsingFromAuthInput(true, false, false, true, decodedStart));
+        assertTrue(UsingItemReceive.shouldKeepUsingDespiteStartSprinting(true, true, decodedStart));
+        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(
+                true, PlayerActionPacket.ACTION_START_USING_ITEM));
+        assertFalse(UsingItemReceive.shouldClearUsingOnUnhandledPlayerAction(
+                true, PlayerActionPacket.ACTION_START_ITEM_USE_ON));
+        assertEquals(ProtocolInfo.v1_21_124, packet.protocol);
+        assertEquals(GameVersion.V1_21_124_NETEASE, packet.gameVersion);
+    }
+
+    /**
+     * Encode a NetEase 860 PlayerAuthInput payload with START_USING_ITEM on the
+     * extra-flag-shifted wire bit (ordinal 53 + 1 extra flag for protocol 860).
+     */
+    private static PlayerAuthInputPacket decodeNetEase860StartUsingItem() {
+        int extraFlags = 2; // protocol 860 is >= 819, NetEase inserts two hidden flags
+        int startUsingOrdinal = AuthInputAction.START_USING_ITEM.ordinal();
+        long wireBit = 1L << (startUsingOrdinal + extraFlags);
+        BinaryStream stream = new BinaryStream();
+        stream.putLFloat(10.5f);
+        stream.putLFloat(20.5f);
+        stream.putVector3f(1.25f, 64.0f, -3.5f);
+        stream.putLFloat(0.25f);
+        stream.putLFloat(-0.5f);
+        stream.putLFloat(30.5f);
+        stream.putUnsignedVarLong(wireBit);
+        stream.putUnsignedVarInt(InputMode.TOUCH.ordinal());
+        stream.putUnsignedVarInt(ClientPlayMode.NORMAL.ordinal());
+        stream.putUnsignedVarInt(AuthInteractionModel.CROSSHAIR.ordinal());
+        stream.putVector2f(5.0f, 6.0f);
+        stream.putUnsignedVarLong(123L);
+        stream.putVector3f(0.1f, 0.2f, 0.3f);
+        stream.putBoolean(false); // cameraDeparted
+        stream.putVector2f(0.6f, -0.4f);
+        stream.putVector3f(0.0f, 1.0f, 0.0f);
+        stream.putVector2f(-0.25f, 0.75f);
+        // fixed NetEase tail since 766
+        stream.putBoolean(false);
+        stream.putLFloat(0.5f);
+        stream.putLFloat(-0.5f);
+        stream.putBoolean(false);
+        stream.putBoolean(true);
+        stream.putByte(0);
+
+        PlayerAuthInputPacket packet = new PlayerAuthInputPacket();
+        packet.protocol = ProtocolInfo.v1_21_124;
+        packet.gameVersion = GameVersion.V1_21_124_NETEASE;
+        packet.setBuffer(stream.getBuffer());
+        packet.decode();
+        return packet;
     }
 }
