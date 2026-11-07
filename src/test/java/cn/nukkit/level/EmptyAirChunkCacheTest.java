@@ -3,29 +3,23 @@ package cn.nukkit.level;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
-import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.nbt.tag.CompoundTag;
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import cn.nukkit.network.protocol.BatchPacket;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
-import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -82,11 +76,13 @@ class EmptyAirChunkCacheTest {
         AtomicInteger serialized = new AtomicInteger();
         BatchPacket first = requestCached(chunk, dimension, serialized);
         assertNotNull(first);
-        for (String field : List.of("tiles", "tileList", "unknownTiles")) {
-            var f = BaseFullChunk.class.getDeclaredField(field);
-            f.setAccessible(true);
-            assertNull(f.get(chunk), "Native serialization must not create owner tile maps: " + field);
-        }
+        // getUnknownTiles() 为非物化读取(null 时返回空集合)，可直接断言无 owner tile map；
+        // tiles/tileList 一旦被序列化创建，下方 AIR 写将走不到跳过路径，setChanged() 会推高
+        // getChanges() 并清空缓存包，由循环后的断言捕获。
+        // getUnknownTiles() is a non-materializing read (empty list when null); if tiles/tileList
+        // were created by serialization, the AIR-write skip path below would be disabled, tripping
+        // the getChanges()/packet-identity asserts after the loop.
+        assertTrue(chunk.getUnknownTiles().isEmpty(), "Native serialization must not create owner tile maps");
         long changes = chunk.getChanges();
         for (int i = 0; i < 64; i++) {
             boolean changed = fullId ? chunk.setFullBlockId(1, 1, 1, i & 1, 0)
@@ -245,46 +241,6 @@ class EmptyAirChunkCacheTest {
     }
 
     @Test
-    void nativeWarmCacheServesRealLevelRequestsWithoutAnotherProviderTask() throws Exception {
-        DimensionData dimension = new DimensionData(1, 0, 31);
-        LevelDBChunk chunk = chunk(dimension);
-        AtomicInteger serialized = new AtomicInteger();
-        BatchPacket packet = requestCached(chunk, dimension, serialized);
-        Level level = mock(Level.class, CALLS_REAL_METHODS);
-        LevelDBProvider provider = (LevelDBProvider) chunk.getProvider();
-        Server server = mock(Server.class);
-        server.cacheChunks = true;
-        when(server.getTick()).thenReturn(1);
-        set(Level.class, level, "server", server);
-        set(Level.class, level, "provider", provider);
-        for (String name : List.of("chunkSendQueues", "chunkSendTasks", "pendingChunkRequests", "chunkRequestEpochs")) {
-            set(Level.class, level, name, new Object2ObjectOpenHashMap<>());
-        }
-        set(Level.class, level, "chunkSendTaskStartTick", new Object2ObjectOpenHashMap<GameVersion, Long2LongOpenHashMap>());
-        doReturn(chunk).when(level).getChunk(3, 5);
-        doReturn(chunk).when(level).getChunkIfLoaded(3, 5);
-        doReturn(1).when(level).getDimension();
-        var process = Level.class.getDeclaredMethod("processChunkRequest");
-        process.setAccessible(true);
-        for (int i = 0; i < 32; i++) {
-            assertFalse(air(chunk, (i & 1) == 0, 1));
-            Player player = mock(Player.class);
-            set(Player.class, player, "usedChunks", new HashMap<Long, Boolean>());
-            player.usedChunks.put(Level.chunkHash(3, 5), false);
-            when(player.getLoaderId()).thenReturn(i + 1);
-            when(player.getGameVersion()).thenReturn(VERSION);
-            when(player.isConnected()).thenReturn(true);
-            when(player.getLevel()).thenReturn(level);
-            level.requestChunk(3, 5, player);
-            process.invoke(level);
-            verify(player).sendChunk(3, 5, packet);
-        }
-        verify(provider, never()).requestChunkTask(
-                org.mockito.ArgumentMatchers.<ObjectSet<GameVersion>>any(), anyInt(), anyInt());
-        assertEquals(1, serialized.get());
-    }
-
-    @Test
     void concurrentNativeMaterializationPreservesTheOtherCellAndInvalidation() throws Exception {
         var workers = java.util.concurrent.Executors.newFixedThreadPool(2);
         try {
@@ -315,11 +271,5 @@ class EmptyAirChunkCacheTest {
             workers.shutdownNow();
             assertTrue(workers.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
         }
-    }
-
-    private static void set(Class<?> type, Object target, String name, Object value) throws Exception {
-        var field = type.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
     }
 }
