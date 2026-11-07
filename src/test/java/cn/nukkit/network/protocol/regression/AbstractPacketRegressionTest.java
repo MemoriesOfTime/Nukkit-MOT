@@ -133,6 +133,7 @@ public abstract class AbstractPacketRegressionTest {
             nukkitPacket.getUnsignedVarInt();
         }
         nukkitPacket.decode();
+        PacketCoverageRegistry.record(nukkitPacket, PacketCoverageRegistry.Direction.DECODE);
         return nukkitPacket;
     }
 }
