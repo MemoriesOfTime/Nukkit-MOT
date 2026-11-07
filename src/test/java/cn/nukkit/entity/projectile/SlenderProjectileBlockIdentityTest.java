@@ -269,6 +269,79 @@ class SlenderProjectileBlockIdentityTest {
         assertEquals(0, trident.getStuckToBlockPos().y);
     }
 
+    private record PaneShot(int block, int protocol, int direction, boolean connected) {}
+
+    private static Stream<PaneShot> paneShots() {
+        List<PaneShot> shots = new ArrayList<>();
+        for (int block : new int[]{BlockID.GLASS_PANE, BlockID.STAINED_GLASS_PANE, BlockID.IRON_BARS}) {
+            for (int protocol : new int[]{589, 1001, 2225}) {
+                for (int direction = 0; direction < 4; direction++) {
+                    shots.add(new PaneShot(block, protocol, direction, false));
+                    shots.add(new PaneShot(block, protocol, direction, true));
+                }
+            }
+        }
+        return shots.stream();
+    }
+
+    @ParameterizedTest
+    @MethodSource("paneShots")
+    void crossbowCannotSkipThinPaneBetweenDiscretePositions(PaneShot shot) {
+        shooter.protocol = shot.protocol;
+        Cell pane = new Cell(1, 64, 1);
+        cells.put(pane, shot.block);
+        boolean alongX = shot.direction < 2;
+        int sign = shot.direction % 2 == 0 ? 1 : -1;
+        double lane = shot.connected ? 1.25 : 1.5;
+        if (shot.connected) {
+            cells.put(alongX ? new Cell(1, 64, 0) : new Cell(0, 64, 1), shot.block);
+            cells.put(alongX ? new Cell(1, 64, 2) : new Cell(2, 64, 1), shot.block);
+        }
+        Vector3 start = alongX ? new Vector3(sign > 0 ? 1 : 2, 64.45, lane)
+                : new Vector3(lane, 64.45, sign > 0 ? 1 : 2);
+        NativeArrow arrow = arrow(start);
+        move(arrow, alongX ? new Vector3(sign * 3.15, 0, 0) : new Vector3(0, 0, sign * 3.15));
+        assertBlockHit(pane);
+        assertTrue(arrow.hadCollision);
+        assertEquals(1, arrow.hitCallbacks);
+        assertEquals(1, arrow.groundCallbacks);
+    }
+
+    @Test
+    void diagonalEnvelopeNearPaneCornerIsNotARealContact() {
+        cells.put(new Cell(1, 64, 0), BlockID.GLASS_PANE);
+        NativeArrow arrow = arrow(new Vector3(1.30, 64.45, .50));
+        move(arrow, new Vector3(3.15, 0, 3.15));
+        assertTrue(hits.isEmpty(), "swept envelope alone must not fill the empty corner");
+        assertFalse(arrow.hadCollision);
+        assertEquals(4.45, arrow.x, 1e-8);
+    }
+
+    @Test
+    void paneShieldsAnEntityBehindIt() {
+        cells.put(new Cell(1, 64, 0), BlockID.GLASS_PANE);
+        EntityLiving target = mock(EntityLiving.class);
+        target.boundingBox = new SimpleAxisAlignedBB(1.8, 64, .3, 2.2, 65, .7);
+        when(target.getBoundingBox()).thenReturn(target.boundingBox);
+        when(target.attack(any())).thenReturn(true);
+        entities.put(1L, target);
+        move(arrow(new Vector3(1, 64.45, .5)), new Vector3(3.15, 0, 0));
+        assertBlockHit(new Cell(1, 64, 0));
+        verify(target, never()).attack(any());
+    }
+
+    @Test
+    void cancelledPaneHitKeepsNativeCancellationAndDoesNotDamageTarget() {
+        cells.put(new Cell(1, 64, 0), BlockID.GLASS_PANE);
+        cancelHit = true;
+        NativeArrow arrow = arrow(new Vector3(1, 64.45, .5));
+        move(arrow, new Vector3(3.15, 0, 0));
+        assertBlockHit(new Cell(1, 64, 0));
+        assertTrue(hits.get(0).isCancelled());
+        assertEquals(0, arrow.hitCallbacks);
+        assertEquals(0, arrow.groundCallbacks);
+    }
+
     private NativeArrow arrow(Vector3 start) { return new NativeArrow(chunk, start, shooter); }
 
     private static void move(EntitySlenderProjectile arrow, Vector3 movement) {
