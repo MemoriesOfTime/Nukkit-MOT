@@ -85,7 +85,7 @@ for fork in range(3):
             assert Path(unquote(urlparse(origins[name]).path)).resolve() == expected
         assert Path(unquote(urlparse(origins['EnumLookupBenchmark']).path)).resolve() == helpers
         loaded = class_log.read_text()
-        assert not any(name in loaded for name in ('EnumLookupScratchTest', 'EnumLookupBaselineProbe', '$MockitoMock'))
+        assert not any(name in loaded for name in ('EnumLookupTest', 'EnumLookupBaselineProbe', '$MockitoMock'))
         samples = [json.loads(line) for line in process.stdout.splitlines() if line.startswith('{')]
         assert len(samples) == 49
         for mode in modes:

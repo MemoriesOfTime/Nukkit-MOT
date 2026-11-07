@@ -21,7 +21,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.*;
 
-class ServerPlayerSnapshotsP03Test {
+class ServerPlayerSnapshotsTest {
     @Test
     void updateSnapshotFinishesRemovedMembersAndLaterPhasesSeeNewMembership() throws Exception {
         Fixture f = new Fixture(true);
@@ -77,7 +77,7 @@ class ServerPlayerSnapshotsP03Test {
         f.verifyEvents();
     }
 
-    private static InetSocketAddress address(int id) { return InetSocketAddress.createUnresolved("p03-test-" + id, 10000 + id); }
+    private static InetSocketAddress address(int id) { return InetSocketAddress.createUnresolved("snapshot-test-" + id, 10000 + id); }
     private static UUID uuid(int id) { return new UUID(0, id); }
     private static final class Fixture {
         final Server server = mock(Server.class, CALLS_REAL_METHODS);
