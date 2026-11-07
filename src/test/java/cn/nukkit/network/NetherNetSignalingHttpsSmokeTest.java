@@ -36,9 +36,7 @@ import java.security.cert.Certificate;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 端到端验证内置信令的 HTTPS：证书装配（PEM 与 PKCS12）、默认 426 拒绝明文、
@@ -160,6 +158,23 @@ class NetherNetSignalingHttpsSmokeTest {
                 "a private key selects the PEM branch: " + pemError.getMessage());
     }
 
+    @Test
+    void missingPasswordFileKeepsItsPathInTheReportedStartupFailure() {
+        NetherNetSettings settings = new NetherNetSettings();
+        settings.httpsCertificate("unused.p12");
+        settings.httpsPassword("file:missing-password.txt");
+        Path missing = this.tempDir.resolve("missing-password.txt");
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> NetherNetHttps.apply(new NetherNetHTTPServerSignaling.Builder(), settings, this.tempDir));
+        Throwable reported = error;
+        while (reported.getCause() != null) {
+            reported = reported.getCause();
+        }
+        assertTrue(reported.getMessage() != null && reported.getMessage().contains(missing.toString()),
+                "startup logging must retain the password file path: " + reported.getMessage());
+    }
+
     /**
      * 绑定一个按给定设置装配的信令端点；trustCert 为 null 时不提供 HTTPS 客户端上下文。
      * Binds a signaling endpoint wired from the settings; trustCert null skips the HTTPS client context.
@@ -173,43 +188,55 @@ class NetherNetSignalingHttpsSmokeTest {
                 .setNonce("0123456789abcdef")
                 .build();
 
-        NetherNetHTTPServerSignaling.Builder builder = new NetherNetHTTPServerSignaling.Builder()
-                .setIdentity(identity)
-                .setServeHttp(true)
-                .setIceOnLocalPort(false)
-                .setTokenTrust(TokenTrust.ANY)
-                .setMotdProvider((host, remoteAddress, client) -> pong)
-                .setPlayerFilter((host, player) -> null);
-        boolean https = NetherNetHttps.apply(builder, settings, this.tempDir);
-        assertEquals(!settings.httpsCertificate().isBlank(), https,
-                "apply must report TLS exactly when a certificate is set");
-        NetherNetHTTPServerSignaling signaling = builder.build();
-        if (trustCert != null) {
-            this.httpsContext = trustedContext(trustCert);
+        for (int attempt = 0; ; attempt++) {
+            NetherNetHTTPServerSignaling.Builder builder = new NetherNetHTTPServerSignaling.Builder()
+                    .setIdentity(identity)
+                    .setServeHttp(true)
+                    .setIceOnLocalPort(false)
+                    .setTokenTrust(TokenTrust.ANY)
+                    .setMotdProvider((host, remoteAddress, client) -> pong)
+                    .setPlayerFilter((host, player) -> null);
+            boolean https = NetherNetHttps.apply(builder, settings, this.tempDir);
+            assertEquals(!settings.httpsCertificate().isBlank(), https,
+                    "apply must report TLS exactly when a certificate is set");
+            NetherNetHTTPServerSignaling signaling = builder.build();
+            if (trustCert != null) {
+                this.httpsContext = trustedContext(trustCert);
+            }
+
+            int port;
+            try (ServerSocket probe = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
+                port = probe.getLocalPort();
+            }
+
+            var bind = new ServerBootstrap()
+                    .group(this.group)
+                    .channelFactory(NetherNetChannelFactory.server(signaling))
+                    // 冒烟测试走不到建连，但 bootstrap 要求必须设置
+                    // No join gets this far in the smoke test, but the bootstrap insists
+                    .childHandler(new ChannelInitializer<>() {
+                        @Override
+                        protected void initChannel(Channel ch) {
+                            ch.close();
+                        }
+                    })
+                    .bind(new InetSocketAddress("127.0.0.1", port))
+                    .awaitUninterruptibly();
+            if (bind.isSuccess()) {
+                this.channel = bind.channel();
+                assertTrue(this.channel.isActive(), "signaling channel should be active");
+                return port;
+            }
+
+            Throwable bindFailure = bind.cause();
+            bind.channel().close().awaitUninterruptibly();
+            boolean portCollision = bindFailure instanceof java.net.ConnectException
+                    && bindFailure.getMessage() != null
+                    && bindFailure.getMessage().startsWith("Failed to bind HTTP signaling");
+            if (!portCollision || attempt >= 9) {
+                throw new AssertionError("Unable to bind the test signaling endpoint", bindFailure);
+            }
         }
-
-        // 通道回报的是请求地址，端口需在此自取
-        // The channel reports the requested address, so pick the ephemeral port here
-        ServerSocket probe = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"));
-        int port = probe.getLocalPort();
-        probe.close();
-
-        this.channel = new ServerBootstrap()
-                .group(this.group)
-                .channelFactory(NetherNetChannelFactory.server(signaling))
-                // 冒烟测试走不到建连，但 bootstrap 要求必须设置
-                // No join gets this far in the smoke test, but the bootstrap insists
-                .childHandler(new ChannelInitializer<>() {
-                    @Override
-                    protected void initChannel(Channel ch) {
-                        ch.close();
-                    }
-                })
-                .bind(new InetSocketAddress("127.0.0.1", port))
-                .awaitUninterruptibly()
-                .channel();
-        assertTrue(this.channel.isActive(), "signaling channel should be active");
-        return port;
     }
 
     private HttpResponse<Void> request(int port, String scheme) throws Exception {

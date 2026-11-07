@@ -43,7 +43,7 @@ final class NetherNetHttps {
         try {
             password = SecretValue.resolve(settings.httpsPassword(), basePath);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Cannot read the NetherNet HTTPS password: " + e.getMessage(), e);
+            throw new IllegalArgumentException("Cannot read the NetherNet HTTPS password: " + e.getMessage());
         }
 
         String privateKey = settings.httpsPrivateKey();
