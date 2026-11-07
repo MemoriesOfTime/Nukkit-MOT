@@ -46,6 +46,9 @@
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
         <netty.version>4.2.16.Final</netty.version>
         <maven.shade.skip>false</maven.shade.skip>
+        <!-- 分配/性能测量默认不进入 mvn test；-Pperf 反向选择 perf 标签 -->
+        <test.groups></test.groups>
+        <test.excludedGroups>perf</test.excludedGroups>
         <!-- Reproducible build: entry timestamps follow the last commit time -->
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
     </properties>
@@ -702,6 +705,8 @@
                     <!-- 隐式异常（NPE/AIOOBE）不走 fast-throw 预分配，测试才可比异常消息文本 -->
                     <!-- Keep implicit-exception messages intact so tests can compare them -->
                     <argLine>@{argLine} -XX:-OmitStackTraceInFastThrow -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                    <groups>${test.groups}</groups>
+                    <excludedGroups>${test.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>
@@ -1040,6 +1045,102 @@
             <properties>
                 <maven.test.skip>true</maven.test.skip>
             </properties>
+        </profile>
+        <!--
+          分配量基准。这些类名为 *Benchmark、以 main() 运行，surefire 不会拾取，
+          因此默认 mvn test 完全不受影响。按需显式执行：
+            mvn -Pperf test-compile exec:exec@viewer-benchmark exec:exec@attack-benchmark
+          之所以独立出来：每次调用的绝对分配字节数取决于 JIT 内联与逃逸分析、JDK 版本与 CPU 架构，
+          把它当作 CI 门禁会让无关改动随机变红。功能行为由普通测试断言。
+        -->
+        <profile>
+            <id>perf</id>
+            <properties>
+                <!-- 只跑 @Tag("perf") 的分配测量，默认 test 排除它们 -->
+                <test.groups>perf</test.groups>
+                <test.excludedGroups></test.excludedGroups>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>viewer-benchmark</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <classpathScope>test</classpathScope>
+                                    <arguments>
+                                        <argument>-XX:-DoEscapeAnalysis</argument>
+                                        <argument>-Xms256m</argument>
+                                        <argument>-Xmx512m</argument>
+                                        <argument>-cp</argument>
+                                        <classpath/>
+                                        <argument>cn.nukkit.entity.EntityViewerSnapshotBenchmark</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>attack-benchmark</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <classpathScope>test</classpathScope>
+                                    <arguments>
+                                        <argument>-XX:-DoEscapeAnalysis</argument>
+                                        <argument>-Xms256m</argument>
+                                        <argument>-Xmx512m</argument>
+                                        <argument>-cp</argument>
+                                        <classpath/>
+                                        <argument>cn.nukkit.entity.mob.EntityZombieAttackBenchmark</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!--
+          真实交叉编解码覆盖率：先跑测试（写 target/packet-coverage.txt），再运行报告。
+          用法: mvn -Pcoverage test exec:exec@packet-coverage
+          报告退出码非 0 表示没有实际执行记录，或有测试声明覆盖但从未执行。
+        -->
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>packet-coverage</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <classpathScope>test</classpathScope>
+                                    <arguments>
+                                        <argument>-cp</argument>
+                                        <classpath/>
+                                        <argument>cn.nukkit.network.protocol.regression.PacketCoverageReport</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>

@@ -30,6 +30,7 @@ public final class PacketBridgeUtil {
      * @return ByteBuf containing only the packet body (no header)
      */
     public static ByteBuf nukkitPacketToByteBuf(DataPacket packet) {
+        PacketCoverageRegistry.record(packet, PacketCoverageRegistry.Direction.ENCODE);
         byte[] raw = packet.getBuffer();
         BinaryStream temp = new BinaryStream(raw);
         temp.getUnsignedVarInt(); // skip packet ID header
