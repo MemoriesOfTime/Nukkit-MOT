@@ -20,7 +20,8 @@ import org.mockito.MockedStatic;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -182,9 +183,49 @@ class DriedGhastHydrationTest {
         assertEquals(protocol<818?"minecraft:ghast":"minecraft:happy_ghast",wire.getString());
     }
 
+    @Test void spawnEventSeesRestoredBabyAndListenerChangesSurviveConstruction() throws Exception {
+        Server server=mock(Server.class);
+        PluginManager plugins=mock(PluginManager.class);
+        when(server.getPluginManager()).thenReturn(plugins);
+        FullChunk chunk=testChunk(server);
+        int[] calls={0};
+        boolean[] babyAtEvent={false};
+        int[] ageAtEvent={0};
+        float[] scaleAtEvent={0};
+        doAnswer(i->{
+            if(i.getArgument(0) instanceof cn.nukkit.event.entity.EntitySpawnEvent event
+                    && event.getEntity() instanceof EntityHappyGhast ghast) {
+                calls[0]++;
+                babyAtEvent[0]=ghast.isBaby();
+                ageAtEvent[0]=ghast.age;
+                scaleAtEvent[0]=ghast.getScale();
+                ghast.setBaby(false);
+                ghast.setScale(0.5f);
+                ghast.age=-1;
+            }
+            return null;
+        }).when(plugins).callEvent(any());
+        CompoundTag tag=Entity.getDefaultNBT(new Vector3(0.5,64,0.5)).putBoolean("Baby",true).putShort("Age",-12000);
+        EntityHappyGhast ghast=new EntityHappyGhast(chunk,tag);
+        try {
+            assertEquals(1,calls[0]);
+            assertTrue(babyAtEvent[0]);
+            assertEquals(-12000,ageAtEvent[0]);
+            assertEquals(0.2375f,scaleAtEvent[0]);
+            assertFalse(ghast.isBaby());
+            assertEquals(-1,ghast.age);
+            assertEquals(0.5f,ghast.getScale());
+        } finally {
+            ghast.close();
+        }
+    }
+
     private static FullChunk testChunk() {
+        return testChunk(MockServer.get());
+    }
+
+    private static FullChunk testChunk(Server server) {
         Level level=mock(Level.class);
-        Server server=MockServer.get();
         when(level.getServer()).thenReturn(server);
         // 让 Entity 构造发布路径上的 scheduleUpdate() 走 no-op 分支，避免触碰 mock 缺省为 null 的 updateEntities。
         level.isBeingConverted = true;
