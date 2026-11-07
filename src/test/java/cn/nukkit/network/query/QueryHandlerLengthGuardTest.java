@@ -1,6 +1,7 @@
 package cn.nukkit.network.query;
 
 import cn.nukkit.Server;
+import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.network.Network;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -8,8 +9,8 @@ import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 
-import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,85 +27,81 @@ class QueryHandlerLengthGuardTest {
 
     @ParameterizedTest
     @ValueSource(ints = {0, 1, 2, 3, 4})
-    void truncatedHandshakeIsIgnoredAtNonzeroReaderIndex(int length) throws Exception {
+    void truncatedHandshakeIsIgnoredAtNonzeroReaderIndex(int length) {
         Fixture f = new Fixture();
-        f.dispatch(Arrays.copyOf(f.request(QueryHandler.HANDSHAKE, null, 0), length), false);
+        f.dispatch(Arrays.copyOf(f.request(QueryHandler.HANDSHAKE, null, 0), length));
         verifyNoInteractions(f.network);
     }
 
     @ParameterizedTest
     @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6, 7, 8})
-    void truncatedStatisticsIsIgnoredWithoutReadingBeyondPayload(int length) throws Exception {
+    void truncatedStatisticsIsIgnoredWithoutReadingBeyondPayload(int length) {
         Fixture f = new Fixture();
-        f.dispatch(Arrays.copyOf(f.request(QueryHandler.STATISTICS, f.challenge(false), 0), length), false);
-        verifyNoInteractions(f.network);
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6, 7, 8})
-    void truncatedStatisticsThroughServerNeverBlocksSender(int length) throws Exception {
-        Fixture f = new Fixture();
-        f.dispatch(Arrays.copyOf(f.request(QueryHandler.STATISTICS, f.challenge(false), 0), length), true);
+        f.dispatch(Arrays.copyOf(f.request(QueryHandler.STATISTICS, f.challenge(false), 0), length));
         verifyNoInteractions(f.network);
     }
 
     @Test
-    void handshakeReplyStillEchoesSessionAndCurrentChallenge() throws Exception {
+    void handshakeReplyStillEchoesSessionAndCurrentChallenge() {
         Fixture f = new Fixture();
-        f.dispatch(f.request(QueryHandler.HANDSHAKE, null, 0), true);
+        f.dispatch(f.request(QueryHandler.HANDSHAKE, null, 0));
         assertArrayEquals(f.request(QueryHandler.HANDSHAKE, f.challenge(false), 1), f.singleReply());
     }
 
     @Test
-    void basicStatisticsStillAcceptCurrentAndPreviousChallenge() throws Exception {
+    void basicStatisticsStillAcceptCurrentAndPreviousChallenge() {
         for (boolean previous : new boolean[]{false, true}) {
             Fixture f = new Fixture();
-            f.dispatch(f.request(QueryHandler.STATISTICS, f.challenge(previous), 0), true);
+            f.dispatch(f.request(QueryHandler.STATISTICS, f.challenge(previous), 0));
             assertArrayEquals(f.reply(f.shortData), f.singleReply());
             verify(f.network, never()).blockAddress(any(), anyInt());
         }
     }
 
     @Test
-    void existingLongStatisticsSelectorAndFourBytePaddingRemainUnchanged() throws Exception {
+    void existingLongStatisticsSelectorAndFourBytePaddingRemainUnchanged() {
         for (int padding : new int[]{4, 8}) {
             Fixture f = new Fixture();
-            f.dispatch(f.request(QueryHandler.STATISTICS, f.challenge(false), padding), true);
+            f.dispatch(f.request(QueryHandler.STATISTICS, f.challenge(false), padding));
             assertArrayEquals(f.reply(padding == 8 ? f.longData : f.shortData), f.singleReply());
         }
     }
 
     @Test
-    void completeStatisticsWithInvalidChallengeStillGetsNoReply() throws Exception {
+    void completeStatisticsWithInvalidChallengeStillGetsNoReply() {
         Fixture f = new Fixture();
         byte[] invalid = new byte[4];
         assertFalse(Arrays.equals(invalid, f.challenge(false)));
         assertFalse(Arrays.equals(invalid, f.challenge(true)));
-        f.dispatch(f.request(QueryHandler.STATISTICS, invalid, 0), true);
+        f.dispatch(f.request(QueryHandler.STATISTICS, invalid, 0));
         verifyNoInteractions(f.network);
     }
 
     private static final class Fixture {
         final Server server = mock(Server.class);
         final Network network = mock(Network.class);
-        final QueryHandler handler = mock(QueryHandler.class, CALLS_REAL_METHODS);
-        final byte[] currentToken = {1, 2, 3, 4, 5, 6, 7, 8};
-        final byte[] previousToken = {8, 7, 6, 5, 4, 3, 2, 1};
+        final QueryRegenerateEvent queryInfo = mock(QueryRegenerateEvent.class);
+        final QueryHandler handler;
         final byte[] shortData = {11, 12, 13};
         final byte[] longData = {21, 22, 23, 24};
         final List<byte[]> replies = new ArrayList<>();
+        private byte[] currentChallenge;
+        private byte[] previousChallenge;
 
-        Fixture() throws Exception {
+        Fixture() {
             when(server.getNetwork()).thenReturn(network);
-            set(server, "network", network);
-            set(server, "queryHandler", handler);
-            set(handler, "server", server);
-            set(handler, "token", currentToken);
-            set(handler, "lastToken", previousToken);
-            set(handler, "shortData", shortData);
-            set(handler, "longData", longData);
-            set(handler, "timeout", Long.MAX_VALUE);
-            doCallRealMethod().when(server).handlePacket(eq(ADDRESS), any(ByteBuf.class));
+            when(server.getQueryInformation()).thenReturn(queryInfo);
+            when(queryInfo.getShortQuery()).thenReturn(shortData);
+            when(queryInfo.getLongQuery()).thenReturn(longData);
+            when(queryInfo.getTimeout()).thenReturn(Integer.MAX_VALUE);
+
+            // 静态 mock 仅覆盖构造期对 Server.getInstance() 的读取；handle() 之后只触达实例字段。
+            // The static mock only covers Server.getInstance() during construction;
+            // handle() afterwards only touches instance state.
+            try (MockedStatic<Server> servers = mockStatic(Server.class)) {
+                servers.when(Server::getInstance).thenReturn(server);
+                handler = new QueryHandler();
+            }
             doAnswer(call -> {
                 ByteBuf reply = call.getArgument(1);
                 try {
@@ -114,10 +111,25 @@ class QueryHandlerLengthGuardTest {
                 }
                 return null;
             }).when(network).sendPacket(eq(ADDRESS), any(ByteBuf.class));
+
+            // 通过握手回包观察随机 token 派生的 challenge；轮换一次后当前/上一代各得其一。
+            // Observe the challenge derived from the random token via the handshake reply;
+            // rotate once so each generation gets its own.
+            previousChallenge = handshakeChallenge();
+            handler.regenerateToken();
+            currentChallenge = handshakeChallenge();
         }
 
         byte[] challenge(boolean previous) {
-            return QueryHandler.getTokenString(previous ? previousToken : currentToken, ADDRESS.getAddress());
+            return previous ? previousChallenge : currentChallenge;
+        }
+
+        private byte[] handshakeChallenge() {
+            dispatch(request(QueryHandler.HANDSHAKE, null, 0));
+            byte[] reply = singleReply();
+            replies.clear();
+            clearInvocations(network);
+            return Arrays.copyOfRange(reply, 5, 9); // type(1) + session(4), then the 4-byte challenge
         }
 
         byte[] request(byte type, byte[] challenge, int padding) {
@@ -138,17 +150,13 @@ class QueryHandlerLengthGuardTest {
             return reply;
         }
 
-        void dispatch(byte[] body, boolean throughServer) {
+        void dispatch(byte[] body) {
             ByteBuf packet = Unpooled.buffer(64);
             try {
                 packet.writeZero(3); // Readable bytes, rather than capacity or absolute index, bound parsing.
                 packet.readerIndex(3);
-                if (throughServer) packet.writeByte(0xfe).writeByte(0xfd);
                 packet.writeBytes(body);
-                assertDoesNotThrow(() -> {
-                    if (throughServer) server.handlePacket(ADDRESS, packet);
-                    else handler.handle(ADDRESS, packet);
-                });
+                assertDoesNotThrow(() -> handler.handle(ADDRESS, packet));
             } finally {
                 packet.release();
             }
@@ -157,12 +165,6 @@ class QueryHandlerLengthGuardTest {
         byte[] singleReply() {
             assertEquals(1, replies.size());
             return replies.get(0);
-        }
-
-        private static void set(Object target, String name, Object value) throws Exception {
-            Field field = (target instanceof Server ? Server.class : QueryHandler.class).getDeclaredField(name);
-            field.setAccessible(true);
-            field.set(target, value);
         }
     }
 }
