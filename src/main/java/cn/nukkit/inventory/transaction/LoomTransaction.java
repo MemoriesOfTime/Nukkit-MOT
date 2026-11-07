@@ -8,6 +8,8 @@ import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.LoomItemAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
 
 import java.util.List;
 
@@ -45,17 +47,7 @@ public class LoomTransaction extends InventoryTransaction {
 
         Item banner = loomInventory.getBanner();
         Item dye = loomInventory.getDye();
-        if (banner.getId() != Item.BANNER || dye.getId() != Item.DYE || banner.getDamage() != outputItem.getDamage()) {
-            return false;
-        }
-
-        if (!outputItem.hasCompoundTag()) {
-            return false;
-        }
-
-        int patternCount = outputItem.getNamedTag().getList("Patterns").size();
-
-        if (patternCount > 6) {
+        if (banner.getId() != Item.BANNER || dye.getId() != Item.DYE) {
             return false;
         }
 
@@ -64,8 +56,55 @@ public class LoomTransaction extends InventoryTransaction {
             return false;
         }
 
-        int bannerPatterns = banner.getNamedTag() != null ? banner.getNamedTag().getList("Patterns").size() : 0;
-        return bannerPatterns + 1 == patternCount;
+        CompoundTag bannerTag = snapshotNamedTag(banner);
+        if (bannerTag == null) {
+            bannerTag = new CompoundTag();
+        }
+        if (bannerTag.contains("Patterns") && !(bannerTag.get("Patterns") instanceof ListTag<?>)) {
+            return false;
+        }
+        ListTag<?> bannerPatterns = bannerTag.getList("Patterns");
+        bannerTag.remove("Patterns");
+        long outputCount = 0;
+        for (InventoryAction action : this.actions) {
+            if (!(action instanceof LoomItemAction)) {
+                continue;
+            }
+            Item output = action.getSourceItem();
+            if (output.getId() != Item.BANNER || output.isNull()
+                    || banner.getDamage() != output.getDamage()) {
+                return false;
+            }
+            outputCount += output.getCount();
+            if (outputCount > banner.getCount() || outputCount > dye.getCount()) {
+                return false;
+            }
+            CompoundTag outputTag = snapshotNamedTag(output);
+            if (outputTag == null || !(outputTag.get("Patterns") instanceof ListTag<?> outputPatterns)
+                    || outputPatterns.size() > 6 || bannerPatterns.size() + 1 != outputPatterns.size()) {
+                return false;
+            }
+            for (int i = 0; i < outputPatterns.size(); i++) {
+                if (!(outputPatterns.get(i) instanceof CompoundTag)
+                        || i < bannerPatterns.size() && !bannerPatterns.get(i).equals(outputPatterns.get(i))) {
+                    return false;
+                }
+            }
+            // A loom may append one pattern; all other input metadata is authoritative.
+            if (!bannerTag.equals(outputTag.remove("Patterns"))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static CompoundTag snapshotNamedTag(Item item) {
+        if (!item.hasCompoundTag()) {
+            return null;
+        }
+        CompoundTag snapshot = item.getNamedTag().copy();
+        snapshot.setName("");
+        return snapshot;
     }
 
     @Override

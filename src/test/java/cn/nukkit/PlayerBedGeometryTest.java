@@ -166,7 +166,10 @@ class PlayerBedGeometryTest {
         double savedY=f.player.namedTag.getList("Pos",cn.nukkit.nbt.tag.DoubleTag.class).get(1).data;
         System.out.println("NATIVE_SAVE protocol="+protocol+" pose=sleep feet_y="+f.player.y
                 +" saved_y="+savedY+" eye_height="+f.player.getEyeHeight());
-        assertEquals(f.player.y,savedY,0,"native profile stores feet, not eyes");
+        // 床脚坐标由 fixture 固定为 (8.5, 65.5, 8.5)；不能再用 player.y 自证。
+        assertEquals(65.5, savedY, 0, "sleeping pose must store the fixed bed foot coordinate");
+        assertNotEquals(f.player.y + f.player.getEyeHeight(), savedY, 1e-9,
+                "must not serialize the sleeping eye height as feet");
     }
 
     @ParameterizedTest @ValueSource(ints={786,2193})
@@ -180,7 +183,9 @@ class PlayerBedGeometryTest {
             double savedY=f.player.namedTag.getList("Pos",cn.nukkit.nbt.tag.DoubleTag.class).get(1).data;
             System.out.println("NATIVE_SAVE protocol="+protocol+" pose="+pose+" feet_y="+f.player.y
                     +" saved_y="+savedY+" eye_height="+f.player.getEyeHeight());
-            assertEquals(f.player.y,savedY,0);
+            assertEquals(65.25, savedY, 0, "ordinary pose must store the fixed feet coordinate");
+            assertNotEquals(f.player.y + f.player.getEyeHeight(), savedY, 1e-9,
+                    "must not serialize eye height as feet");
         }
     }
 
