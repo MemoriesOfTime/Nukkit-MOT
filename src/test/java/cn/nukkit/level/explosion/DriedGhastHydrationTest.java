@@ -1,8 +1,9 @@
 package cn.nukkit.level.explosion;
 
-import cn.nukkit.Server;
 import cn.nukkit.MockServer;
-import cn.nukkit.block.*;
+import cn.nukkit.Server;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockDriedGhast;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.passive.EntityHappyGhast;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
@@ -11,35 +12,20 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.PluginManager;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
+
 import java.util.ArrayList;
 import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@org.junit.jupiter.api.parallel.Isolated("native Server.instance, block and entity registries")
+@org.junit.jupiter.api.parallel.Isolated("block and entity registries")
 class DriedGhastHydrationTest {
-    private static Server previousServer;
-
-    @BeforeAll static void boot() throws Exception {
-        var instance=Server.class.getDeclaredField("instance");
-        instance.setAccessible(true);
-        previousServer=(Server)instance.get(null);
-        instance.set(null,null);
-        MockServer.init();
-    }
-
-    @AfterAll static void restoreServer() throws Exception {
-        var instance=Server.class.getDeclaredField("instance");
-        instance.setAccessible(true);
-        instance.set(null,previousServer);
-    }
 
     @Test void canBeWaterloggedByPlacementAndFlow() {
         assertEquals(Block.WaterloggingType.FLOW_INTO_BLOCK, new BlockDriedGhast().getWaterloggingType());
@@ -200,13 +186,8 @@ class DriedGhastHydrationTest {
         Level level=mock(Level.class);
         Server server=MockServer.get();
         when(level.getServer()).thenReturn(server);
-        try {
-            var field=Level.class.getDeclaredField("updateEntities");
-            field.setAccessible(true);
-            field.set(level,new cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap<Entity>());
-        } catch (ReflectiveOperationException failure) {
-            throw new IllegalStateException(failure);
-        }
+        // 让 Entity 构造发布路径上的 scheduleUpdate() 走 no-op 分支，避免触碰 mock 缺省为 null 的 updateEntities。
+        level.isBeingConverted = true;
         cn.nukkit.level.format.LevelProvider provider=mock(cn.nukkit.level.format.LevelProvider.class);
         when(provider.getLevel()).thenReturn(level);
         FullChunk chunk=mock(FullChunk.class);
