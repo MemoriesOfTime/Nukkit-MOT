@@ -49,6 +49,9 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
     public void initEntity() {
         this.setMaxHealth(20);
         super.initEntity();
+        if (this.isBaby() && this.namedTag.contains("Age")) {
+            this.age = Math.max(-24000, Math.min(0, this.namedTag.getShort("Age")));
+        }
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_FLY, true);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_WALKER, true);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_TAMED, true);
@@ -75,6 +78,15 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
     }
 
     @Override
+    public void setBaby(boolean baby) {
+        super.setBaby(baby);
+        if (baby) {
+            this.age = -24000;
+            this.setScale(0.2375f);
+        }
+    }
+
+    @Override
     public void saveNBT() {
         super.saveNBT();
         if (this.armorInventory != null) {
@@ -88,12 +100,12 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
 
     @Override
     public float getWidth() {
-        return isBaby() ? 0.95f : 4f;
+        return 4f;
     }
 
     @Override
     public float getHeight() {
-        return isBaby() ? 0.95f : 4f;
+        return 4f;
     }
 
     @Override
