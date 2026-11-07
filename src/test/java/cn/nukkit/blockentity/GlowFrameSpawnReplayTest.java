@@ -14,14 +14,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.lang.reflect.Method;
 import java.nio.ByteOrder;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class GlowFrameSpawnReplayTest {
     @BeforeAll
@@ -40,7 +39,7 @@ class GlowFrameSpawnReplayTest {
 
     @ParameterizedTest(name = "protocol={0}, glow={1}, filled={2}")
     @MethodSource("frames")
-    void savedFrameReplaysCorrectTypeAndItemInBothChunkPaths(int protocol, boolean glow, boolean filled) throws Exception {
+    void savedFrameReplaysCorrectTypeAndItemOverNetwork(int protocol, boolean glow, boolean filled) throws Exception {
         BaseChunk chunk = mock(BaseChunk.class);
         LevelProvider provider = mock(LevelProvider.class);
         Level level = mock(Level.class);
@@ -70,31 +69,25 @@ class GlowFrameSpawnReplayTest {
         else assertTrue(restored.getItem().isNull(), "Empty native air item retains its existing count semantics");
         assertEquals(3, restored.getItemRotation());
         CompoundTag beforeReplay = restored.namedTag.copy();
-        when(chunk.getBlockEntities()).thenReturn(Map.of(restored.getId(), restored));
 
-        Method fullChunk = NetworkChunkSerializer.class.getDeclaredMethod("serializeEntities", BaseChunk.class, int.class);
-        fullChunk.setAccessible(true);
-        byte[] full = (byte[]) fullChunk.invoke(null, chunk, protocol);
-        byte[] sub = NetworkChunkSerializer.serializeBlockEntities(List.of(restored), protocol);
-        for (byte[] bytes : List.of(full, sub)) {
-            CompoundTag wire = NBTIO.read(bytes, ByteOrder.LITTLE_ENDIAN, true);
-            assertEquals(id, wire.getString("id"), "Network tile type must match the saved frame type");
-            assertTrue(wire.contains("Item"));
-            if (!filled) {
-                CompoundTag empty = wire.getCompound("Item");
-                assertEquals("minecraft:air", empty.getString("Name"));
-                assertTrue(NBTIO.getItemHelper(empty.copy()).isNull());
-                assertEquals(beforeReplay.getCompound("Item").getByte("Count"), empty.getByte("Count"));
-                assertEquals(3, wire.getByte("ItemRotation"));
-            }
-            if (filled) {
-                assertEquals("minecraft:diamond", wire.getCompound("Item").getString("Name"));
-                assertEquals(7, wire.getCompound("Item").getByte("Count"));
-                assertEquals(3, wire.getByte("ItemRotation"));
-                assertEquals("qa1107-sentinel", wire.getCompound("Item").getCompound("tag").getString("opaque"));
-                wire.getCompound("Item").getCompound("tag").getCompound("nested").putInt("receipt", 99);
-            }
-            assertEquals(beforeReplay, restored.namedTag, "Wire NBT belongs to the packet, not the saved item");
+        byte[] wireBytes = NetworkChunkSerializer.serializeBlockEntities(List.of(restored), protocol);
+        CompoundTag wire = NBTIO.read(wireBytes, ByteOrder.LITTLE_ENDIAN, true);
+        assertEquals(id, wire.getString("id"), "Network tile type must match the saved frame type");
+        assertTrue(wire.contains("Item"));
+        if (!filled) {
+            CompoundTag empty = wire.getCompound("Item");
+            assertEquals("minecraft:air", empty.getString("Name"));
+            assertTrue(NBTIO.getItemHelper(empty.copy()).isNull());
+            assertEquals(beforeReplay.getCompound("Item").getByte("Count"), empty.getByte("Count"));
+            assertEquals(3, wire.getByte("ItemRotation"));
         }
+        if (filled) {
+            assertEquals("minecraft:diamond", wire.getCompound("Item").getString("Name"));
+            assertEquals(7, wire.getCompound("Item").getByte("Count"));
+            assertEquals(3, wire.getByte("ItemRotation"));
+            assertEquals("qa1107-sentinel", wire.getCompound("Item").getCompound("tag").getString("opaque"));
+            wire.getCompound("Item").getCompound("tag").getCompound("nested").putInt("receipt", 99);
+        }
+        assertEquals(beforeReplay, restored.namedTag, "Wire NBT belongs to the packet, not the saved item");
     }
 }

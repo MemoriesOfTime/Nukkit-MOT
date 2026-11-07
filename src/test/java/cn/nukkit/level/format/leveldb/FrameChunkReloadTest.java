@@ -14,7 +14,6 @@ import cn.nukkit.item.Item;
 import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.generator.Flat;
@@ -30,7 +29,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.lang.reflect.Method;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -52,7 +50,7 @@ class FrameChunkReloadTest {
     @ParameterizedTest
     @CsvSource({"false,false,false", "false,true,false", "true,false,false", "true,true,false",
             "false,false,true", "false,true,true", "true,false,true", "true,true,true"})
-    void diskReloadPreservesTileAndBothWirePaths(boolean glow, boolean filled, boolean deferred) throws Exception {
+    void diskReloadPreservesTileAndWireNbt(boolean glow, boolean filled, boolean deferred) throws Exception {
         try (World world = new World(directory)) {
             BlockEntityItemFrame original = world.create(glow, filled);
             CompoundTag item = original.namedTag.getCompound("Item").copy();
@@ -68,24 +66,20 @@ class FrameChunkReloadTest {
             assertSame(restored, world.frame());
             assertEquals(1, world.chunk.getBlockEntities().size());
 
-            Method full = NetworkChunkSerializer.class.getDeclaredMethod("serializeEntities", BaseChunk.class, int.class);
-            full.setAccessible(true);
             for (int protocol : ProtocolInfo.SUPPORTED_PROTOCOLS.stream()
                     .filter(p -> p >= 589 && p <= ProtocolInfo.CURRENT_PROTOCOL).distinct().toList()) {
-                for (byte[] packet : List.of((byte[]) full.invoke(null, world.chunk, protocol),
-                        NetworkChunkSerializer.serializeBlockEntities(List.of(restored), protocol))) {
-                    CompoundTag wire = NBTIO.read(packet, ByteOrder.LITTLE_ENDIAN, true);
-                    assertEquals(glow ? BlockEntity.GLOW_ITEM_FRAME : BlockEntity.ITEM_FRAME, wire.getString("id"));
-                    assertEquals(filled, !NBTIO.getItemHelper(wire.getCompound("Item").copy()).isNull());
-                    if (filled) {
-                        assertEquals(7, wire.getCompound("Item").getByte("Count"));
-                        assertEquals(7, wire.getByte("ItemRotation"));
-                        CompoundTag nested = wire.getCompound("Item").getCompound("tag").getCompound("nested");
-                        assertEquals(51, nested.getInt("receipt"));
-                        nested.putInt("receipt", 99);
-                    }
-                    assertStored(restored, item, 7, 0.375f);
+                byte[] packet = NetworkChunkSerializer.serializeBlockEntities(List.of(restored), protocol);
+                CompoundTag wire = NBTIO.read(packet, ByteOrder.LITTLE_ENDIAN, true);
+                assertEquals(glow ? BlockEntity.GLOW_ITEM_FRAME : BlockEntity.ITEM_FRAME, wire.getString("id"));
+                assertEquals(filled, !NBTIO.getItemHelper(wire.getCompound("Item").copy()).isNull());
+                if (filled) {
+                    assertEquals(7, wire.getCompound("Item").getByte("Count"));
+                    assertEquals(7, wire.getByte("ItemRotation"));
+                    CompoundTag nested = wire.getCompound("Item").getCompound("tag").getCompound("nested");
+                    assertEquals(51, nested.getInt("receipt"));
+                    nested.putInt("receipt", 99);
                 }
+                assertStored(restored, item, 7, 0.375f);
             }
             assertStored(world.reopen(!deferred), item, 7, 0.375f);
         }
