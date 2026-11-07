@@ -37,6 +37,7 @@ import java.lang.reflect.Constructor;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -151,7 +152,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             this.relay = null;
         }
 
-        this.signaling = new NetherNetHTTPServerSignaling.Builder()
+        NetherNetHTTPServerSignaling.Builder signalingBuilder = new NetherNetHTTPServerSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
                 // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口经 server-udp-ports
@@ -166,8 +167,9 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
                 .setTokenTrust(TokenTrust.ANY)
                 .setMotdProvider((host, remoteAddress, client) -> this.buildPong())
-                .setPlayerFilter((host, player) -> this.refusePlayer(player))
-                .build();
+                .setPlayerFilter((host, player) -> this.refusePlayer(player));
+        boolean https = NetherNetHttps.apply(signalingBuilder, settings, Path.of(server.getDataPath()));
+        this.signaling = signalingBuilder.build();
 
         this.eventLoopGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
 
@@ -227,6 +229,10 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         } else {
             log.info(server.getLanguage().translateString("nukkit.nethernet.listening.auto",
                     bindAddress.getPort()));
+        }
+        if (https) {
+            log.info(server.getLanguage().translateString(settings.httpsRejectPlaintext()
+                    ? "nukkit.nethernet.https.required" : "nukkit.nethernet.https.dual", bindAddress.getPort()));
         }
     }
 

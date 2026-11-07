@@ -135,6 +135,7 @@ dependencies {
     api(libs.netty.epoll)
     api(libs.netty.codec.haproxy)
     api(libs.netty.codec.http)
+    api(libs.netty.handler)
     api(libs.nukkitx.natives)
 
     api(libs.cloudburst.common) {
