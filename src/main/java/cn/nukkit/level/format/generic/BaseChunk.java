@@ -78,31 +78,28 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         removeInvalidUnknownTile(x, y, z);
     }
 
-    /** An initialized native empty section cannot change when a primitive setter writes air. */
+    /**
+     * 原生共享空 section 的空气写入是无操作；真实写入方负责物化和缓存失效。
+     * <p>
+     * Air writes to a native shared empty section are no-ops; real writers handle materialization and cache invalidation.
+     */
     private boolean canSkipEmptyAirWrite(int sectionY) {
-        if (getClass() != cn.nukkit.level.format.leveldb.structure.LevelDBChunk.class || !this.isInit) {
-            return false;
-        }
-        if (this.tiles != null || this.tileList != null || this.unknownTiles != null) {
+        if (getClass() != cn.nukkit.level.format.leveldb.structure.LevelDBChunk.class || !this.isInit
+                || this.tiles != null || this.tileList != null || this.unknownTiles != null) {
             return false;
         }
         var chunk = (cn.nukkit.level.format.leveldb.structure.LevelDBChunk) this;
         if (!chunk.hasStableSectionOffset()) {
             return false;
         }
-        ChunkSection[] captured = this.sections;
+        ChunkSection[] sections = this.sections;
         // Match getSection(float), including its conversion before adding the offset.
         int index = (int) (chunk.getSectionOffset() + (float) sectionY);
-        if (captured == null || index < 0 || index >= captured.length
-                || captured[index] == null || captured[index].getClass() != EmptyChunkSection.class) {
+        if (sections == null || index < 0 || index >= sections.length) {
             return false;
         }
-        // Recheck the sentinel and chunk structure before treating this write as a no-op.
-        synchronized (captured) {
-            return this.sections == captured && this.isInit
-                    && this.tiles == null && this.tileList == null && this.unknownTiles == null
-                    && captured[index] != null && captured[index].getClass() == EmptyChunkSection.class;
-        }
+        ChunkSection section = sections[index];
+        return section != null && section.getClass() == EmptyChunkSection.class;
     }
 
     @Override
