@@ -23,11 +23,18 @@ public class DoubleEncodeIdempotenceTest {
 
     private static final int LATEST_PROTOCOL = 2193;
 
+    /**
+     * 已知无法用默认字段编码的包数量。这个数字是回归哨兵：如果某个原本可编码的包
+     * 退化为抛异常，exercised 会减少、skipped 会增加，超过基线即失败。
+     */
+    private static final int BASELINE_SKIPPED = 75;
+
     @Test
     void encodeTwiceProducesIdenticalBytes() {
         MockServer.init();
 
         List<String> failures = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
         int exercised = 0;
 
         for (Class<?> cls : scanDataPacketSubclasses()) {
@@ -42,7 +49,8 @@ public class DoubleEncodeIdempotenceTest {
                 try {
                     packet.encode();
                 } catch (Throwable ignored) {
-                    continue; // needs populated fields — not exercisable with defaults
+                    skipped.add(name); // needs populated fields — not exercisable with defaults
+                    continue;
                 }
                 byte[] first = packet.getBuffer();
                 packet.encode();
@@ -52,12 +60,16 @@ public class DoubleEncodeIdempotenceTest {
                 }
                 exercised++;
             } catch (Throwable ignored) {
-                // not instantiable — skip
+                skipped.add(name); // not instantiable — record instead of silently dropping
             }
         }
 
+        System.out.println("double-encode skipped: " + skipped.size() + " (baseline " + BASELINE_SKIPPED + ")");
         assertTrue(exercised >= 50,
                 "only " + exercised + " packets exercised; scan is broken or protocol moved");
+        assertTrue(skipped.size() <= BASELINE_SKIPPED,
+                "more packets became non-exercisable (" + skipped.size() + " > " + BASELINE_SKIPPED
+                        + "): " + skipped);
         assertTrue(failures.isEmpty(),
                 "encode() not idempotent — missing reset() at encode start: " + failures
                         + " (exercised " + exercised + " packets)");
