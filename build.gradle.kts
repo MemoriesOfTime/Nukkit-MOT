@@ -97,6 +97,7 @@ dependencies {
     constraints {
         implementation("net.jodah:expiringmap:${libs.versions.expiringmap.get()}")
         implementation("org.slf4j:slf4j-api:${libs.versions.slf4j.api.get()}")
+        implementation("org.jspecify:jspecify:${libs.versions.jspecify.get()}")
         // Maven nearest-wins 解析出 2.18.0，Gradle highest-wins 会漂到 2.20，strictly 钉死对齐
         // Maven resolves 2.18.0 while Gradle highest-wins drifts to 2.20; pin strictly
         implementation("com.fasterxml.jackson.core:jackson-annotations") { version { strictly("2.18.0") } }
@@ -145,6 +146,7 @@ dependencies {
 
     api(libs.fastutil)
     api(libs.guava)
+    api(libs.checker.qual)
     api(libs.gson)
     api(libs.caffeine) {
         exclude("org.checkerframework", "checker-qual")
