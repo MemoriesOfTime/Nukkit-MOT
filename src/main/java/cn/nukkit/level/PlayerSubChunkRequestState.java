@@ -1,16 +1,21 @@
 package cn.nukkit.level;
 
 import cn.nukkit.math.BlockVector3;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import cn.nukkit.network.protocol.SubChunkPacket;
 import cn.nukkit.network.protocol.SubChunkRequestPacket;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.BooleanSupplier;
 import java.util.function.ToIntBiFunction;
+import java.util.function.ToLongFunction;
 
 /**
  * 每玩家子区块请求的延期队列与流量记账：包数/offset 总数双上限的排队、按 offset 扣减的
@@ -79,6 +84,18 @@ public class PlayerSubChunkRequestState {
     // on mismatch (in-flight answers die on quit / dimension switch)
     private int epoch;
 
+    // ---- 列级数据投递账本 / Column data-delivery ledger ----
+    // 记录空壳列的方块数据是否已派发，随 unloadChunk/clear 回收
+    // Tracks whether a shelled column's block data was dispatched; recycled on unloadChunk/clear
+    private final Long2IntOpenHashMap columnWaitingSince = new Long2IntOpenHashMap();
+    private final Long2IntOpenHashMap columnOutstanding = new Long2IntOpenHashMap();
+    private final LongOpenHashSet columnDelivered = new LongOpenHashSet();
+    // A new accepted shell owns a fresh receipt, even when clear() did not change the player epoch.
+    private final Long2ObjectOpenHashMap<Object> columnReceipts = new Long2ObjectOpenHashMap<>();
+    // Failure releases active work but preserves the exact absolute-Y obligation until a retry succeeds.
+    // Allocated only after a valid section fails; unload/full replacement/clear reclaim it.
+    private Long2ObjectOpenHashMap<IntOpenHashSet> columnUndeliveredSections;
+
     /**
      * 一次异步序列化的完成应答：worker 构建的条目列表与缓存模式下的 blob 组装材料
      * （blobId/data 的最终组装在主线程发送时完成——tryTrackClientCacheBlob 是玩家状态记账）。
@@ -106,12 +123,25 @@ public class PlayerSubChunkRequestState {
          * take credit owned by new-epoch submissions
          */
         public final int offsets;
+        public final Level sourceLevel;
+        public final Map<Long, Object> columnReceipts;
+        public final List<BlockVector3> submittedOffsets;
 
         public CompletedSubChunkAnswer(int epoch, SubChunkRequestPacket request, boolean cacheMode,
                                        List<SubChunkPacket.SubChunkData> entries,
                                        long[] blobHashes, byte[][] blobSections, byte[][] blobEntities,
                                        int offsets) {
+            this(epoch, request, cacheMode, entries, blobHashes, blobSections, blobEntities, offsets, null, null, null);
+        }
+
+        public CompletedSubChunkAnswer(int epoch, SubChunkRequestPacket request, boolean cacheMode,
+                                       List<SubChunkPacket.SubChunkData> entries,
+                                       long[] blobHashes, byte[][] blobSections, byte[][] blobEntities, int offsets,
+                                       Level sourceLevel, Map<Long, Object> columnReceipts, List<BlockVector3> submittedOffsets) {
             this.epoch = epoch;
+            this.sourceLevel = sourceLevel;
+            this.columnReceipts = columnReceipts;
+            this.submittedOffsets = submittedOffsets;
             this.request = request;
             this.cacheMode = cacheMode;
             this.entries = entries;
@@ -197,16 +227,50 @@ public class PlayerSubChunkRequestState {
      */
     public int drain(ToIntBiFunction<SubChunkRequestPacket, Integer> answerer,
                      int budget, BooleanSupplier keepGoing) {
+        return this.drain(answerer, budget, keepGoing, null);
+    }
+
+    /**
+     * 带优先级的排空：priority 键更小先处理，null 退回 FIFO。
+     * <p>
+     * Priority-aware drain: a smaller key is served first; null falls back to FIFO.
+     */
+    public int drain(ToIntBiFunction<SubChunkRequestPacket, Integer> answerer, int budget,
+                     BooleanSupplier keepGoing, ToLongFunction<SubChunkRequestPacket> priority) {
         int remaining = Math.max(0, budget);
         int spent = 0;
         while (!this.deferredRequests.isEmpty() && remaining > 0 && keepGoing.getAsBoolean()) {
-            SubChunkRequestPacket pk = this.deferredRequests.poll();
+            SubChunkRequestPacket pk = priority == null ? this.deferredRequests.poll() : this.pollNearest(priority);
+            if (pk == null) {
+                break;
+            }
             this.deferredOffsets -= requestOffsetCount(pk);
             int consumed = Math.max(0, answerer.applyAsInt(pk, remaining));
             spent += consumed;
             remaining -= Math.min(consumed, remaining);
         }
         return spent;
+    }
+
+    /**
+     * 取键最小的请求；同键保持先入先出，按身份移除。
+     * <p>
+     * Removes the smallest-key request; equal keys keep arrival order, removal by identity.
+     */
+    private SubChunkRequestPacket pollNearest(ToLongFunction<SubChunkRequestPacket> priority) {
+        SubChunkRequestPacket best = null;
+        long bestKey = Long.MAX_VALUE;
+        for (SubChunkRequestPacket candidate : this.deferredRequests) {
+            long key = priority.applyAsLong(candidate);
+            if (best == null || key < bestKey) {
+                bestKey = key;
+                best = candidate;
+            }
+        }
+        if (best != null) {
+            this.deferredRequests.remove(best);
+        }
+        return best;
     }
 
     public boolean hasDeferred() {
@@ -242,6 +306,11 @@ public class PlayerSubChunkRequestState {
     public boolean responseBytesExceeded(int tick) {
         return this.responseBytesTick == tick
                 && this.responseBytesThisTick >= MAX_RESPONSE_TICK_BYTES;
+    }
+
+    /** Whether response work has already reserved any bytes in this tick. */
+    public boolean hasResponseBytes(int tick) {
+        return this.responseBytesTick == tick && this.responseBytesThisTick > 0;
     }
 
     /**
@@ -309,6 +378,112 @@ public class PlayerSubChunkRequestState {
         this.responseBytesThisTick = 0;
         this.spentEntriesTick = -1;
         this.spentEntriesThisTick = 0;
+        this.columnWaitingSince.clear();
+        this.columnOutstanding.clear();
+        this.columnDelivered.clear();
+        this.columnReceipts.clear();
+        this.columnUndeliveredSections = null;
+    }
+
+    /**
+     * 登记一列已发出：空壳进入等待并清除送达标记，全量发送直接记已送达。
+     * <p>
+     * Registers a sent column: a shell starts waiting and clears the delivery mark;
+     * a full send is delivered right away.
+     */
+    public void onColumnSent(long index, int tick, boolean pullMode) {
+        clearUndeliveredSections(index);
+        this.columnReceipts.remove(index);
+        if (pullMode) this.columnReceipts.put(index, new Object());
+        if (!pullMode) {
+            this.columnWaitingSince.remove(index);
+            this.columnOutstanding.remove(index);
+            this.columnDelivered.add(index);
+            return;
+        }
+        this.columnWaitingSince.put(index, tick);
+        this.columnOutstanding.put(index, 0);
+        this.columnDelivered.remove(index);
+    }
+
+    public void forgetColumn(long index) {
+        clearUndeliveredSections(index);
+        this.columnReceipts.remove(index);
+        this.columnWaitingSince.remove(index);
+        this.columnOutstanding.remove(index);
+        this.columnDelivered.remove(index);
+    }
+
+    /** An accepted pull shell remains serviceable even after pull mode is disabled. */
+    public boolean hasPullChunk(long index) {
+        return this.columnWaitingSince.containsKey(index);
+    }
+
+    public boolean hasPullChunks() {
+        return !this.columnWaitingSince.isEmpty();
+    }
+
+    public void addOutstandingOffsets(long index, int count) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) {
+            return;
+        }
+        this.columnOutstanding.addTo(index, count);
+    }
+
+    public void completeOutstandingOffsets(long index, int count) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) {
+            return;
+        }
+        this.columnOutstanding.put(index, Math.max(0, this.columnOutstanding.get(index) - count));
+        this.columnDelivered.add(index);
+    }
+
+    public Object columnReceipt(long index) { return this.columnReceipts.get(index); }
+
+    public void releaseOutstandingOffsets(long index, int count) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) return;
+        this.columnOutstanding.put(index, Math.max(0, this.columnOutstanding.get(index) - count));
+    }
+
+    /** Release active credit without claiming that the exact absolute section was delivered. */
+    public void releaseOutstandingOffsets(long index, int count, int absoluteSectionY) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) return;
+        releaseOutstandingOffsets(index, count);
+        if (this.columnUndeliveredSections == null) this.columnUndeliveredSections = new Long2ObjectOpenHashMap<>();
+        this.columnUndeliveredSections.computeIfAbsent(index, ignored -> new IntOpenHashSet()).add(absoluteSectionY);
+    }
+
+    /** A successful retry fulfills only its own absolute-section obligation. */
+    public void completeOutstandingOffsets(long index, int count, int absoluteSectionY) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) return;
+        completeOutstandingOffsets(index, count);
+        if (this.columnUndeliveredSections != null) {
+            IntOpenHashSet missing = this.columnUndeliveredSections.get(index);
+            if (missing != null && missing.remove(absoluteSectionY) && missing.isEmpty()) clearUndeliveredSections(index);
+        }
+    }
+
+    private void clearUndeliveredSections(long index) {
+        if (this.columnUndeliveredSections == null) return;
+        this.columnUndeliveredSections.remove(index);
+        if (this.columnUndeliveredSections.isEmpty()) this.columnUndeliveredSections = null;
+    }
+
+    /**
+     * 列数据是否就绪：未等待 / 已派发完 / 等待超过 timeoutTicks 均视为就绪。
+     * <p>
+     * Whether the column's data is ready: not waiting, fully dispatched, or past
+     * {@code timeoutTicks} all count as ready.
+     */
+    public boolean isColumnDataReady(long index, int tick, int timeoutTicks) {
+        if (!this.columnWaitingSince.containsKey(index)) {
+            return true;
+        }
+        if (this.columnDelivered.contains(index) && this.columnOutstanding.get(index) <= 0
+                && (this.columnUndeliveredSections == null || !this.columnUndeliveredSections.containsKey(index))) {
+            return true;
+        }
+        return tick - this.columnWaitingSince.get(index) > timeoutTicks;
     }
 
     // ---- in-flight 与完成应答（见类注释的线程边界）---- / in-flight and completions (thread edges in the class javadoc) ----

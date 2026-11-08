@@ -27,16 +27,17 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
         return CORAL_FAN;
     }
     
+    private static final String[] NAMES = new String[] {
+            "Tube Coral Fan",
+            "Brain Coral Fan",
+            "Bubble Coral Fan",
+            "Fire Coral Fan",
+            "Horn Coral Fan"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[] {
-                "Tube Coral Fan",
-                "Brain Coral Fan",
-                "Bubble Coral Fan",
-                "Fire Coral Fan",
-                "Horn Coral Fan"
-        };
-        return names[this.getType()];
+        return NAMES[this.getType()];
     }
     
     @Override

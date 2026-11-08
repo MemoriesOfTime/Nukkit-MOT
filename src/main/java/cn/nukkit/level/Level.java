@@ -86,6 +86,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -109,6 +110,8 @@ public class Level implements ChunkManager, Metadatable {
     public static final int BLOCK_UPDATE_TOUCH = 5;
     public static final int BLOCK_UPDATE_REDSTONE = 6;
     public static final int BLOCK_UPDATE_TICK = 7;
+
+    private static final BlockFace[] REDSTONE_UPDATE_FACES = BlockFace.values();
 
     public static final int TIME_DAY = 1000;
     public static final int TIME_NOON = 6000;
@@ -459,6 +462,7 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
+    private volatile boolean chunkLoadsClosing;
     // 每世界在飞异步读取上限,为共享池提供背压(取代原每世界有界队列)
     // Per-level in-flight cap for async reads, backpressure for the shared pool (replaces the old bounded queue)
     private Semaphore asyncChunkLoadSlots;
@@ -475,16 +479,13 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<FailedChunkRequest> asyncChunkRequestFailedQueue = new ConcurrentLinkedQueue<>();
 
     // 任务提交 tick,用于超时自愈 / Submit tick for timeout self-healing
-    private final Long2LongOpenHashMap chunkSendTaskStartTick = new Long2LongOpenHashMap();
+    private final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> chunkSendTaskStartTick = new Object2ObjectOpenHashMap<>();
 
-    // 区块发送代次(仅主线程读写):超时重试时递增,使仍在飞的旧序列化结果失效。
-    // 存值恒 ≥2(首轮跳 2、后续 +1),提交点传 max(1, 代次),0 留给不回传代次的第三方路径。
-    // 仅超时过的区块有条目,量级远小于总区块数,故不随发送完成清理。
-    // Chunk send generation (main thread only): bumped on timeout retries to drop in-flight
-    // older serializations. Values are always ≥2 (first bump lands at 2), submissions carry
-    // max(1, generation), and 0 stays free for third parties that don't echo it. Only timed-out
-    // chunks carry entries, so the map is never cleared.
-    private final Long2LongOpenHashMap chunkSendGeneration = new Long2LongOpenHashMap();
+    // 区块请求代次(仅主线程):受理时分配单调 id,回调回传比对,不符即丢;id 不复用,收尾即删
+    // Chunk request epochs (main thread): a monotonic id per acceptance, echoed by
+    // callbacks and dropped on mismatch; ids are never reused, so entries are deleted on completion
+    private final Object2ObjectMap<GameVersion, Long2LongOpenHashMap> chunkRequestEpochs = new Object2ObjectOpenHashMap<>();
+    private long nextChunkRequestId;
 
     /**
      * 连接/角落位驱动的方块 id 白名单（楼梯/栅栏/玻璃板/铁栏/绊线），延迟初始化。
@@ -520,12 +521,46 @@ public class Level implements ChunkManager, Metadatable {
         final GameVersion protocol;
         final int x;
         final int z;
+        final long sequence;
+        final ChunkRequestOwner owner;
 
         FailedChunkRequest(GameVersion protocol, int x, int z) {
+            this(protocol, x, z, 0L);
+        }
+
+        FailedChunkRequest(GameVersion protocol, int x, int z, long sequence) {
+            this(protocol, x, z, sequence, null);
+        }
+
+        FailedChunkRequest(GameVersion protocol, int x, int z, long sequence, ChunkRequestOwner owner) {
+            this.owner = owner;
             this.protocol = protocol;
             this.x = x;
             this.z = z;
+            this.sequence = sequence;
         }
+    }
+
+    private record ChunkCallbackContext(Level level, GameVersion protocol, int x, int z,
+                                        long sequence, ChunkRequestOwner owner) { }
+
+    private static final ThreadLocal<ChunkCallbackContext> CHUNK_CALLBACK_CONTEXT = new ThreadLocal<>();
+
+    private void withChunkCallbackContext(GameVersion protocol, int x, int z, long sequence,
+                                         ChunkRequestOwner owner, Runnable hook) {
+        ChunkCallbackContext previous = CHUNK_CALLBACK_CONTEXT.get();
+        CHUNK_CALLBACK_CONTEXT.set(new ChunkCallbackContext(this, protocol, x, z, sequence, owner));
+        try { hook.run(); }
+        finally {
+            if (previous == null) CHUNK_CALLBACK_CONTEXT.remove();
+            else CHUNK_CALLBACK_CONTEXT.set(previous);
+        }
+    }
+
+    private ChunkRequestOwner scopedChunkCallbackOwner(GameVersion protocol, int x, int z, long sequence) {
+        ChunkCallbackContext context = CHUNK_CALLBACK_CONTEXT.get();
+        return context != null && context.level == this && context.protocol == protocol
+                && context.x == x && context.z == z && context.sequence == sequence ? context.owner : null;
     }
 
     private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
@@ -773,6 +808,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public void close() {
         boolean interrupted = false;
+        this.chunkLoadsClosing = true;
+        for (PendingChunkLoad pending : this.pendingChunkLoads.values()) {
+            pending.invalidated = true;
+        }
         this.providerLock.writeLock().lock();
         try {
             interrupted = this.drainAsyncChunkLoads();
@@ -1455,7 +1494,7 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        if (this.server.asyncChunkSending) {
+        if (!this.asyncChunkRequestCallbackQueue.isEmpty()) {
             NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
@@ -1465,18 +1504,14 @@ public class Level implements ChunkManager, Metadatable {
                     continue;
                 }
                 this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload(),
-                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities());
+                        data.getSubChunkBlobs(), data.getBiomes(), data.getBlockEntities(), data.getSequence(), data.getRequestOwner());
             }
         }
 
         // 清 tasks 后下 tick 守卫(!contains)重新成立即自动重试
         // Clearing tasks lets the guard re-accept it next tick
         if (!this.asyncChunkRequestFailedQueue.isEmpty()) {
-            FailedChunkRequest failed;
-            while ((failed = this.asyncChunkRequestFailedQueue.poll()) != null) {
-                this.getChunkSendTasks(failed.protocol).remove(Level.chunkHash(failed.x, failed.z));
-                this.chunkSendTaskStartTick.remove(Level.chunkHash(failed.x, failed.z));
-            }
+            this.drainFailedChunkRequests();
         }
 
         // 挂载异步加载完成的区块;不以配置为 gate,保证配置热切换后残留 pending 也能排空
@@ -1967,7 +2002,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void updateAroundRedstone(@NotNull Vector3 pos, @Nullable BlockFace ignoredFace) {
-        for (BlockFace side : BlockFace.values()) {
+        for (BlockFace side : REDSTONE_UPDATE_FACES) {
             if (ignoredFace != null && side == ignoredFace) {
                 continue;
             }
@@ -2039,7 +2074,14 @@ public class Level implements ChunkManager, Metadatable {
     public void updateAround(Vector3 pos, int layer) {
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
-            this.queueNormalUpdate(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+            Block side = block.getSideAtLayer(layer, face);
+            // Layer 1 only holds waterlogging and is air almost everywhere. Updating that air
+            // fires a BlockUpdateEvent and a no-op onUpdate, so skip it. If water reaches the
+            // cell before the queue is drained, the setBlock that puts it there updates it.
+            if (layer == 1 && side.getId() == Block.AIR) {
+                continue;
+            }
+            this.queueNormalUpdate(new QueuedUpdate(side, face));
         }
     }
 
@@ -2566,10 +2608,11 @@ public class Level implements ChunkManager, Metadatable {
         if (size == 0) {
             return;
         }
-        Queue<Long> lightPropagationQueue = new ConcurrentLinkedQueue<>();
-        Queue<Object[]> lightRemovalQueue = new ConcurrentLinkedQueue<>();
-        LongOpenHashSet visited = new LongOpenHashSet();
-        LongOpenHashSet removalVisited = new LongOpenHashSet();
+        // Allocate traversal scratch only if a queued root changes its emitted light.
+        Queue<Long> lightPropagationQueue = null;
+        Queue<Object[]> lightRemovalQueue = null;
+        LongOpenHashSet visited = null;
+        LongOpenHashSet removalVisited = null;
 
         Iterator<Map.Entry<Long, Set<Integer>>> iter = map.entrySet().iterator();
         while (iter.hasNext() && size-- > 0) {
@@ -2587,6 +2630,12 @@ public class Level implements ChunkManager, Metadatable {
                     int oldLevel = chunk.getBlockLight(lcx, pos.getFloorY(), lcz);
                     int newLevel = Block.getBlockLight(chunk.getBlockId(lcx, pos.getFloorY(), lcz));
                     if (oldLevel != newLevel) {
+                        if (lightPropagationQueue == null) {
+                            lightPropagationQueue = new ConcurrentLinkedQueue<>();
+                            lightRemovalQueue = new ConcurrentLinkedQueue<>();
+                            visited = new LongOpenHashSet();
+                            removalVisited = new LongOpenHashSet();
+                        }
                         chunk.setBlockLight(((int) pos.x) & 0x0f, (int) pos.y, ((int) pos.z) & 0x0f, newLevel & 0x0f);
 
                         long hash = Hash.hashBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
@@ -2600,6 +2649,10 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
             }
+        }
+
+        if (lightPropagationQueue == null) {
+            return;
         }
 
         while (!lightRemovalQueue.isEmpty()) {
@@ -2762,7 +2815,11 @@ public class Level implements ChunkManager, Metadatable {
 
         try {
             for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
-                callback.accept(blockPrevious, block);
+                try {
+                    callback.accept(blockPrevious, block);
+                } catch (Exception e) {
+                    Server.getInstance().getLogger().error("Error while calling block set callback", e);
+                }
             }
         } catch (Exception e) {
             Server.getInstance().getLogger().error("Error while calling block set callback", e);
@@ -3334,13 +3391,7 @@ public class Level implements ChunkManager, Metadatable {
 
 
         if (!hand.canPassThrough() && hand.getBoundingBox() != null) {
-            List<Entity> entities = CollisionHelper.getCollidingEntities(this, hand.getBoundingBox());
-            //int realCount = 0;
-            for (Entity e : entities) {
-                if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator() || !e.canCollide())) {
-                    continue;
-                }
-                //++realCount;
+            if (this.isBlockPlacementObstructed(hand.getBoundingBox(), player)) {
                 return null;
             }
 
@@ -3513,6 +3564,24 @@ public class Level implements ChunkManager, Metadatable {
 
     public Entity[] getEntities() {
         return entities.values().toArray(new Entity[0]);
+    }
+
+    /**
+     * Checks whether an entity stands in the way of a block that would fill the given box.
+     * Arrows, dropped items, spectators, entities without collision and the placing player never block a placement.
+     *
+     * @param bb     the box the placed block would fill
+     * @param player the player placing the block, or {@code null}
+     * @return {@code true} when at least one entity blocks the placement
+     */
+    public boolean isBlockPlacementObstructed(AxisAlignedBB bb, @Nullable Player player) {
+        for (Entity e : CollisionHelper.getCollidingEntities(this, bb)) {
+            if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator()) || !e.canCollide()) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -4443,44 +4512,55 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void sendChunkInternal(int x, int z, long index, DataPacket packet, GameVersion protocol) {
-        LongSet tasks = this.getChunkSendTasks(protocol);
-        if (!tasks.contains(index)) {
-            return;
-        }
-
         ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
-        if (this.retainChunkRecipients(protocol, index)) {
-            for (Player player : queue.get(index).values()) {
-                if (this.isChunkRecipient(player, index)) {
-                    player.sendChunk(x, z, packet);
-                }
+        Int2ObjectMap<Player> owner = queue.get(index);
+        if (!this.isChunkOwnerCurrent(protocol, index, owner) || !this.retainChunkRecipients(protocol, index)) return;
+        for (Player player : owner.values()) {
+            if (!this.isChunkOwnerCurrent(protocol, index, owner)) return;
+            if (this.isChunkRecipient(player, index) && this.isChunkOwnerCurrent(protocol, index, owner)) {
+                player.sendChunk(x, z, packet);
             }
         }
-        queue.remove(index);
-        tasks.remove(index);
-        this.chunkSendTaskStartTick.remove(index);
+        this.completeChunkRequest(protocol, index, owner);
     }
 
     private boolean isChunkRecipient(Player player, long index) {
         return player.isConnected() && player.getLevel() == this && player.usedChunks.containsKey(index);
     }
 
+    private boolean isChunkOwnerCurrent(GameVersion protocol, long index, Int2ObjectMap<Player> owner) {
+        return owner != null && this.getChunkSendTasks(protocol).contains(index)
+                && this.getChunkSendQueue(protocol).get(index) == owner;
+    }
+
+    private void completeChunkRequest(GameVersion protocol, long index, Int2ObjectMap<Player> owner) {
+        ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
+        if (owner != null && queue.get(index) == owner && queue.remove(index, owner)) {
+            this.releaseChunkRequest(protocol, index);
+        }
+    }
+
+    private boolean retainChunkRecipients(GameVersion protocol, long index, Int2ObjectMap<Player> recipients) {
+        if (recipients == null || this.getChunkSendQueue(protocol).get(index) != recipients) return false;
+        return this.retainChunkRecipients(protocol, index);
+    }
+
     private boolean retainChunkRecipients(GameVersion protocol, long index) {
         ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
         Int2ObjectMap<Player> recipients = queue.get(index);
-        if (recipients == null) {
-            return false;
+        if (recipients != null) {
+            recipients.values().removeIf(player -> !this.isChunkRecipient(player, index));
+            // Recipient hooks may reenter; never retire or dispatch a replacement cohort.
+            if (queue.get(index) != recipients) return false;
+            if (!recipients.isEmpty()) return true;
+            if (!queue.remove(index, recipients)) return false;
         }
-        recipients.values().removeIf(player -> !this.isChunkRecipient(player, index));
-        if (recipients.isEmpty()) {
-            queue.remove(index);
-            return false;
-        }
-        return true;
+        this.releaseChunkRequest(protocol, index);
+        return false;
     }
 
     private void processChunkRequest() {
-        Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
+        Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = null;
         for (GameVersion protocolId : this.pendingChunkRequests.keySet()) {
             LongSet pending = this.getPendingChunkRequests(protocolId);
             if (pending.isEmpty()) {
@@ -4490,21 +4570,27 @@ public class Level implements ChunkManager, Metadatable {
             ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
             for (long index : pending) {
                 // Discard departed recipients before chunk lookup and serialization.
-                if (!this.retainChunkRecipients(protocolId, index)) {
+                if (!this.retainChunkRecipients(protocolId, index, queue.get(index))) {
                     continue;
                 }
                 // 超时未回调则强制清除重试 / Force-clear and retry if no callback within timeout
-                long startTick = this.chunkSendTaskStartTick.get(index);
-                if (startTick != 0 && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
+                Long2LongOpenHashMap starts = this.chunkSendTaskStartTick.get(protocolId);
+                long startTick = starts == null ? Long.MIN_VALUE : starts.getOrDefault(index, Long.MIN_VALUE);
+                if (startTick != Long.MIN_VALUE && this.server.getTick() - startTick > CHUNK_SEND_TIMEOUT_TICKS
                         && tasks.contains(index)) {
                     server.getLogger().warning("Chunk send task timed out for index " + index + " in level " + this.getName() + ", forcing retry");
-                    tasks.remove(index);
-                    this.chunkSendTaskStartTick.remove(index);
-                    // 首轮跳到 2 而非 1:首轮提交已带 1,落 1 则新旧同号无法区分
-                    // Jump to 2 on the first bump: submissions already carry 1, so 1 would collide with the retry
-                    this.chunkSendGeneration.addTo(index, this.chunkSendGeneration.get(index) == 0L ? 2L : 1L);
+                    // retiring invalidates this submission's late results
+                    this.releaseChunkRequest(protocolId, index);
                 }
                 if (!tasks.contains(index) && queue.containsKey(index)) {
+                    // Preserve native iteration order while giving each accepted retry a new identity.
+                    Int2ObjectMap<Player> recipients = queue.get(index);
+                    queue.put(index, recipients.getClass() == Int2ObjectOpenHashMap.class
+                            ? ((Int2ObjectOpenHashMap<Player>) recipients).clone()
+                            : new Int2ObjectLinkedOpenHashMap<>(recipients));
+                    if (chunkRequests == null) {
+                        chunkRequests = new Long2ObjectOpenHashMap<>();
+                    }
                     chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                     tasks.add(index);
                 }
@@ -4512,7 +4598,9 @@ public class Level implements ChunkManager, Metadatable {
             pending.clear();
         }
 
-        this.chunkRequestInternal(chunkRequests);
+        if (chunkRequests != null) {
+            this.chunkRequestInternal(chunkRequests);
+        }
     }
 
     /**
@@ -4689,20 +4777,66 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    /** Immutable identity of an accepted request, without retaining departed recipients. */
+    public static final class ChunkRequestOwner {
+        private final WeakReference<Level> level;
+        private final long index;
+        private final Map<GameVersion, WeakReference<Int2ObjectMap<Player>>> owners;
+
+        private ChunkRequestOwner(Level level, long index,
+                                  Map<GameVersion, WeakReference<Int2ObjectMap<Player>>> owners) {
+            this.level = new WeakReference<>(level);
+            this.index = index;
+            this.owners = Map.copyOf(owners);
+        }
+
+        private boolean isCurrent(Level level, GameVersion protocol, long index) {
+            if (this.level.get() != level || this.index != index) return false;
+            WeakReference<Int2ObjectMap<Player>> reference = this.owners.get(level.getChunkProtocol(protocol));
+            return reference != null && level.isChunkOwnerCurrent(protocol, index, reference.get());
+        }
+    }
+
+    /** Main thread only: capture before provider lookup can reenter request processing. */
+    public ChunkRequestOwner captureChunkRequestOwner(ObjectSet<GameVersion> protocols, int x, int z) {
+        long index = Level.chunkHash(x, z);
+        Map<GameVersion, WeakReference<Int2ObjectMap<Player>>> owners = new HashMap<>();
+        for (GameVersion protocol : protocols) {
+            Int2ObjectMap<Player> owner = this.getChunkSendTasks(protocol).contains(index)
+                    ? this.getChunkSendQueue(protocol).get(index) : null;
+            owners.put(this.getChunkProtocol(protocol), new WeakReference<>(owner));
+        }
+        return new ChunkRequestOwner(this, index, owners);
+    }
+
     private void chunkRequestInternal(Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests) {
+        Long2ObjectMap<ChunkRequestOwner> owners = new Long2ObjectOpenHashMap<>();
+        // Capture all cohorts before the first lookup can replace any pending request.
+        for (long index : chunkRequests.keySet()) {
+            owners.put(index, this.captureChunkRequestOwner(chunkRequests.get(index), getHashX(index), getHashZ(index)));
+        }
         for (long index : chunkRequests.keySet()) {
             ObjectSet<GameVersion> protocols = new ObjectOpenHashSet<>(chunkRequests.get(index));
             int x = getHashX(index);
             int z = getHashZ(index);
 
+            ChunkRequestOwner owner = owners.get(index);
             for (GameVersion protocol : chunkRequests.get(index)) {
                 BaseFullChunk chunk = this.getChunk(x, z);
+                if (!owner.isCurrent(this, protocol, index)) {
+                    protocols.remove(protocol);
+                    continue;
+                }
                 if (chunk != null) {
                     // 兜底：挂载尾段邻居未齐而保留标志的区块，发送前最后重试一次 / Fallback:
                     // last retry before sending for chunks still flagged after the mount tail
                     this.fixLegacyBlockConnections(x, z, chunk);
+                    if (!owner.isCurrent(this, protocol, index)) {
+                        protocols.remove(protocol);
+                        continue;
+                    }
                     BatchPacket packet = chunk.getChunkPacket(protocol);
-                    if (packet != null) {
+                    if (packet != null && owner.isCurrent(this, protocol, index)) {
                         //this.sendChunk(x, z, index, packet);
                         this.sendChunkInternal(x, z, index, packet, protocol);
                         protocols.remove(protocol);
@@ -4710,14 +4844,75 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
 
+            protocols.removeIf(protocol -> !owner.isCurrent(this, protocol, index));
             if (protocols.isEmpty()) {
                 continue;
             }
 
-            this.chunkSendTaskStartTick.put(index, this.server.getTick());
-            // 代次下限 1:首轮提交的迟到回调在首轮超时后也能判旧;0 留给不回传代次的第三方
-            // Floored at 1 so a first submission's late callback is droppable too; 0 is reserved for third parties
-            this.requireProvider().requestChunkTask(protocols, x, z, Math.max(1L, this.chunkSendGeneration.get(index)));
+            long startTick = this.server.getTick();
+            for (GameVersion protocol : protocols) {
+                this.chunkSendTaskStartTick.computeIfAbsent(this.getChunkProtocol(protocol),
+                        ignored -> new Long2LongOpenHashMap()).put(index, startTick);
+            }
+            // one id per acceptance, shared by this round's protocol buckets
+            this.requireProvider().requestChunkTask(protocols, x, z, this.beginChunkRequest(protocols, index));
+        }
+    }
+
+    private long beginChunkRequest(ObjectSet<GameVersion> protocols, long index) {
+        long requestId = ++this.nextChunkRequestId;
+        for (GameVersion protocol : protocols) {
+            this.getChunkRequestEpochs(protocol).put(index, requestId);
+        }
+        return requestId;
+    }
+
+    /**
+     * 该结果是否属于当前受理(主线程)；id 0(第三方不回传)不校验。
+     * <p>
+     * Whether the result belongs to the current submission; id 0 is exempt.
+     */
+    private boolean isChunkRequestCurrent(GameVersion protocol, long index, long requestId) {
+        if (requestId == 0L) {
+            return true;
+        }
+        Long2LongOpenHashMap epochs = this.chunkRequestEpochs.get(this.getChunkProtocol(protocol));
+        return epochs != null && epochs.get(index) == requestId;
+    }
+
+    /**
+     * 收尾一次受理：只清该协议桶的任务、代次与提交 tick。
+     * <p>
+     * Retires one submission: clears only this protocol bucket's task, epoch and submit tick.
+     */
+    private void releaseChunkRequest(GameVersion protocol, long index) {
+        this.getChunkSendTasks(protocol).remove(index);
+        Long2LongOpenHashMap epochs = this.chunkRequestEpochs.get(this.getChunkProtocol(protocol));
+        if (epochs != null) {
+            epochs.remove(index);
+        }
+        GameVersion protocolId = this.getChunkProtocol(protocol);
+        Long2LongOpenHashMap starts = this.chunkSendTaskStartTick.get(protocolId);
+        if (starts != null) {
+            starts.remove(index);
+            if (starts.isEmpty()) this.chunkSendTaskStartTick.remove(protocolId);
+        }
+    }
+
+    /**
+     * 排空异步清理队列(主线程)，丢弃代次不符的旧失败。
+     * <p>
+     * Drains the async failure queue (main thread), dropping failures of superseded submissions.
+     */
+    void drainFailedChunkRequests() {
+        FailedChunkRequest failed;
+        while ((failed = this.asyncChunkRequestFailedQueue.poll()) != null) {
+            long index = Level.chunkHash(failed.x, failed.z);
+            if (!this.isChunkRequestCurrent(failed.protocol, index, failed.sequence)
+                    || (failed.owner != null && !failed.owner.isCurrent(this, failed.protocol, index))) {
+                continue;
+            }
+            this.releaseChunkRequest(failed.protocol, index);
         }
     }
 
@@ -4736,18 +4931,28 @@ public class Level implements ChunkManager, Metadatable {
     public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                           List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
         this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(
-                gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence));
+                gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence,
+                this.scopedChunkCallbackOwner(gameVersion, x, z, sequence)));
+    }
+
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                          List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence,
+                                          ChunkRequestOwner owner) {
+        this.withChunkCallbackContext(gameVersion, x, z, sequence, owner,
+                () -> this.asyncChunkRequestCallback(gameVersion, timestamp, x, z, subChunkCount, payload,
+                        subChunkBlobs, biomes, blockEntities, sequence));
     }
 
     /**
-     * 该异步结果是否已被超时重试取代(主线程调用);序号 0(第三方不回传)不参与校验。
+     * 该异步结果是否已不属于当前受理(主线程)；代次 0 不校验。
      * <p>
-     * Whether this async result was superseded by a timeout retry (main thread);
-     * sequence 0 (third-party, not echoed) is exempt.
+     * Whether this async result no longer belongs to the current submission; epoch 0 is exempt.
      */
     boolean isSupersededChunkCallback(NetworkChunkSerializer.NetworkChunkSerializerCallbackData data) {
-        long sequence = data.getSequence();
-        return sequence != 0L && sequence < this.chunkSendGeneration.get(Level.chunkHash(data.getX(), data.getZ()));
+        if (data.getRequestOwner() != null && !data.getRequestOwner().isCurrent(
+                this, data.getGameVersion(), Level.chunkHash(data.getX(), data.getZ()))) return true;
+        return !this.isChunkRequestCurrent(data.getGameVersion(),
+                Level.chunkHash(data.getX(), data.getZ()), data.getSequence());
     }
 
     /**
@@ -4755,8 +4960,60 @@ public class Level implements ChunkManager, Metadatable {
      * <p>
      * Async-thread entry; just enqueues (main thread drains & clears tasks).
      */
+    private record ChunkFailureContext(Level level, FailedChunkRequest request) { }
+
+    private static final ThreadLocal<ChunkFailureContext> CHUNK_FAILURE_CONTEXT = new ThreadLocal<>();
+
+    private boolean matchesChunkFailureContext(ChunkFailureContext context, GameVersion protocol, int x, int z) {
+        return context != null && context.level == this && context.request.protocol == protocol
+                && context.request.x == x && context.request.z == z;
+    }
+
+    private void withChunkFailureContext(FailedChunkRequest request, Runnable hook) {
+        ChunkFailureContext previous = CHUNK_FAILURE_CONTEXT.get();
+        CHUNK_FAILURE_CONTEXT.set(new ChunkFailureContext(this, request));
+        try {
+            hook.run();
+        } finally {
+            if (previous == null) CHUNK_FAILURE_CONTEXT.remove();
+            else CHUNK_FAILURE_CONTEXT.set(previous);
+        }
+    }
+
     public void onAsyncChunkRequestFailed(GameVersion protocol, int x, int z) {
-        this.asyncChunkRequestFailedQueue.add(new FailedChunkRequest(protocol, x, z));
+        ChunkFailureContext context = CHUNK_FAILURE_CONTEXT.get();
+        this.asyncChunkRequestFailedQueue.add(this.matchesChunkFailureContext(context, protocol, x, z)
+                ? context.request : new FailedChunkRequest(protocol, x, z, 0L));
+    }
+
+    public void onAsyncChunkRequestFailed(GameVersion protocol, int x, int z, long sequence) {
+        ChunkFailureContext context = CHUNK_FAILURE_CONTEXT.get();
+        if (this.matchesChunkFailureContext(context, protocol, x, z) && context.request.sequence == sequence) {
+            this.onAsyncChunkRequestFailed(protocol, x, z);
+        } else {
+            this.withChunkFailureContext(new FailedChunkRequest(protocol, x, z, sequence),
+                    () -> this.onAsyncChunkRequestFailed(protocol, x, z));
+        }
+    }
+
+    public void onAsyncChunkRequestFailed(GameVersion protocol, int x, int z, long sequence, ChunkRequestOwner owner) {
+        this.withChunkFailureContext(new FailedChunkRequest(protocol, x, z, sequence, owner),
+                () -> this.onAsyncChunkRequestFailed(protocol, x, z, sequence));
+    }
+
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                     List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, ChunkRequestOwner owner) {
+        this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload,
+                subChunkBlobs, biomes, blockEntities, 0L, owner);
+    }
+
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                     List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities,
+                                     long sequence, ChunkRequestOwner owner) {
+        if (owner != null && !owner.isCurrent(this, protocol, Level.chunkHash(x, z))) return;
+        this.withChunkCallbackContext(protocol, x, z, sequence, owner,
+                () -> this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload,
+                        subChunkBlobs, biomes, blockEntities, sequence));
     }
 
     @Deprecated
@@ -4768,63 +5025,65 @@ public class Level implements ChunkManager, Metadatable {
         this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload, null, null, null);
     }
 
-    /**
-     * 序列化回调装配：按接收者能力分流——全量推送 / 全量+blob 哈希 / 子区块 shell。
-     * <p>
-     * Serializer callback assembly: recipients are partitioned by delivery mode —
-     * full payload / full payload + blob hashes / sub-chunk shell.
-     */
     public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                      List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities) {
+        this.chunkRequestCallback(protocol, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, 0L);
+    }
+
+    /**
+     * 序列化回调装配：按接收者能力分流(全量/全量+blob/子区块 shell)；代次不符的快照直接丢弃。
+     * <p>
+     * Serializer callback assembly: partitions recipients by delivery mode (full / blob /
+     * sub-chunk shell); stale-epoch snapshots are dropped.
+     */
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                     List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
         long index = Level.chunkHash(x, z);
-
-        if (!this.retainChunkRecipients(protocol, index)) {
-            this.getChunkSendTasks(protocol).remove(index);
-            this.chunkSendTaskStartTick.remove(index);
-            return;
-        }
-
+        ChunkRequestOwner scopedOwner = this.scopedChunkCallbackOwner(protocol, x, z, sequence);
+        if (scopedOwner != null && !scopedOwner.isCurrent(this, protocol, index)) return;
+        if (!this.isChunkRequestCurrent(protocol, index, sequence)) return;
         Int2ObjectMap<Player> recipients = this.getChunkSendQueue(protocol).get(index);
+        if (!this.isChunkOwnerCurrent(protocol, index, recipients) || !this.retainChunkRecipients(protocol, index)) return;
         boolean anyBlobMode = false;
         boolean anyPullMode = false;
-        if (recipients != null) {
-            for (Player player : recipients.values()) {
-                if (this.isChunkRecipient(player, index) && matchMVChunkProtocol(protocol, player.getGameVersion())) {
-                    if (player.isSubChunkPullMode()) {
-                        anyPullMode = true;
-                    }
-                    if (player.isClientBlobCacheActive()) {
-                        anyBlobMode = true;
-                    }
+        for (Player player : recipients.values()) {
+            if (this.isChunkRecipient(player, index) && matchMVChunkProtocol(protocol, player.getGameVersion())) {
+                if (player.isSubChunkPullMode()) {
+                    anyPullMode = true;
+                }
+                if (player.isClientBlobCacheActive()) {
+                    anyBlobMode = true;
                 }
             }
         }
+
+        if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
 
         // 缓存/拉取模式接收者存在时不能用 BatchPacket 快路径 / the BatchPacket fast path
         // only applies when no cache/pull-mode recipient remains
         if (server.cacheChunks && !anyBlobMode && !anyPullMode) {
             BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunkIfLoaded(x, z);
-            if (chunk != null && chunk.getChanges() <= timestamp) {
+            if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
+            if (chunk != null && chunk.getChanges() <= timestamp
+                    && this.isChunkOwnerCurrent(protocol, index, recipients)) {
                 chunk.setChunkPacket(protocol, data);
             }
-            //this.sendChunk(x, z, index, data);
+            if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
             this.sendChunkInternal(x, z, index, data, protocol);
             return;
         }
 
-        LongSet tasks = this.getChunkSendTasks(protocol);
-        if (tasks.contains(index)) {
-            ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
-
-            if (queue.containsKey(index)) {
+        if (this.isChunkOwnerCurrent(protocol, index, recipients)) {
+            if (!recipients.isEmpty()) {
                 LevelChunkPacket blobPacket = null;
                 LevelChunkPacket pullCachePacket = null;
                 LevelChunkPacket pullRawPacket = null;
                 long biomeBlobHash = 0;
                 boolean biomeBlobPrepared = false;
 
-                for (Player player : queue.get(index).values()) {
+                for (Player player : recipients.values()) {
+                    if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
                     if (!this.isChunkRecipient(player, index) || !matchMVChunkProtocol(protocol, player.getGameVersion())) {
                         continue;
                     }
@@ -4839,6 +5098,7 @@ public class Level implements ChunkManager, Metadatable {
                                 if (pullCachePacket == null) {
                                     pullCachePacket = this.buildPullLevelChunkPacket(protocol, x, z, subChunkCount, true, biomeBlobHash, null);
                                 }
+                                if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
                                 player.sendChunk(x, z, pullCachePacket);
                                 continue;
                             }
@@ -4848,11 +5108,13 @@ public class Level implements ChunkManager, Metadatable {
                             if (pullRawPacket == null) {
                                 pullRawPacket = this.buildPullLevelChunkPacket(protocol, x, z, subChunkCount, false, 0, biomes);
                             }
+                            if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
                             player.sendChunk(x, z, pullRawPacket);
                         } else {
                             // 序列化时捕获未开启（/reload 翻转窗口）：退全量，避免发出无 biomes 的空壳
                             // / Capture was off when this column was serialized (a /reload
                             // flip window): fall back to a full send instead of a biome-less shell
+                            if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
                             player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                         }
                     } else if (player.isClientBlobCacheActive() && subChunkBlobs != null) {
@@ -4860,20 +5122,21 @@ public class Level implements ChunkManager, Metadatable {
                             blobPacket = this.buildBlobLevelChunkPacket(protocol, x, z, subChunkCount, subChunkBlobs, biomes, blockEntities);
                         }
                         if (player.tryOpenBlobTransaction(blobPacket.blobIds)) {
+                            if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
                             player.sendChunk(x, z, blobPacket);
                         } else {
                             // pending 超限降级全量 / pending over cap: degrade to a full send
+                            if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
                             player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                         }
                     } else {
+                        if (!this.isChunkOwnerCurrent(protocol, index, recipients)) return;
                         player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                     }
                 }
             }
 
-            queue.remove(index);
-            tasks.remove(index);
-            this.chunkSendTaskStartTick.remove(index);
+            this.completeChunkRequest(protocol, index, recipients);
         }
     }
 
@@ -5123,7 +5386,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     public boolean requestChunkLoadAsync(int x, int z) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
+        if (this.chunkLoadsClosing || levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
             return false;
         }
 
@@ -5143,7 +5406,7 @@ public class Level implements ChunkManager, Metadatable {
                 this.asyncChunkLoadExecutor.execute(() -> {
                     this.runningAsyncChunkLoads.incrementAndGet();
                     try {
-                        if (pending.invalidated) {
+                        if (this.chunkLoadsClosing || pending.invalidated) {
                             return;
                         }
                         pending.chunk = levelProvider.readChunkOffThread(x, z);
@@ -5184,7 +5447,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     synchronized void mountChunk(PendingChunkLoad pending) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || levelProvider.getLevel() == null
+        if (this.chunkLoadsClosing || levelProvider == null || levelProvider.getLevel() == null
             || levelProvider != pending.provider || pending.invalidated
                 || levelProvider.isChunkLoaded(pending.hash)) {
             return;
@@ -5747,7 +6010,8 @@ public class Level implements ChunkManager, Metadatable {
             pk2.x = (float) x;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_X;
         }
-        if (entity.lastY != y) {
+        // lastY is the raw position, while y may include the entity's base offset
+        if (entity.lastY != entity.y) {
             pk2.y = (float) y;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_Y;
         }
@@ -5982,6 +6246,8 @@ public class Level implements ChunkManager, Metadatable {
         return (int) block.getY() >= this.getHighestBlockAt((int) block.getX(), (int) block.getZ());
     }
 
+    private static final BlockFace[] REDSTONE_POWER_FACES = BlockFace.values();
+
     public int getStrongPower(Vector3 pos, BlockFace direction) {
         return this.getBlock(pos).getStrongPower(direction);
     }
@@ -5989,7 +6255,7 @@ public class Level implements ChunkManager, Metadatable {
     public int getStrongPower(Vector3 pos) {
         int i = 0;
 
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             i = Math.max(i, this.getStrongPower(pos.getSideVec(face), face));
 
             if (i >= 15) {
@@ -6010,7 +6276,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean isBlockPowered(Vector3 pos) {
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             if (this.getRedstonePower(pos.getSideVec(face), face) > 0) {
                 return true;
             }
@@ -6021,7 +6287,7 @@ public class Level implements ChunkManager, Metadatable {
     public int isBlockIndirectlyGettingPowered(Vector3 pos) {
         int power = 0;
 
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             int blockPower = this.getRedstonePower(pos.getSideVec(face), face);
 
             if (blockPower >= 15) {
@@ -6502,6 +6768,11 @@ public class Level implements ChunkManager, Metadatable {
     private LongSet getChunkSendTasks(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendTasks.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
+    }
+
+    private Long2LongOpenHashMap getChunkRequestEpochs(GameVersion protocol) {
+        GameVersion protocolId = this.getChunkProtocol(protocol);
+        return this.chunkRequestEpochs.computeIfAbsent(protocolId, i -> new Long2LongOpenHashMap());
     }
 
     private LongSet getPendingChunkRequests(GameVersion protocol) {

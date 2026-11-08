@@ -46,19 +46,20 @@ public class BlockDoubleSlabStone4 extends BlockDoubleSlabStone {
         return ItemTool.TIER_WOODEN;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Mossy Stone Brick",
+            "Smooth Quartz",
+            "Stone",
+            "Cut Sandstone",
+            "Cut Red Sandstone",
+            "",
+            "",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Mossy Stone Brick",
-                "Smooth Quartz",
-                "Stone",
-                "Cut Sandstone",
-                "Cut Red Sandstone",
-                "",
-                "",
-                ""
-        };
-        return "Double " + names[this.getDamage() & 0x07] + " Slab";
+        return "Double " + NAMES[this.getDamage() & 0x07] + " Slab";
     }
 
     @Override

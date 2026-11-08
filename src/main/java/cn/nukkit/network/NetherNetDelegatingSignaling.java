@@ -1,6 +1,7 @@
 package cn.nukkit.network;
 
 import io.netty.channel.EventLoop;
+import org.cloudburstmc.netty.channel.nethernet.config.NetherServerMetrics;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
 import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.cloudburstmc.netty.util.nethernet.OperatorIdentity;
@@ -35,6 +36,16 @@ abstract class NetherNetDelegatingSignaling implements NetherNetServerSignaling 
     @Override
     public void setNewConnectionHandler(NewConnectionHandler handler) {
         this.delegate.setNewConnectionHandler(handler);
+    }
+
+    @Override
+    public void setMetrics(NetherServerMetrics metrics) {
+        this.delegate.setMetrics(metrics);
+    }
+
+    @Override
+    public void setMediaRelayed(boolean relayed) {
+        this.delegate.setMediaRelayed(relayed);
     }
 
     @Override

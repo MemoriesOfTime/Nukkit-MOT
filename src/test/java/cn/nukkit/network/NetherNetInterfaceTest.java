@@ -2,29 +2,39 @@ package cn.nukkit.network;
 
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
+import cn.nukkit.event.player.PlayerCreationEvent;
 import cn.nukkit.lang.BaseLang;
+import cn.nukkit.network.session.NetherNetPlayerSession;
 import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import org.cloudburstmc.netty.channel.nethernet.AddressSource;
+import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
+import org.cloudburstmc.netty.channel.nethernet.SourcedAddress;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -96,6 +106,160 @@ class NetherNetInterfaceTest {
         assertEquals(30, NetherNetInterface.handshakeTimeoutSeconds(-1));
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void blockedIceAddressIsRejectedBeforePlayerCreation(boolean blockedWhileQueued) {
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress media = new InetSocketAddress("203.0.113.11", 52000);
+        NetherNetPlayerSession session = activeSession(this.netherNet, signaling, media);
+        if (!blockedWhileQueued) {
+            this.netherNet.blockAddress(media.getAddress(), 60);
+        }
+
+        this.netherNet.queueSessionForPlayerCreation(session);
+        if (blockedWhileQueued) {
+            this.netherNet.blockAddress(media.getAddress(), 60);
+        }
+        this.netherNet.process();
+
+        assertSessionRejected(this.netherNet, session, media);
+    }
+
+    @Test
+    void unblockedIceAddressCanCreatePlayer() {
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress media = new InetSocketAddress("203.0.113.11", 52000);
+        NetherNetPlayerSession session = activeSession(this.netherNet, signaling, media);
+        this.netherNet.blockAddress(media.getAddress(), 60);
+        this.netherNet.unblockAddress(media.getAddress());
+
+        this.netherNet.queueSessionForPlayerCreation(session);
+        this.netherNet.process();
+
+        assertSessionCreated(this.netherNet, session, media);
+    }
+
+    @Test
+    @Timeout(30)
+    void expiredIceAddressBanDoesNotRejectPlayer() throws InterruptedException {
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress media = new InetSocketAddress("203.0.113.11", 52000);
+        NetherNetPlayerSession session = activeSession(this.netherNet, signaling, media);
+        this.netherNet.blockAddress(media.getAddress(), 1);
+        this.netherNet.queueSessionForPlayerCreation(session);
+        Thread.sleep(1100);
+
+        this.netherNet.process();
+
+        assertSessionCreated(this.netherNet, session, media);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Timeout(30)
+    void sharedPortChecksSignalingAddressInsteadOfRelayLeg(boolean signalingBlocked) throws Exception {
+        Server server = MockServer.get();
+        int port = freeTcpPort();
+        when(server.getPort()).thenReturn(port);
+        when(server.getPropertyString(eq("server-udp-ports"), anyString())).thenReturn(String.valueOf(port));
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress leg = new InetSocketAddress("127.0.0.1", 52000);
+
+        try (RakNetStandIn rakNet = new RakNetStandIn()) {
+            NetherNetInterface shared = new NetherNetInterface(server, new NetherNetSettings(), rakNet.rakNet);
+            try {
+                NetherNetPlayerSession session = activeSession(shared, signaling, leg);
+                shared.blockAddress(signalingBlocked ? signaling.getAddress() : leg.getAddress(), 60);
+                shared.queueSessionForPlayerCreation(session);
+                shared.process();
+
+                if (signalingBlocked) {
+                    assertSessionRejected(shared, session, signaling);
+                } else {
+                    assertSessionCreated(shared, session, signaling);
+                }
+                assertNull(shared.getSession(leg), "a relay leg must never be the player's address");
+            } finally {
+                shared.shutdown();
+            }
+        }
+    }
+
+    private static void assertSessionRejected(NetherNetInterface transport, NetherNetPlayerSession session,
+                                              InetSocketAddress address) {
+        assertAll(
+                () -> verify(MockServer.get().getPluginManager(), never()).callEvent(isA(PlayerCreationEvent.class)),
+                () -> verify(MockServer.get(), never()).addPlayer(any(), any()),
+                () -> assertNull(session.getPlayer(), "a blocked address must not create a Player"),
+                () -> assertNull(transport.getSession(address), "a blocked session must not enter the active map"),
+                () -> assertNotNull(session.getDisconnectReason(), "a blocked session must disconnect"));
+    }
+
+    private static void assertSessionCreated(NetherNetInterface transport, NetherNetPlayerSession session,
+                                             InetSocketAddress address) {
+        assertNotNull(session.getPlayer(), "an allowed address must create a Player");
+        assertSame(session, transport.getSession(address));
+        assertEquals(address, session.getPlayer().getRawSocketAddress());
+        assertNull(session.getDisconnectReason());
+        verify(MockServer.get()).addPlayer(address, session.getPlayer());
+    }
+
+    private static NetherNetPlayerSession activeSession(NetherNetInterface transport, InetSocketAddress signaling,
+                                                        InetSocketAddress media) {
+        NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
+        when(channel.signaledAddress()).thenReturn(new SourcedAddress(signaling, AddressSource.SIGNALING, null));
+        when(channel.remoteAddress()).thenReturn(media);
+        when(channel.isOpen()).thenReturn(true);
+        when(channel.isActive()).thenReturn(true);
+        when(channel.eventLoop()).thenReturn(mock(EventLoop.class));
+        when(channel.closeFuture()).thenReturn(mock(ChannelFuture.class));
+        return new NetherNetPlayerSession(transport, channel);
+    }
+
+    @Test
+    void sharedPortTakesThePlayerAddressFromSignaling() {
+        NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
+        InetSocketAddress client = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress leg = new InetSocketAddress("127.0.0.1", 52000);
+        when(channel.signaledAddress()).thenReturn(new SourcedAddress(client, AddressSource.SIGNALING, null));
+        when(channel.remoteAddress()).thenReturn(leg);
+
+        assertEquals(client, NetherNetInterface.playerAddress(channel, true),
+                "the media peer is the loopback leg, so identity comes from signaling");
+        assertEquals(leg, NetherNetInterface.playerAddress(channel, false),
+                "a dedicated media port reports the selected pair");
+    }
+
+    @Test
+    void sharedPortFallsBackToTheMediaAddressWhenSignalingNamesNothing() {
+        NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
+        InetSocketAddress leg = new InetSocketAddress("127.0.0.1", 52000);
+        when(channel.signaledAddress()).thenReturn(
+                new SourcedAddress(new InetSocketAddress(0), AddressSource.UNKNOWN, null));
+        when(channel.remoteAddress()).thenReturn(leg);
+
+        assertEquals(leg, NetherNetInterface.playerAddress(channel, true));
+    }
+
+    @Test
+    void resolvedIpv6FollowsTheMediaBinding() throws Exception {
+        InetAddress wildcard = InetAddress.getByName("0.0.0.0");
+        InetAddress ipv4 = InetAddress.getByName("192.168.1.5");
+        InetAddress ipv6 = InetAddress.getByName("2606:4700:4700::1111");
+
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, true, wildcard));
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, false, null),
+                "automatic media ports gather on every interface");
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, false, wildcard),
+                "direct ICE is independent of the RakNet IPv6 listener");
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, false, ipv6));
+        assertFalse(NetherNetInterface.includeResolvedIpv6(false, true, ipv4),
+                "an IPv4-bound direct socket cannot receive IPv6 media");
+        assertTrue(NetherNetInterface.includeResolvedIpv6(true, true, ipv4));
+        assertFalse(NetherNetInterface.includeResolvedIpv6(true, false, wildcard),
+                "shared mode needs the RakNet IPv6 listener");
+    }
+
     @Test
     void mediaUnreachableRequiresAttemptsFloorAndZeroIce() {
         assertTrue(NetherNetInterface.mediaUnreachable(snapshot(10, 0)),
@@ -122,6 +286,64 @@ class NetherNetInterfaceTest {
         assertEquals(2, simple.size(), "simple mode renders two lines");
         assertTrue(simple.get(0).contains("NetherNet"), "the summary line renders through lang.ini, got: " + simple.get(0));
         assertTrue(simple.get(1).contains("ICE"), "the funnel line names ICE, got: " + simple.get(1));
+    }
+
+    @Test
+    void netherNetMessagesExistInEveryBundledLanguage() throws IOException {
+        // 与 nukkit.palette.* 同一约定：六语言全量键覆盖 + placeholder 集合一致，缺失键会静默回退英文
+        // Same convention as nukkit.palette.*: full key parity across the six bundled languages
+        // with matching placeholder sets; a missing key silently falls back to English.
+        Map<String, String> eng = loadLangKeys("eng");
+        Map<String, String> keys = new HashMap<>();
+        eng.forEach((key, value) -> {
+            if (key.startsWith("nukkit.nethernet.")) {
+                keys.put(key, value);
+            }
+        });
+        assertFalse(keys.isEmpty(), "eng must define nukkit.nethernet.* keys");
+        assertTrue(keys.containsKey("nukkit.nethernet.disabled.hint"),
+                "the 1.26.60+ RakNet-removal startup hint must stay translated");
+
+        for (String folder : new String[]{"chs", "deu", "jpn", "rus", "vie"}) {
+            Map<String, String> lang = loadLangKeys(folder);
+            for (Map.Entry<String, String> entry : keys.entrySet()) {
+                String translated = lang.get(entry.getKey());
+                assertNotNull(translated, folder + " lacks " + entry.getKey());
+                assertEquals(placeholders(entry.getValue()), placeholders(translated),
+                        folder + "/" + entry.getKey() + " placeholder set differs from eng");
+            }
+        }
+    }
+
+    private static Map<String, String> loadLangKeys(String folder) throws IOException {
+        try (InputStream in = NetherNetInterfaceTest.class.getClassLoader()
+                .getResourceAsStream("lang/" + folder + "/lang.ini")) {
+            assertNotNull(in, folder + "/lang.ini missing from classpath");
+            Map<String, String> map = new HashMap<>();
+            for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                line = line.trim();
+                if (line.isEmpty() || line.charAt(0) == '#') {
+                    continue;
+                }
+                String[] split = line.split("=", 2);
+                if (split.length == 2) {
+                    map.put(split[0].trim(), split[1]);
+                }
+            }
+            return map;
+        }
+    }
+
+    private static List<String> placeholders(String text) {
+        // 文本中的占位符顺序随语序合法变化，比较时按集合处理 / placeholder order may shift with
+        // the language's word order, so compare as a set
+        List<String> found = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\\{%\\d+}").matcher(text);
+        while (matcher.find()) {
+            found.add(matcher.group());
+        }
+        found.sort(null);
+        return found;
     }
 
     @Test

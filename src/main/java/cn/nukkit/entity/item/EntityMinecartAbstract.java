@@ -17,6 +17,7 @@ import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMinecart;
 import cn.nukkit.level.GameRule;
+import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -461,6 +462,24 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
     private void processMovement(int dx, int dy, int dz, BlockRail block) {
         fallDistance = 0.0F;
+        if (getClass() == EntityMinecartEmpty.class && block.getClass() == BlockRail.class
+                && passengers.isEmpty() && motionX == 0 && motionZ == 0
+                && motionY == -0.03999999910593033D && maxSpeed > 0 && y == dy + 0.5D) {
+            int meta = block.getRealMeta();
+            if ((meta == 0 && x == dx + 0.5D) || (meta == 1 && z == dz + 0.5D)) {
+                // Flat, aligned carts need no rail projection scans. Keep support and collision checks live.
+                y = dy;
+                x = meta == 0 ? dx + 0.5D : dx + (x - dx);
+                z = meta == 1 ? dz + 0.5D : dz + (z - dz);
+                motionX = 0;
+                motionZ = 0;
+                setPosition(new Vector3(x, y, z));
+                onGround = !new Position(x, y - 1, z, level).getLevelBlock().canPassThrough();
+                applyDrag();
+                setPosition(new Vector3(x, dy + 0.5D, z));
+                return;
+            }
+        }
         Vector3 vector = getNextRail(x, y, z);
 
         y = dy;

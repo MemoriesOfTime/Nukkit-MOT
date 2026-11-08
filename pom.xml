@@ -51,7 +51,7 @@
         <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
 
         <caffeine.version>3.2.3</caffeine.version>
-        <guava.version>33.1.0-jre</guava.version>
+        <guava.version>33.7.2-jre</guava.version>
         <gson.version>2.13.2</gson.version>
         <fastutil.version>8.5.15</fastutil.version>
         <snakeyaml.version>2.5</snakeyaml.version>
@@ -87,6 +87,9 @@
 
         <error-prone.version>2.41.0</error-prone.version>
         <maven.shade.skip>false</maven.shade.skip>
+        <!-- 分配/性能测量默认不进入 mvn test；-Pperf 反向选择 perf 标签 -->
+        <test.groups></test.groups>
+        <test.excludedGroups>perf</test.excludedGroups>
         <!-- Reproducible build: entry timestamps follow the last commit time -->
         <project.build.outputTimestamp>${git.commit.time}</project.build.outputTimestamp>
     </properties>
@@ -154,6 +157,11 @@
                 <artifactId>expiringmap</artifactId>
                 <version>0.5.11</version>
             </dependency>
+            <dependency>
+                <groupId>org.jspecify</groupId>
+                <artifactId>jspecify</artifactId>
+                <version>1.0.1</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -162,7 +170,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-nethernet</artifactId>
-            <version>2.0.0.CR6-20261023.132252-11</version>
+            <version>2.0.0.CR6-20261105.090937-25</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -178,7 +186,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-common</artifactId>
-            <version>2.0.0.CR6-20261023.132252-11</version>
+            <version>2.0.0.CR6-20261105.090937-25</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -190,13 +198,13 @@
         <dependency>
             <groupId>dev.opencollab</groupId>
             <artifactId>libdatachannel-java</artifactId>
-            <version>0.24.6.0-20261023.142230-9</version>
+            <version>0.24.6.0-20261105.085043-11</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>dev.opencollab</groupId>
             <artifactId>libdatachannel-java-arch-detect</artifactId>
-            <version>0.24.6.0-20261023.142230-9</version>
+            <version>0.24.6.0-20261105.085043-11</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -260,6 +268,12 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-handler</artifactId>
+            <version>${netty.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>com.nukkitx</groupId>
             <artifactId>natives</artifactId>
             <version>${nukkitx-natives.version}</version>
@@ -308,6 +322,12 @@
                     <artifactId>error_prone_annotations</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+            <version>3.42.0</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -750,6 +770,13 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.5</version>
+                <configuration>
+                    <!-- 隐式异常（NPE/AIOOBE）不走 fast-throw 预分配，测试才可比异常消息文本 -->
+                    <!-- Keep implicit-exception messages intact so tests can compare them -->
+                    <argLine>@{argLine} -XX:-OmitStackTraceInFastThrow -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                    <groups>${test.groups}</groups>
+                    <excludedGroups>${test.excludedGroups}</excludedGroups>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -805,6 +832,7 @@
                             <arguments>
                                 <argument>${project.build.directory}/dependency-list.txt</argument>
                                 <argument>${project.build.outputDirectory}/DEPENDENCIES.txt</argument>
+                                <argument>${settings.localRepository}</argument>
                             </arguments>
                         </configuration>
                     </execution>
@@ -1040,13 +1068,115 @@
                     <plugin>
                         <groupId>org.sonatype.central</groupId>
                         <artifactId>central-publishing-maven-plugin</artifactId>
-                        <version>0.11.0</version>
+                        <version>0.12.0</version>
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
                         </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>skip-tests</id>
+            <properties>
+                <maven.test.skip>true</maven.test.skip>
+            </properties>
+        </profile>
+        <!--
+          分配量基准。这些类名为 *Benchmark、以 main() 运行，surefire 不会拾取，
+          因此默认 mvn test 完全不受影响。按需显式执行：
+            mvn -Pperf test-compile exec:exec@viewer-benchmark exec:exec@attack-benchmark
+          之所以独立出来：每次调用的绝对分配字节数取决于 JIT 内联与逃逸分析、JDK 版本与 CPU 架构，
+          把它当作 CI 门禁会让无关改动随机变红。功能行为由普通测试断言。
+        -->
+        <profile>
+            <id>perf</id>
+            <properties>
+                <!-- 只跑 @Tag("perf") 的分配测量，默认 test 排除它们 -->
+                <test.groups>perf</test.groups>
+                <test.excludedGroups></test.excludedGroups>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>viewer-benchmark</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <classpathScope>test</classpathScope>
+                                    <arguments>
+                                        <argument>-XX:-DoEscapeAnalysis</argument>
+                                        <argument>-Xms256m</argument>
+                                        <argument>-Xmx512m</argument>
+                                        <argument>-cp</argument>
+                                        <classpath/>
+                                        <argument>cn.nukkit.entity.EntityViewerSnapshotBenchmark</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>attack-benchmark</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <classpathScope>test</classpathScope>
+                                    <arguments>
+                                        <argument>-XX:-DoEscapeAnalysis</argument>
+                                        <argument>-Xms256m</argument>
+                                        <argument>-Xmx512m</argument>
+                                        <argument>-cp</argument>
+                                        <classpath/>
+                                        <argument>cn.nukkit.entity.mob.EntityZombieAttackBenchmark</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!--
+          真实交叉编解码覆盖率：先跑测试（写 target/packet-coverage.txt），再运行报告。
+          用法: mvn -Pcoverage test exec:exec@packet-coverage
+          报告退出码非 0 表示没有实际执行记录，或有测试声明覆盖但从未执行。
+        -->
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>packet-coverage</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <classpathScope>test</classpathScope>
+                                    <arguments>
+                                        <argument>-cp</argument>
+                                        <classpath/>
+                                        <argument>cn.nukkit.network.protocol.regression.PacketCoverageReport</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>

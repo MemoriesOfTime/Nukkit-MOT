@@ -74,19 +74,20 @@ public class BlockFence extends BlockTransparentMeta {
         return ItemTool.TYPE_AXE;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Oak Fence",
+            "Spruce Fence",
+            "Birch Fence",
+            "Jungle Fence",
+            "Acacia Fence",
+            "Dark Oak Fence",
+            "",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Oak Fence",
-                "Spruce Fence",
-                "Birch Fence",
-                "Jungle Fence",
-                "Acacia Fence",
-                "Dark Oak Fence",
-                "",
-                ""
-        };
-        return names[this.getDamage() & 0x07];
+        return NAMES[this.getDamage() & 0x07];
     }
 
     /** Post and arms instead of one stretched box; see {@link CrossCollisionShape}. */

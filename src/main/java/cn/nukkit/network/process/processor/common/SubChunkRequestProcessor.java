@@ -28,8 +28,12 @@ import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
@@ -75,6 +79,10 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
     // packets (entries are self-describing, partial answers are legal)
     private static final int MAX_RESPONSE_PACKET_BYTES = 2 * 1024 * 1024;
 
+    // 14-bit offset index (packet cap 8192); the high bits carry the distance
+    private static final int OFFSET_INDEX_BITS = 14;
+    private static final int OFFSET_INDEX_MASK = (1 << OFFSET_INDEX_BITS) - 1;
+
     // 测试注入同步执行器；生产路径恒为 null（走 level.getAsyncChuckExecutor()）
     // / Test seam for a synchronous executor; always null in production (level.getAsyncChuckExecutor())
     static volatile ExecutorService executorOverride;
@@ -96,10 +104,10 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull SubChunkRequestPacket pk) {
         Player player = playerHandle.player;
-        if (!player.isSubChunkPullMode()) {
+        PlayerSubChunkRequestState state = playerHandle.getSubChunkRequestState();
+        if (!player.isSubChunkPullMode() && (state == null || !state.hasPullChunks())) {
             return;
         }
-        PlayerSubChunkRequestState state = playerHandle.getSubChunkRequestState();
         // 构造器可被 mock 框架绕过，状态对象未必已初始化 / constructors can be bypassed
         // (mocks), the state object may be uninitialized
         if (state == null) {
@@ -132,17 +140,29 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         if (state == null) {
             return;
         }
+        Player player = playerHandle.player;
+        Level sourceLevel = player.getLevel();
+        int sourceEpoch = state.epoch();
         sendCompletions(playerHandle, state);
+        if (state.epoch() != sourceEpoch || player.getLevel() != sourceLevel) {
+            return;
+        }
         if (!state.hasDeferred()) {
             return;
         }
-        Player player = playerHandle.player;
         int tick = player.getServer().getTick();
         state.drain(
                 (pk, budget) -> submitSubChunkRequest(playerHandle, pk, budget),
                 state.remainingInFlightOffsets(),
-                () -> !state.responseBytesExceeded(tick)
-                        && state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) > 0);
+                () -> state.epoch() == sourceEpoch && player.getLevel() == sourceLevel
+                        && !state.responseBytesExceeded(tick)
+                        && state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) > 0,
+                // serve the request nearest the player first
+                pk -> {
+                    long dx = pk.subChunkPosition.x - player.getChunkX();
+                    long dz = pk.subChunkPosition.z - player.getChunkZ();
+                    return dx * dx + dz * dz;
+                });
     }
 
     /**
@@ -165,6 +185,47 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
     }
 
     /**
+     * 按到玩家的距离重排 offset，同距保持原序。
+     * <p>
+     * Reorders offsets by distance to the player; equal distances keep their order.
+     */
+    private static List<BlockVector3> nearestFirst(List<BlockVector3> offsets, BlockVector3 center, Player player) {
+        int n = offsets.size();
+        if (n <= 1) {
+            return offsets;
+        }
+        int playerX = player.getChunkX();
+        int playerZ = player.getChunkZ();
+        long[] order = new long[n];
+        for (int i = 0; i < n; i++) {
+            BlockVector3 offset = offsets.get(i);
+            int dx = center.x + offset.x - playerX;
+            int dz = center.z + offset.z - playerZ;
+            // distance high, index low: one sort, nearest-first with stable ties
+            order[i] = (((long) dx * dx + (long) dz * dz) << OFFSET_INDEX_BITS) | i;
+        }
+        Arrays.sort(order);
+        List<BlockVector3> sorted = new ArrayList<>(n);
+        for (long key : order) {
+            sorted.add(offsets.get((int) (key & OFFSET_INDEX_MASK)));
+        }
+        return sorted;
+    }
+
+    private static void accountSubmittedOffsets(PlayerSubChunkRequestState state, SubChunkRequestPacket pk,
+                                                List<BlockVector3> offsets, int count) {
+        for (int i = 0; i < count; i++) {
+            BlockVector3 offset = offsets.get(i);
+            state.addOutstandingOffsets(
+                    Level.chunkHash(pk.subChunkPosition.x + offset.x, pk.subChunkPosition.z + offset.z), 1);
+        }
+    }
+
+    private static long columnHashOf(SubChunkRequestPacket request, BlockVector3 offset) {
+        return Level.chunkHash(request.subChunkPosition.x + offset.x, request.subChunkPosition.z + offset.z);
+    }
+
+    /**
      * 提交至多 {@code maxOffsets} 个 offset 的异步序列化：主线程快照（section 引用/方块
      * 实体列表/高度图克隆），worker 构建条目并回传完成队列；未提交的剩余 offset 重排队尾。
      * 提交批次保守钳制到剩余条目预算，保证执行器不可用时同步序列化也有工作量上限。
@@ -183,7 +244,7 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         PlayerSubChunkRequestState state = playerHandle.getSubChunkRequestState();
         boolean cacheMode = player.isClientBlobCacheActive();
         Level level = player.getLevel();
-        List<BlockVector3> offsets = subChunkRequestOffsets(pk);
+        List<BlockVector3> offsets = nearestFirst(subChunkRequestOffsets(pk), pk.subChunkPosition, player);
         int limit = Math.min(maxOffsets, offsets.size());
 
         if (level == null || pk.dimension != level.getDimension()) {
@@ -205,7 +266,19 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             return 0;
         }
 
-        SubChunkTask task = buildSubChunkTask(playerHandle, state, pk, offsets, granted, cacheMode, level);
+        int requestEpoch = state.epoch();
+        SubChunkTask task;
+        try {
+            task = buildSubChunkTask(playerHandle, state, pk, offsets, granted, cacheMode, level);
+        } catch (RuntimeException | Error failure) {
+            if (state.epoch() == requestEpoch) {
+                state.releaseInFlightOffsets(granted);
+                state.tryDefer(pk);
+            }
+            throw failure;
+        }
+        // account only after a successful snapshot
+        accountSubmittedOffsets(state, pk, offsets, granted);
         ExecutorService executor = executorOverride != null ? executorOverride : level.getAsyncChuckExecutor();
         if (executor == null) {
             // async-chunks=false：该 level 无异步执行器，同步兜底（与执行器关停同路径）
@@ -222,7 +295,7 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 dispatchAnswer(playerHandle, state, buildAnswerSafely(task));
             }
         }
-        if (granted < offsets.size()) {
+        if (state.epoch() == requestEpoch && player.getLevel() == level && granted < offsets.size()) {
             requeueSubChunkRequestResidual(state, pk, offsets, granted);
         }
         return granted;
@@ -250,7 +323,8 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
 
         SubChunkOffsetData[] data = new SubChunkOffsetData[count];
         for (int i = 0; i < count; i++) {
-            BlockVector3 offset = offsets.get(i);
+            BlockVector3 originalOffset = offsets.get(i);
+            BlockVector3 offset = new BlockVector3(originalOffset.x, originalOffset.y, originalOffset.z);
             int chunkX = pk.subChunkPosition.x + offset.x;
             int chunkZ = pk.subChunkPosition.z + offset.z;
             int subIndex = pk.subChunkPosition.y + offset.y - minSectionY;
@@ -263,32 +337,43 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             long chunkHash = Level.chunkHash(chunkX, chunkZ);
             boolean inView = player.usedChunks instanceof Long2ObjectMap<?> chunks
                     ? chunks.containsKey(chunkHash) : player.usedChunks.containsKey(chunkHash);
-            BaseFullChunk chunk = inView
+            boolean issued = player.isSubChunkPullMode() || state.hasPullChunk(chunkHash);
+            BaseFullChunk chunk = inView && issued
                     ? level.getChunkIfLoaded(chunkX, chunkZ) : null;
-            if (!(chunk instanceof BaseChunk)) {
+            if (!(chunk instanceof BaseChunk baseChunk)) {
                 data[i] = SubChunkOffsetData.cheap(offset, subIndex, SubChunkRequestResult.CHUNK_NOT_FOUND);
                 continue;
             }
             short[] heights = chunk.getHeightMapArray().clone();
-            ChunkSection[] sections = ((BaseChunk) chunk).getSections();
-            if (subIndex >= sections.length || sections[subIndex] == null || sections[subIndex].isEmpty()) {
+            ChunkSection[] sections = baseChunk.getSections();
+            // sections[worldSectionY + getSectionOffset()] — resolve through the chunk's own offset
+            int worldSectionY = subIndex + minSectionY;
+            int storageIndex = worldSectionY + baseChunk.getSectionOffset();
+            if (storageIndex < 0 || storageIndex >= sections.length
+                    || sections[storageIndex] == null || sections[storageIndex].isEmpty()) {
                 data[i] = SubChunkOffsetData.allAir(offset, subIndex, heights);
                 continue;
             }
-            data[i] = SubChunkOffsetData.serialize(offset, subIndex, sections[subIndex], heights,
-                    chunk.getBlockEntitiesOfSection(subIndex + minSectionY));
+            data[i] = SubChunkOffsetData.serialize(offset, subIndex, sections[storageIndex], heights,
+                    chunk.getBlockEntitiesOfSection(worldSectionY));
         }
-        return new SubChunkTask(state, state.epoch(), pk, cacheMode, gameVersion, antiXray, minSectionY,
-                player.getName() + "(" + player.getId() + ")", data);
+        SubChunkRequestPacket frozen = new SubChunkRequestPacket();
+        frozen.dimension = pk.dimension;
+        frozen.subChunkPosition = new BlockVector3(pk.subChunkPosition.x, pk.subChunkPosition.y, pk.subChunkPosition.z);
+        Map<Long, Object> receipts = new HashMap<>();
+        for (SubChunkOffsetData offset : data) {
+            long column = columnHashOf(frozen, offset.offset);
+            receipts.put(column, state.columnReceipt(column));
+        }
+        return new SubChunkTask(state, state.epoch(), frozen, cacheMode, gameVersion, antiXray, minSectionY,
+                player.getName() + "(" + player.getId() + ")", data, level, receipts);
     }
 
     /**
-     * worker 入口：构建完成应答并入队回主线程；任何异常都收敛为空条目应答（额度照常归还，
-     * 不楔死该玩家的管线）。
+     * worker 入口：构建应答并入队；循环外失败收敛为空条目应答。
      * <p>
-     * Worker entry: builds the completion and queues it back to the main thread; any
-     * failure collapses into an empty-entry answer (the credit is still released, so the
-     * player's pipeline cannot wedge).
+     * Worker entry: builds and queues the answer; failures outside the loop collapse
+     * into an empty answer.
      */
     private static void runSerializationTask(SubChunkTask task) {
         task.state.offerCompletion(buildAnswerSafely(task));
@@ -298,9 +383,13 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         try {
             return buildAnswer(task);
         } catch (Throwable t) {
-            Server.getInstance().getLogger().error("Sub-chunk serialization failed for " + task.playerName, t);
+            Server server = Server.getInstance();
+            if (server != null) {
+                server.getLogger().error("Sub-chunk serialization failed for " + task.playerName, t);
+            }
             return new PlayerSubChunkRequestState.CompletedSubChunkAnswer(task.epoch, task.request,
-                    task.cacheMode, new ArrayList<>(), null, null, null, task.offsets.length);
+                    task.cacheMode, new ArrayList<>(), null, null, null, task.offsets.length,
+                    task.sourceLevel, task.columnReceipts, submittedOffsets(task));
         }
     }
 
@@ -326,25 +415,30 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 SubChunkOffsetData od = task.offsets[i];
                 SubChunkPacket.SubChunkData entry = new SubChunkPacket.SubChunkData();
                 entry.offset = od.offset;
-                if (od.preset != null) {
-                    entry.result = od.preset;
-                    if (od.preset == SubChunkRequestResult.SUCCESS_ALL_AIR) {
+                try {
+                    if (od.preset != null) {
+                        entry.result = od.preset;
+                        if (od.preset == SubChunkRequestResult.SUCCESS_ALL_AIR) {
+                            computeHeightMap(entry, od.heights, od.subIndex, task.minSectionY);
+                        }
+                    } else {
+                        stream.reset();
+                        od.section.writeTo(task.gameVersion, stream, task.antiXray);
+                        byte[] sectionBytes = task.cacheMode ? stream.getBuffer() : null;
+                        byte[] entityBytes = NetworkChunkSerializer.serializeBlockEntities(od.blockEntities, task.gameVersion.getProtocol());
                         computeHeightMap(entry, od.heights, od.subIndex, task.minSectionY);
+                        entry.result = SubChunkRequestResult.SUCCESS;
+                        stream.put(entityBytes);
+                        entry.data = stream.getBuffer();
+                        if (task.cacheMode) {
+                            hashes[i] = XXHash64.hash(sectionBytes);
+                            sections[i] = sectionBytes;
+                            entities[i] = entityBytes;
+                        }
                     }
-                } else {
-                    stream.reset();
-                    od.section.writeTo(task.gameVersion, stream, task.antiXray);
-                    byte[] sectionBytes = task.cacheMode ? stream.getBuffer() : null;
-                    byte[] entityBytes = NetworkChunkSerializer.serializeBlockEntities(od.blockEntities, task.gameVersion.getProtocol());
-                    computeHeightMap(entry, od.heights, od.subIndex, task.minSectionY);
-                    entry.result = SubChunkRequestResult.SUCCESS;
-                    stream.put(entityBytes);
-                    entry.data = stream.getBuffer();
-                    if (task.cacheMode) {
-                        hashes[i] = XXHash64.hash(sectionBytes);
-                        sections[i] = sectionBytes;
-                        entities[i] = entityBytes;
-                    }
+                } catch (Throwable t) {
+                    // degrade only this entry, keep the rest of the batch
+                    degradeEntry(entry, hashes, sections, entities, i, task, t);
                 }
                 entries.add(entry);
             }
@@ -352,7 +446,35 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             ThreadCache.releaseBinaryStream(stream);
         }
         return new PlayerSubChunkRequestState.CompletedSubChunkAnswer(task.epoch, task.request,
-                task.cacheMode, entries, hashes, sections, entities, n);
+                task.cacheMode, entries, hashes, sections, entities, n,
+                task.sourceLevel, task.columnReceipts, submittedOffsets(task));
+    }
+
+    /**
+     * 把失败条目降级为 CHUNK_NOT_FOUND 并清掉写了一半的缓存材料。
+     * <p>
+     * Degrades a failed entry to CHUNK_NOT_FOUND and clears half-written cache material.
+     */
+    private static void degradeEntry(SubChunkPacket.SubChunkData entry, long[] hashes, byte[][] sections,
+                                     byte[][] entities, int index, SubChunkTask task, Throwable failure) {
+        entry.result = SubChunkRequestResult.CHUNK_NOT_FOUND;
+        entry.data = null;
+        entry.heightMapType = SubChunkPacket.HeightMapDataType.NO_DATA;
+        entry.heightMapData = null;
+        entry.renderHeightMapType = SubChunkPacket.HeightMapDataType.NO_DATA;
+        entry.renderHeightMapData = null;
+        entry.hasBlobId = false;
+        entry.blobId = 0;
+        if (hashes != null) {
+            hashes[index] = 0;
+            sections[index] = null;
+            entities[index] = null;
+        }
+        Server server = Server.getInstance();
+        if (server != null) {
+            server.getLogger().error("Sub-chunk serialization failed for " + task.playerName
+                    + " at " + entry.offset, failure);
+        }
     }
 
     /**
@@ -368,8 +490,11 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
      */
     private static void sendCompletions(PlayerHandle playerHandle, PlayerSubChunkRequestState state) {
         Player player = playerHandle.player;
+        Level sourceLevel = player.getLevel();
+        int sourceEpoch = state.epoch();
         int tick = player.getServer().getTick();
-        while (!state.responseBytesExceeded(tick)
+        while (state.epoch() == sourceEpoch && player.getLevel() == sourceLevel
+                && !state.responseBytesExceeded(tick)
                 && state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) > 0) {
             PlayerSubChunkRequestState.CompletedSubChunkAnswer answer = state.pollCompletion();
             if (answer == null) {
@@ -378,7 +503,9 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             if (answer.epoch != state.epoch()) {
                 continue;
             }
-            dispatchAnswer(playerHandle, state, answer);
+            if (!dispatchAnswer(playerHandle, state, answer)) {
+                return;
+            }
         }
     }
 
@@ -386,58 +513,190 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
      * 派发一个完成应答：cache 模式先做 blob 跟踪（成功→条目改 blob 形态；pending 打满→
      * 降级 raw，翻包是粘性的），随后按原字节预算/包级缓存一致性拆包发送。条目预算只对
      * 昂贵条目生效；预算中途耗尽的剩余条目构造残余应答推回队头，已发送部分归还 in-flight
-     * 额度。全廉价应答在预算 0 时也整包发送（与原同步路径一致——廉价条目不占预算）。
+     * 额度。廉价条目不占条目预算，但仍受共享字节预算约束。
      * <p>
      * Dispatches one completion: cache mode tracks blobs first (success rewrites the
      * entry into blob form; a full pending cap degrades to raw, and the flip is sticky),
      * then sends under the original byte budget and packet-level cache consistency. The
      * entry budget applies to expensive entries only; entries left over when it runs out
      * form a residual answer pushed back to the head, and the sent portion releases its
-     * in-flight credit. An all-cheap answer still sends in full at budget 0 (matching the
-     * old synchronous path — cheap entries cost no budget).
+     * in-flight credit. Cheap entries consume no entry budget, but their wire bytes
+     * remain subject to the shared per-tick response byte budget.
+     *
+     * @return whether the answer was fully consumed; false stops draining when a residual cannot fit
      */
-    private static void dispatchAnswer(PlayerHandle playerHandle, PlayerSubChunkRequestState state,
+    private static boolean dispatchAnswer(PlayerHandle playerHandle, PlayerSubChunkRequestState state,
                                        PlayerSubChunkRequestState.CompletedSubChunkAnswer answer) {
         Player player = playerHandle.player;
+        Level sourceLevel = player.getLevel();
+        if (answer.epoch != state.epoch()) {
+            return true;
+        }
         int tick = player.getServer().getTick();
         int stopAt = state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player));
         List<SubChunkPacket.SubChunkData> entries = answer.entries;
 
-        SubChunkResponseBuffer buffer = new SubChunkResponseBuffer(answer.request, answer.cacheMode, player::dataPacket);
+        if (answer.sourceLevel != null && answer.sourceLevel != sourceLevel) {
+            state.releaseInFlightOffsets(answer.offsets);
+            return true;
+        }
+        // Keep receipt coordinates separate from mutable packet entries exposed to listeners.
+        List<BlockVector3> submitted = answer.submittedOffsets != null ? answer.submittedOffsets
+                : entries.stream().map(entry -> new BlockVector3(entry.offset.x, entry.offset.y, entry.offset.z)).toList();
+        Map<SubChunkPacket.SubChunkData, Integer> entryIndices = new IdentityHashMap<>();
+        boolean[] delivered = new boolean[submitted.size()];
+        boolean[] settled = new boolean[submitted.size()];
+        for (int i = 0; i < entries.size(); i++) entryIndices.put(entries.get(i), i);
+        SubChunkResponseBuffer buffer = new SubChunkResponseBuffer(answer.request, answer.cacheMode, packet -> {
+            // dataPacket invokes arbitrary listeners; snapshot membership/results before entering them.
+            List<SubChunkPacket.SubChunkData> packetEntries = new ArrayList<>(packet.subChunks);
+            boolean[] successful = new boolean[packetEntries.size()];
+            for (int i = 0; i < packetEntries.size(); i++) {
+                SubChunkRequestResult result = packetEntries.get(i).result;
+                successful[i] = result == SubChunkRequestResult.SUCCESS || result == SubChunkRequestResult.SUCCESS_ALL_AIR;
+            }
+            boolean accepted = player.dataPacket(packet);
+            if (!currentAnswer(player, state, answer, sourceLevel)) throw new DeliveryInterruptedException();
+            for (int i = 0; i < packetEntries.size(); i++) {
+                Integer index = entryIndices.get(packetEntries.get(i));
+                if (index == null || settled[index]) continue;
+                BlockVector3 offset = submitted.get(index);
+                if (currentColumn(state, answer, offset)) {
+                    long column = columnHashOf(answer.request, offset);
+                    int sectionY = answer.request.subChunkPosition.y + offset.y;
+                    SubChunkPacket.SubChunkData sentEntry = packetEntries.get(i);
+                    boolean unchanged = packet.subChunks.size() == packetEntries.size() && packet.subChunks.get(i) == sentEntry
+                            && sentEntry.offset.x == offset.x && sentEntry.offset.y == offset.y && sentEntry.offset.z == offset.z
+                            && packet.centerPosition.x == answer.request.subChunkPosition.x
+                            && packet.centerPosition.y == answer.request.subChunkPosition.y
+                            && packet.centerPosition.z == answer.request.subChunkPosition.z
+                            && (sentEntry.result == SubChunkRequestResult.SUCCESS || sentEntry.result == SubChunkRequestResult.SUCCESS_ALL_AIR);
+                    if (accepted && successful[i] && unchanged) {
+                        state.completeOutstandingOffsets(column, 1, sectionY);
+                        delivered[index] = true;
+                    } else {
+                        releaseUndelivered(state, answer, sourceLevel, offset);
+                    }
+                }
+                settled[index] = true;
+            }
+            if (!accepted) throw new DeliveryInterruptedException();
+        });
         int sent = 0;
         int spent = 0;
-        for (; sent < entries.size(); sent++) {
-            SubChunkPacket.SubChunkData entry = entries.get(sent);
-            if (entry.result == SubChunkRequestResult.SUCCESS && (spent >= stopAt || state.responseBytesExceeded(tick))) {
-                break;
-            }
-            boolean trackBlob = buffer.isCacheMode();
-            if (trackBlob && entry.result == SubChunkRequestResult.SUCCESS && answer.blobHashes[sent] != 0) {
-                if (player.tryTrackClientCacheBlob(answer.blobHashes[sent], answer.blobSections[sent])) {
-                    entry.blobId = answer.blobHashes[sent];
-                    entry.hasBlobId = true;
-                    entry.data = answer.blobEntities[sent];
-                } else if (answer.blobEntities[sent].length == 0) {
-                    entry.data = answer.blobSections[sent];
+        int retainedFrom = submitted.size();
+        boolean completed = false;
+        try {
+            for (; sent < entries.size(); sent++) {
+                if (!currentAnswer(player, state, answer, sourceLevel)) return false;
+                SubChunkPacket.SubChunkData entry = entries.get(sent);
+                if (!currentColumn(state, answer, submitted.get(sent))) {
+                    settled[sent] = true; // A replacement shell owns a different outstanding ledger.
+                    continue;
                 }
-                // else: pending 超限降级 raw —— data 已是 section+entities 拼接形态 / pending
-                // over cap degrades to raw — data already holds the section+entities assembly
+                if (state.responseBytesExceeded(tick)
+                        || (entry.result == SubChunkRequestResult.SUCCESS
+                        && (spent >= stopAt || state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) == 0))) break;
+                boolean trackBlob = buffer.isCacheMode();
+                byte[] originalData = entry.data;
+                long originalBlobId = entry.blobId;
+                boolean originalHasBlobId = entry.hasBlobId;
+                if (trackBlob && entry.result == SubChunkRequestResult.SUCCESS && answer.blobHashes[sent] != 0) {
+                    if (player.tryTrackClientCacheBlob(answer.blobHashes[sent], answer.blobSections[sent])) {
+                        entry.blobId = answer.blobHashes[sent];
+                        entry.hasBlobId = true;
+                        entry.data = answer.blobEntities[sent];
+                    } else if (answer.blobEntities[sent].length == 0) {
+                        entry.data = answer.blobSections[sent];
+                    }
+                }
+                int entryBytes = subChunkEntryWireBytes(entry);
+                if (entryBytes > state.remainingResponseBytes(tick) && state.hasResponseBytes(tick)) {
+                    entry.data = originalData; entry.blobId = originalBlobId; entry.hasBlobId = originalHasBlobId;
+                    break;
+                }
+                state.accountResponseBytes(tick, entryBytes);
+                if (entry.result == SubChunkRequestResult.SUCCESS) {
+                    spent++;
+                    state.accountSpentEntries(tick, 1);
+                    if (trackBlob && !entry.hasBlobId) {
+                        buffer.degradeToRaw();
+                        if (!currentAnswer(player, state, answer, sourceLevel)) return false;
+                    }
+                }
+                buffer.add(entry);
+                if (!currentAnswer(player, state, answer, sourceLevel)) return false;
             }
-            if (entry.result == SubChunkRequestResult.SUCCESS) {
-                spent++;
-                if (trackBlob && !entry.hasBlobId) {
-                    buffer.degradeToRaw();
+            buffer.flush();
+            if (!currentAnswer(player, state, answer, sourceLevel)) return false;
+            if (sent < entries.size()) {
+                state.pushCompletionFront(residual(answer, sent));
+                retainedFrom = sent;
+            }
+            completed = sent == entries.size();
+            return completed;
+        } catch (DeliveryInterruptedException cancelled) {
+            return false;
+        } finally {
+            if (currentAnswer(player, state, answer, sourceLevel)) {
+                List<BlockVector3> retry = new ArrayList<>();
+                for (int i = 0; i < retainedFrom; i++) {
+                    BlockVector3 offset = submitted.get(i);
+                    if (!currentColumn(state, answer, offset)) continue;
+                    if (!settled[i]) releaseUndelivered(state, answer, sourceLevel, offset);
+                    // Explicit failure results are returned to the client. Cancelled/abandoned sends
+                    // also get a bounded server retry, without claiming that they were delivered.
+                    if (!delivered[i] && (!settled[i] || !completed)) retry.add(offset);
+                }
+                state.releaseInFlightOffsets(retainedFrom == submitted.size() ? answer.offsets : retainedFrom);
+                if (!retry.isEmpty()) {
+                    SubChunkRequestPacket request = new SubChunkRequestPacket();
+                    request.dimension = answer.request.dimension;
+                    request.subChunkPosition = new BlockVector3(answer.request.subChunkPosition.x,
+                            answer.request.subChunkPosition.y, answer.request.subChunkPosition.z);
+                    request.positionOffsets = retry;
+                    state.tryDefer(request);
                 }
             }
-            state.accountResponseBytes(tick, buffer.add(entry));
         }
-        buffer.flush();
-        state.accountSpentEntries(tick, spent);
-        state.releaseInFlightOffsets(sent == entries.size() ? answer.offsets : sent);
+    }
 
-        if (sent < entries.size()) {
-            state.pushCompletionFront(residual(answer, sent));
+    private static boolean currentAnswer(Player player, PlayerSubChunkRequestState state,
+                                         PlayerSubChunkRequestState.CompletedSubChunkAnswer answer, Level level) {
+        return state.epoch() == answer.epoch && player.getLevel() == level;
+    }
+
+    private static boolean currentColumn(PlayerSubChunkRequestState state,
+                                         PlayerSubChunkRequestState.CompletedSubChunkAnswer answer, BlockVector3 offset) {
+        if (answer.columnReceipts == null) return true; // Compatibility for pre-existing synthetic completions.
+        long column = columnHashOf(answer.request, offset);
+        Object receipt = answer.columnReceipts.get(column);
+        return answer.columnReceipts.containsKey(column) && state.columnReceipt(column) == receipt;
+    }
+
+    private static void releaseUndelivered(PlayerSubChunkRequestState state,
+                                           PlayerSubChunkRequestState.CompletedSubChunkAnswer answer, Level level, BlockVector3 offset) {
+        int sectionY = answer.request.subChunkPosition.y + offset.y;
+        DimensionData dimension = level.getDimensionData();
+        // Invalid vertical probes have no terrain obligation; only valid sections retain missing markers.
+        if (dimension != null && sectionY >= dimension.getMinSectionY()
+                && sectionY < dimension.getMinSectionY() + (dimension.getHeight() >> 4)) {
+            state.releaseOutstandingOffsets(columnHashOf(answer.request, offset), 1, sectionY);
+        } else {
+            state.releaseOutstandingOffsets(columnHashOf(answer.request, offset), 1);
         }
+    }
+
+    private static final class DeliveryInterruptedException extends RuntimeException {
+        private DeliveryInterruptedException() { super(null, null, false, false); }
+    }
+
+    private static List<BlockVector3> submittedOffsets(SubChunkTask task) {
+        List<BlockVector3> result = new ArrayList<>(task.offsets.length);
+        for (SubChunkOffsetData offset : task.offsets) {
+            result.add(new BlockVector3(offset.offset.x, offset.offset.y, offset.offset.z));
+        }
+        return result;
     }
 
     /**
@@ -462,13 +721,14 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
             System.arraycopy(answer.blobEntities, from, entities, 0, n);
         }
         return new PlayerSubChunkRequestState.CompletedSubChunkAnswer(answer.epoch, answer.request,
-                answer.cacheMode, rest, hashes, sections, entities, rest.size());
+                answer.cacheMode, rest, hashes, sections, entities, rest.size(), answer.sourceLevel, answer.columnReceipts,
+                answer.submittedOffsets == null ? null : new ArrayList<>(answer.submittedOffsets.subList(from, answer.submittedOffsets.size())));
     }
 
     static SubChunkPacket newSubChunkResponse(SubChunkRequestPacket pk, boolean cacheMode) {
         SubChunkPacket resp = new SubChunkPacket();
         resp.dimension = pk.dimension;
-        resp.centerPosition = pk.subChunkPosition;
+        resp.centerPosition = new BlockVector3(pk.subChunkPosition.x, pk.subChunkPosition.y, pk.subChunkPosition.z);
         resp.cacheEnabled = cacheMode;
         return resp;
     }
@@ -603,10 +863,20 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         final int minSectionY;
         final String playerName;
         final SubChunkOffsetData[] offsets;
+        final Level sourceLevel;
+        final Map<Long, Object> columnReceipts;
 
         SubChunkTask(PlayerSubChunkRequestState state, int epoch, SubChunkRequestPacket request, boolean cacheMode,
                      GameVersion gameVersion, boolean antiXray, int minSectionY, String playerName,
                      SubChunkOffsetData[] offsets) {
+            this(state, epoch, request, cacheMode, gameVersion, antiXray, minSectionY, playerName, offsets, null, null);
+        }
+
+        SubChunkTask(PlayerSubChunkRequestState state, int epoch, SubChunkRequestPacket request, boolean cacheMode,
+                     GameVersion gameVersion, boolean antiXray, int minSectionY, String playerName,
+                     SubChunkOffsetData[] offsets, Level sourceLevel, Map<Long, Object> columnReceipts) {
+            this.sourceLevel = sourceLevel;
+            this.columnReceipts = columnReceipts;
             this.state = state;
             this.epoch = epoch;
             this.request = request;

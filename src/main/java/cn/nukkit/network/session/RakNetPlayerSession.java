@@ -142,6 +142,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         this.state.getSecurity().setCompressionOut(this.compressionOut);
         this.state.getSecurity().setCompressionInitialized(false);
         this.state.getSecurity().setPrefixedCompression(protocolVersion >= 11);
+        // A rejected RakNet handshake may close before channelInactive can be delivered.
+        // Stop the repeating task on terminal close without changing disconnect timing or reasons.
+        this.channel.closeFuture().addListener(future -> this.tickFuture.cancel(false));
     }
 
     @Override
@@ -364,7 +367,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
         try {
             this.drainDeferredInbound();
-            List<DataPacket> toBatch = new ObjectArrayList<>();
+            List<DataPacket> toBatch = null;
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
                 if (packet instanceof DisconnectPacket) {
@@ -381,18 +384,21 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     }
                     return; // Disconnected
                 } else if (packet instanceof BatchPacket) {
-                    if (!toBatch.isEmpty()) {
+                    if (toBatch != null && !toBatch.isEmpty()) {
                         this.sendPackets(toBatch);
                         toBatch.clear();
                     }
 
                     this.sendPacket(((BatchPacket) packet).payload);
                 } else {
+                    if (toBatch == null) {
+                        toBatch = new ObjectArrayList<>();
+                    }
                     toBatch.add(packet);
                 }
             }
 
-            if (!toBatch.isEmpty()) {
+            if (toBatch != null && !toBatch.isEmpty()) {
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
