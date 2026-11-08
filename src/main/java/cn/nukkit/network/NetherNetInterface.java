@@ -35,6 +35,7 @@ import tel.schich.libdatachannel.LibDataChannelArchDetect;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.DatagramSocket;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -94,6 +95,8 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     private final Queue<NetherNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<NetherNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<InetAddress, Long> blockedAddresses = new ConcurrentHashMap<>();
+    /** 玩家用域名连接时解析出的媒体候选；server-udp-ports 已配对外地址时不再参与。 Media candidates resolved from a host name a player typed, unused while server-udp-ports names external addresses. */
+    private final NetherNetHostCandidates hostCandidates = new NetherNetHostCandidates();
     /** 广告随附的 nonce（P2P 世界机制，专用服务器客户端不回传也不校验），启动时随机一次。 Rides along in the advertisement, random once at startup; a P2P-worlds mechanism, never verified. */
     private final AtomicReference<String> pongNonce = new AtomicReference<>(String.format("%016x", new SecureRandom().nextLong()));
 
@@ -152,6 +155,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             this.relay = null;
         }
 
+        boolean publishTypedNames = mediaPorts == null || mediaPorts.advertisedAddresses().isEmpty();
         NetherNetHTTPServerSignaling.Builder signalingBuilder = new NetherNetHTTPServerSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
@@ -166,8 +170,23 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 .setStunServers(stunServers(settings))
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
                 .setTokenTrust(TokenTrust.ANY)
-                .setMotdProvider((host, remoteAddress, client) -> this.buildPong())
-                .setPlayerFilter((host, player) -> this.refusePlayer(player));
+                // 状态请求先到，顺手解析域名；玩家随后点加入时缓存通常已就绪（解析不在事件循环上等）
+                // The status request arrives first, so resolve the name there and the join that
+                // follows usually finds it cached (nothing waits on the event loop)
+                .setMotdProvider((host, remoteAddress, client) -> {
+                    if (publishTypedNames) {
+                        this.hostCandidates.prefetch(remoteAddress == null ? null : remoteAddress.getAddress(), host);
+                    }
+                    return this.buildPong();
+                })
+                .setPlayerFilter((host, player) -> {
+                    JoinRefusal refusal = this.refusePlayer(player);
+                    if (refusal == null && publishTypedNames) {
+                        InetSocketAddress remote = player.remoteAddress();
+                        this.hostCandidates.observe(player.networkId(), remote == null ? null : remote.getAddress(), host);
+                    }
+                    return refusal;
+                });
         boolean https = NetherNetHttps.apply(signalingBuilder, settings, Path.of(server.getDataPath()));
         this.signaling = signalingBuilder.build();
 
@@ -186,6 +205,16 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                     sdp, internalPort, this.publishedAddresses(), externalPorts));
         } else if (mediaPorts != null) {
             channelSignaling = mediaPorts.decorate(this.signaling);
+        }
+        if (publishTypedNames) {
+            // 域名候选在模式改写之前追加：共用端口模式下它带的是内部回环端口，由随后的改写平移到对外端口
+            // Domain candidates are appended before the mode rewrite: in shared-port mode they
+            // carry the internal loopback port, which that rewrite moves to the public one
+            channelSignaling = new NetherNetHostAnswerSignaling(channelSignaling, this.hostCandidates,
+                    includeResolvedIpv6(sharedPort, server.isIpv6Enabled(),
+                            mediaPorts == null ? null : bindAddress.getAddress()),
+                    sharedPort ? NetherNetSharedPortSdp.PortSource.SHARED
+                            : NetherNetSharedPortSdp.PortSource.PER_FAMILY);
         }
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(this.eventLoopGroup)
@@ -251,6 +280,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 externalPort, mediaPorts.begin());
         return mediaPorts.advertisedAddresses().isEmpty()
                 ? description : description + " via " + mediaPorts.advertisedAddresses();
+    }
+
+    /** 共用端口受 RakNet IPv6 监听约束，独立媒体则由 ICE 绑定地址决定。 Shared mode needs an IPv6 listener; direct media follows its ICE bind. */
+    static boolean includeResolvedIpv6(boolean sharedPort, boolean ipv6Enabled, InetAddress bindAddress) {
+        return sharedPort ? ipv6Enabled : bindAddress == null || bindAddress.isAnyLocalAddress()
+                || bindAddress instanceof Inet6Address;
     }
 
     /**
@@ -732,6 +767,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     @Override
     public void shutdown() {
         this.accepting = false;
+        this.hostCandidates.close();
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
@@ -744,6 +780,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     @Override
     public void emergencyShutdown() {
         this.accepting = false;
+        this.hostCandidates.close();
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();

@@ -102,6 +102,25 @@ class NetherNetInterfaceTest {
     }
 
     @Test
+    void resolvedIpv6FollowsTheMediaBinding() throws Exception {
+        InetAddress wildcard = InetAddress.getByName("0.0.0.0");
+        InetAddress ipv4 = InetAddress.getByName("192.168.1.5");
+        InetAddress ipv6 = InetAddress.getByName("2606:4700:4700::1111");
+
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, true, wildcard));
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, false, null),
+                "automatic media ports gather on every interface");
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, false, wildcard),
+                "direct ICE is independent of the RakNet IPv6 listener");
+        assertTrue(NetherNetInterface.includeResolvedIpv6(false, false, ipv6));
+        assertFalse(NetherNetInterface.includeResolvedIpv6(false, true, ipv4),
+                "an IPv4-bound direct socket cannot receive IPv6 media");
+        assertTrue(NetherNetInterface.includeResolvedIpv6(true, true, ipv4));
+        assertFalse(NetherNetInterface.includeResolvedIpv6(true, false, wildcard),
+                "shared mode needs the RakNet IPv6 listener");
+    }
+
+    @Test
     void mediaUnreachableRequiresAttemptsFloorAndZeroIce() {
         assertTrue(NetherNetInterface.mediaUnreachable(snapshot(10, 0)),
                 "attempts at the floor with zero ICE successes is the unreachable signature");
