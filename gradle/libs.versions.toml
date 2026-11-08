@@ -54,6 +54,7 @@ libdatachannel-arch-detect = { module = "dev.opencollab:libdatachannel-java-arch
 netty-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "netty_epoll" }
 netty-codec-haproxy = { module = "io.netty:netty-codec-haproxy", version.ref = "netty_epoll" }
 netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty_epoll" }
+netty-handler = { module = "io.netty:netty-handler", version.ref = "netty_epoll" }
 nukkitx-natives = { module = "com.nukkitx:natives", version.ref = "nukkitx_natives" }
 cloudburst-common = { module = "org.cloudburstmc.protocol:common", version.ref = "cloudburst_common" }
 cloudburst-bedrock-codec = { module = "org.cloudburstmc.protocol:bedrock-codec", version.ref = "cloudburst_bedrock_codec" }
