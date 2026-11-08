@@ -8,7 +8,7 @@ import java.io.PrintStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public final class ListTag<T extends Tag> extends Tag {
+public class ListTag<T extends Tag> extends Tag {
 
     private List<T> list = new ArrayList<>();
 
