@@ -21,6 +21,7 @@ import io.netty.util.internal.PlatformDependent;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
+import org.cloudburstmc.netty.channel.nethernet.SourcedAddress;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
 import org.cloudburstmc.netty.channel.nethernet.signaling.JoinRefusal;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPServerSignaling;
@@ -34,10 +35,7 @@ import tel.schich.libdatachannel.LibDataChannelArchDetect;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.net.DatagramSocket;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.net.*;
 import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.PublicKey;
@@ -465,6 +463,28 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         return null;
     }
 
+    /**
+     * 玩家地址：共用端口模式下媒体对端是回环 leg，取信令来源；独立端口取选中的 ICE pair。
+     * The player's address: the signaling source in shared-port mode, where the media peer is a
+     * loopback leg, and the selected ICE pair otherwise.
+     */
+    public InetSocketAddress playerAddress(NetherNetChildChannel channel) {
+        return playerAddress(channel, this.relay != null);
+    }
+
+    static InetSocketAddress playerAddress(NetherNetChildChannel channel, boolean relayed) {
+        if (relayed) {
+            SourcedAddress signaled = channel.signaledAddress();
+            InetSocketAddress address = signaled == null ? null : signaled.address();
+            InetAddress inet = address == null ? null : address.getAddress();
+            if (inet != null && !inet.isAnyLocalAddress()) {
+                return address;
+            }
+        }
+        SocketAddress remote = channel.remoteAddress();
+        return remote instanceof InetSocketAddress address ? address : null;
+    }
+
     @Override
     public void setNetwork(Network network) {
         this.network = network;
@@ -481,12 +501,15 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
                 continue;
             }
-            // 远端地址自会话构造首次读取起被 Netty 缓存为库给出的信令来源（真实客户端地址），
-            // ICE 连上后也不会变成 leg 地址，玩家创建、封禁与日志直接使用即可
-            // Netty caches the remote from the session's first read as the library's signaling
-            // source (the real client); it never turns into the leg address once ICE connects,
-            // so player creation, bans and logs can use it as is
-            InetSocketAddress address = (InetSocketAddress) session.getChannel().remoteAddress();
+            // 共用端口模式下媒体对端是回环 leg，玩家地址取信令来源；独立端口取选中的 ICE pair
+            // In shared-port mode the media peer is a loopback leg, so the player address comes
+            // from signaling; a dedicated media port uses the selected ICE pair
+            InetSocketAddress address = this.playerAddress(session.getChannel());
+            InetAddress inetAddress = address == null ? null : address.getAddress();
+            if (inetAddress != null && this.isAddressBlocked(inetAddress)) {
+                session.disconnect("Address blocked");
+                continue;
+            }
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);
                 this.server.getPluginManager().callEvent(event);
@@ -582,7 +605,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 return false;
             }
 
-            log.warn("Disconnecting timed out pending NetherNet session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            log.warn("Disconnecting timed out pending NetherNet session {} in phase {}", this.playerAddress(session.getChannel()), session.getState().getLogin().getPhase());
             this.stats.onLoginTimeout();
             session.disconnect("disconnectionScreen.timeout");
             return true;
@@ -596,7 +619,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             if (session.getDisconnectReason() != null || !session.isLoginPhaseTimedOut(nowNanos, timeoutMillis)) {
                 continue;
             }
-            log.warn("Disconnecting timed out NetherNet session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            log.warn("Disconnecting timed out NetherNet session {} in phase {}", this.playerAddress(session.getChannel()), session.getState().getLogin().getPhase());
             this.stats.onLoginTimeout();
             session.disconnect("disconnectionScreen.timeout");
         }
@@ -710,7 +733,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         if (!(session instanceof NetherNetPlayerSession netherNetSession)) {
             return null;
         }
-        Channel channel = netherNetSession.getChannel();
+        NetherNetChildChannel channel = netherNetSession.getChannel();
         PublicKey identityKey = parseIdentityKey(identityPublicKeyBase64);
         String mismatch = identityKey == null
                 ? "the login chain carries no usable identity key"
@@ -722,7 +745,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             // player instead can tell a replayed chain from its holder, exactly as RakNet's
             // encryption handshake lets it.
             if (mismatch != null) {
-                log.debug("NetherNet login from {} is not bound to its chain: {}", channel.remoteAddress(), mismatch);
+                log.debug("NetherNet login from {} is not bound to its chain: {}", this.playerAddress(channel), mismatch);
             }
             return null;
         }

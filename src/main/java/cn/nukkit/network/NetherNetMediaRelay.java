@@ -35,9 +35,9 @@ import java.util.function.UnaryOperator;
  * 再发给客户端。libjuice 只按来源地址与 ufrag 分流、不看目的地址，所以把 leg 当作对端即可完成 ICE/DTLS/SCTP。
  * <p>
  * 首个 STUN Binding Request 必须携带某个待建连接的本端 ufrag（来自应答 SDP）才会开 leg，未知来源的其它数据报
- * 一律丢弃；leg 有总数与每 IP 上限，空闲超时回收。子 channel 的远端由库按信令来源给出（真实客户端地址，
- * Netty 自首次读取后缓存、不再跟随库内部变化），无需换回；{@link #clientFor} 仅供诊断把 leg 地址映射回客户端。
- * 内部端口可经 {@link #reserveMediaPort} 预留到首个 offer 为止。
+ * 一律丢弃；leg 有总数与每 IP 上限，空闲超时回收。库在 ICE 连上后把子 channel 的远端改为选中的 ICE pair，这里就是
+ * leg 地址，玩家身份须经 {@code NetherNetInterface.playerAddress} 取信令来源；{@link #clientFor} 仅供诊断把 leg
+ * 地址映射回客户端。内部端口可经 {@link #reserveMediaPort} 预留到首个 offer 为止。
  * <p>
  * In-process UDP relay so NetherNet media shares server-port with RakNet. libjuice owns its own
  * socket with no injection API, so the two transports cannot share one UDP socket; instead STUN/DTLS
@@ -47,10 +47,11 @@ import java.util.function.UnaryOperator;
  * RakNet socket. libjuice demultiplexes by source address and ufrag only, never by destination, so
  * the leg passes as the peer. A leg opens only for a STUN Binding Request carrying the local ufrag
  * of a pending answer; anything else from an unknown source is dropped. Legs are capped in total
- * and per address and reaped when idle. The child channel's remote is whatever the library derives
- * from the signaling source (the real client; Netty caches it from the first read and never
- * re-reads), so no swap is needed; {@link #clientFor} maps a leg address back to its client for
- * diagnostics. The internal port can be held through {@link #reserveMediaPort} until the first offer.
+ * and per address and reaped when idle. Once ICE connects the library reports the selected pair as
+ * the child channel's remote, which here is the leg address, so player identity must come from
+ * signaling through {@code NetherNetInterface.playerAddress}; {@link #clientFor} maps a leg address
+ * back to its client for diagnostics. The internal port can be held through
+ * {@link #reserveMediaPort} until the first offer.
  */
 @Log4j2
 public final class NetherNetMediaRelay {

@@ -28,6 +28,7 @@ import org.apache.logging.log4j.message.FormattedMessage;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -106,7 +107,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         this.lastIngressRefillNanos = acceptedAt;
         this.state.getConnection().setSessionCreatedNanos(acceptedAt);
         this.state.getConnection().setChildChannelAcceptedNanos(acceptedAt);
-        this.state.getConnection().setRemoteAddress(String.valueOf(channel.remoteAddress()));
+        this.state.getConnection().setRemoteAddress(String.valueOf(this.clientAddress()));
         this.state.getProtocol().setRaknetProtocol(RAKNET_PROTOCOL);
         this.state.getSecurity().setCompressionIn(this.compressionIn);
         this.state.getSecurity().setCompressionOut(this.compressionOut);
@@ -217,13 +218,13 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                             callback.run();
                         } else {
                             log.warn("Failed to send direct packet {} to {}",
-                                    packet.getClass().getSimpleName(), this.channel.remoteAddress(), result.cause());
+                                    packet.getClass().getSimpleName(), this.clientAddress(), result.cause());
                             this.disconnect("Internal Server Error");
                         }
                     });
                 } catch (Throwable throwable) {
                     log.warn("Failed to prepare direct packet {} for {}",
-                            packet.getClass().getSimpleName(), this.channel.remoteAddress(), throwable);
+                            packet.getClass().getSimpleName(), this.clientAddress(), throwable);
                     this.disconnect("Internal Server Error");
                 }
             });
@@ -276,7 +277,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
-            log.error("[{}] Failed to tick NetherNetPlayerSession", this.channel.remoteAddress(), e);
+            log.error("[{}] Failed to tick NetherNetPlayerSession", this.clientAddress(), e);
         }
     }
 
@@ -503,8 +504,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                 && protocol >= ProtocolInfo.v1_20_60;
     }
 
+    private InetSocketAddress clientAddress() {
+        if (this.server != null) {
+            return this.server.playerAddress(this.channel);
+        }
+        return this.channel.remoteAddress() instanceof InetSocketAddress address ? address : null;
+    }
+
     private String playerLabel() {
-        return this.player == null ? String.valueOf(this.channel.remoteAddress()) : this.player.getName();
+        return this.player == null ? String.valueOf(this.clientAddress()) : this.player.getName();
     }
 
     private RakNetPlayerSession.InboundBatchDecodeResult processInboundBatch(byte[] packetBuffer, boolean ci, CompressionProvider receivedCompression) {
@@ -693,8 +701,8 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
             return;
         }
 
-        InetAddress malformedAddress = this.channel.remoteAddress() instanceof java.net.InetSocketAddress address
-                ? address.getAddress() : null;
+        InetSocketAddress remote = this.clientAddress();
+        InetAddress malformedAddress = remote == null ? null : remote.getAddress();
         boolean blockMalformedAddress = RakNetPlayerSession.shouldBlockAddressAfterMalformed(
                 this.state.getLogin().getPhase(), malformedAddress);
         this.disconnect("Sent malformed packet");
