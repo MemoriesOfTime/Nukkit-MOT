@@ -4,19 +4,14 @@ import cn.nukkit.event.Event;
 import cn.nukkit.event.server.DataPacketSendEvent;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.generic.BaseFullChunk;
-import cn.nukkit.network.protocol.BatchPacket;
-import cn.nukkit.network.protocol.ChangeDimensionPacket;
-import cn.nukkit.network.protocol.ChunkRadiusUpdatedPacket;
-import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.LevelChunkPacket;
-import cn.nukkit.network.protocol.SubChunkPacket;
+import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.plugin.PluginManager;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Field;
@@ -37,6 +32,7 @@ class PlayerChunkSubmissionWorldFenceTest {
         NetworkPlayerSession network = mock(NetworkPlayerSession.class);
         field(player, "usedChunks", new Long2ObjectOpenHashMap<Boolean>());
         field(player, "loadQueue", new LongLinkedOpenHashSet());
+        field(player, "pendingChunkRetries", Player.newPendingRetryQueue());
         field(player, "server", server);
         field(player, "networkSession", network);
         player.level = original;
@@ -92,6 +88,7 @@ class PlayerChunkSubmissionWorldFenceTest {
         NetworkPlayerSession network = mock(NetworkPlayerSession.class);
         field(player, "usedChunks", new Long2ObjectOpenHashMap<Boolean>());
         field(player, "loadQueue", new LongLinkedOpenHashSet());
+        field(player, "pendingChunkRetries", Player.newPendingRetryQueue());
         field(player, "server", server);
         field(player, "networkSession", network);
         field(player, "gameVersion", GameVersion.V1_21_70);

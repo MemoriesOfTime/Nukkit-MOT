@@ -132,10 +132,8 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
+import java.util.Queue;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -318,8 +316,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public final Map<Long, Boolean> usedChunks = new ConcurrentHashMap<>();
 
     private int chunksSent = 0;
-    private long chunkDeliveryEpoch;
-    private long chunkOrderEpoch;
+    // 异步回调会读取这两代次，写入方恒为主线程 / async callbacks read both epochs; the main thread is the only writer
+    private volatile long chunkDeliveryEpoch;
+    private volatile long chunkOrderEpoch;
     private boolean chunkPublisherUpdatePending;
     private ChunkSubmissionGuard chunkSubmissionGuard;
     private PublisherSubmissionGuard publisherSubmissionGuard;
@@ -330,8 +329,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private record PublisherSubmissionGuard(DataPacket packet, Level sourceLevel, long sourceEpoch,
                                              long orderEpoch, int radius, double x, double y, double z) { }
 
+    private record ChunkRetry(Level sourceLevel, long deliveryEpoch, long orderEpoch, long index) { }
+
     private boolean hasSpawnChunks;
+    /** 主线程独占，保持视野与距离顺序 / Main-thread owned; preserves FOV and distance order. */
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
+    /** 重试队列上限：超限丢弃，由重排窗口按 usedChunks 重建候选 / Retry queue cap: over-cap entries drop and the reorder window rebuilds candidates from usedChunks. */
+    static final int MAX_PENDING_CHUNK_RETRIES = 256;
+    private final Queue<ChunkRetry> pendingChunkRetries = newPendingRetryQueue();
+
+    @SuppressWarnings("unchecked")
+    static <T> Queue<T> newPendingRetryQueue() {
+        return (Queue<T>) new ArrayBlockingQueue<>(MAX_PENDING_CHUNK_RETRIES);
+    }
+
     protected int nextChunkOrderRun = 1;
     // 客户端缓存协商与事务状态 / Client cache negotiation & transaction state
     private boolean clientCacheSupported = false;
@@ -1304,6 +1315,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void unloadChunks(boolean online) {
         ++this.chunkDeliveryEpoch;
         this.chunkPublisherUpdatePending = false;
+        this.pendingChunkRetries.clear();
         // 切世界后旧事务引用的 blob 全部作废 / old transaction blob refs are void after a world switch
         this.clearBlobCacheState();
         for (long index : this.usedChunks.keySet()) {
@@ -1367,6 +1379,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         long index = Level.chunkHash(x, z);
         Level sourceLevel = this.level;
         long sourceEpoch = this.chunkDeliveryEpoch;
+        long sourceOrderEpoch = this.chunkOrderEpoch;
         boolean tracked = this.usedChunks.containsKey(index);
         boolean submitted = false;
         ChunkSubmissionGuard previousGuard = this.chunkSubmissionGuard;
@@ -1375,10 +1388,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             submitted = this.dataPacket(packet);
         } finally {
             this.chunkSubmissionGuard = previousGuard;
-            if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
-                    && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
-                this.usedChunks.put(index, Boolean.FALSE);
-                this.loadQueue.add(index);
+            if (!submitted && tracked) {
+                // 插件取消(DataPacketSendEvent)同样走重试，每个重排窗口内每 tick 一次 / A plugin cancel (DataPacketSendEvent) retries too, once per tick until the next reorder
+                this.dispatchChunkRetry(new ChunkRetry(sourceLevel, sourceEpoch, sourceOrderEpoch, index));
             }
         }
         if (!submitted || !isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, tracked)) {
@@ -1422,6 +1434,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                                      long index, boolean tracked) {
         return this.connected && this.level == sourceLevel && this.chunkDeliveryEpoch == sourceEpoch
                 && (!tracked || this.usedChunks.containsKey(index));
+    }
+
+    /** 异步线程仅投递，主线程直接应用 / Async callers only enqueue; the main thread applies directly. */
+    void requestChunkRetry(long index) {
+        this.dispatchChunkRetry(new ChunkRetry(this.level, this.chunkDeliveryEpoch, this.chunkOrderEpoch, index));
+    }
+
+    private void dispatchChunkRetry(ChunkRetry retry) {
+        if (this.server.isPrimaryThread()) {
+            this.applyChunkRetry(retry);
+            return;
+        }
+        this.pendingChunkRetries.offer(retry);
+    }
+
+    private void applyChunkRetry(ChunkRetry retry) {
+        if (this.connected && this.level == retry.sourceLevel()
+                && this.chunkDeliveryEpoch == retry.deliveryEpoch()
+                && this.chunkOrderEpoch == retry.orderEpoch()
+                && this.usedChunks.get(retry.index()) == Boolean.FALSE) {
+            this.loadQueue.add(retry.index());
+        }
+    }
+
+    void drainChunkRetries() {
+        ChunkRetry retry;
+        while ((retry = this.pendingChunkRetries.poll()) != null) {
+            this.applyChunkRetry(retry);
+        }
     }
 
     @Deprecated
@@ -3767,6 +3808,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void checkNetwork() {
+        this.drainChunkRetries();
+
         if (this.protocol < ProtocolInfo.v1_16_100 && !this.isOnline()) {
             return;
         }
