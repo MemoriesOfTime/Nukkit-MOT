@@ -3498,8 +3498,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
 
                     // Wiki: 使用鞘翅滑翔时在垂直高度下降率低于每刻 0.5 格的情况下，摔落高度被重置为 1 格。
-                    // Wiki: 玩家在较小的角度和足够低的速度上着陆不会受到坠落伤害。着陆时临界伤害角度为50°，伤害值等同于玩家从滑行的最高点直接摔落到着陆点受到的伤害。
-                    if (this.isSwimming() || this.isGliding() && Math.abs(this.speed.y) < 0.5 && this.getPitch() <= 40) {
+                    if (this.isSwimming() || this.isGliding() && isSafeElytraLanding(this.speed.y)) {
                         this.resetFallDistance();
                     } else if (this.isGliding()) {
                         this.resetInAirTicks();
@@ -3512,24 +3511,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.foodData.update(tickDiff);
                 }
 
-                //鞘翅检查和耐久计算
-                if (this.isGliding()) {
-                    PlayerInventory playerInventory = this.getInventory();
-                    if (playerInventory != null) {
-                        Item chestplate = playerInventory.getChestplateFast();
-                        if ((chestplate == null || chestplate.getId() != ItemID.ELYTRA)) {
-                            this.setGliding(false);
-                        } else if (!chestplate.isUnbreakable() && ((this.gamemode & 0x01) == 0 && this.age % (20 * (chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY) + 1)) == 0)) {
-                            int newDamage = chestplate.getDamage() + 1;
-                            if (newDamage < chestplate.getMaxDurability()) {
-                                chestplate.setDamage(newDamage);
-                                playerInventory.setChestplate(chestplate);
-                            } else {
-                                this.setGliding(false);
-                            }
-                        }
-                    }
-                }
+                this.updateElytraDurability();
             }
         }
 
@@ -3562,6 +3544,47 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.removeExpiredShapes();
 
         return true;
+    }
+
+    static boolean isSafeElytraLanding(double verticalSpeed) {
+        return verticalSpeed < 0.5;
+    }
+
+    static boolean isUsableElytra(Item item) {
+        return item != null && item.getId() == ItemID.ELYTRA && item.getDamage() < item.getMaxDurability() - 1;
+    }
+
+    void updateElytraDurability() {
+        if (!this.isGliding()) {
+            return;
+        }
+
+        PlayerInventory playerInventory = this.getInventory();
+        if (playerInventory == null) {
+            return;
+        }
+
+        Item chestplate = playerInventory.getChestplateFast();
+        if (!isUsableElytra(chestplate)) {
+            this.setGliding(false);
+            return;
+        }
+
+        if (chestplate.isUnbreakable() || (this.gamemode & 0x01) != 0 || this.age % 20 != 0) {
+            return;
+        }
+
+        int unbreakingLevel = chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY);
+        if (unbreakingLevel > 0 && ThreadLocalRandom.current().nextInt(unbreakingLevel + 1) != 0) {
+            return;
+        }
+
+        int newDamage = chestplate.getDamage() + 1;
+        chestplate.setDamage(newDamage);
+        playerInventory.setChestplate(chestplate);
+        if (newDamage >= chestplate.getMaxDurability() - 1) {
+            this.setGliding(false);
+        }
     }
 
     private void updateBlockingFlag() {
@@ -4847,7 +4870,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (authPacket.getInputData().contains(AuthInputAction.START_GLIDING)) {
                     boolean withoutElytra = false;
                     Item chestplate = this.getInventory().getChestplateFast();
-                    if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
+                    if (!isUsableElytra(chestplate)) {
                         withoutElytra = true;
                     }
                     // A glide request without elytra is refused, never punished: the client asks
@@ -5167,7 +5190,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
                         boolean withoutElytra = false;
                         Item chestplate = this.getInventory().getChestplateFast();
-                        if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
+                        if (!isUsableElytra(chestplate)) {
                             withoutElytra = true;
                         }
                         // Refused, not punished: see ACTION_START_GLIDING above.
