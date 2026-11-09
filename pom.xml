@@ -773,7 +773,7 @@
                 <configuration>
                     <!-- 隐式异常（NPE/AIOOBE）不走 fast-throw 预分配，测试才可比异常消息文本 -->
                     <!-- Keep implicit-exception messages intact so tests can compare them -->
-                    <argLine>@{argLine} -XX:-OmitStackTraceInFastThrow -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                    <argLine>@{argLine} -XX:-OmitStackTraceInFastThrow -javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
                     <groups>${test.groups}</groups>
                     <excludedGroups>${test.excludedGroups}</excludedGroups>
                 </configuration>
@@ -781,11 +781,18 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.7.0</version>
+                <version>3.11.0</version>
                 <configuration>
                     <useBaseVersion>false</useBaseVersion>
                 </configuration>
                 <executions>
+                    <execution>
+                        <id>get-mockito-agent-path</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
                     <execution>
                         <id>attach-javadocs</id>
                         <phase>none</phase>
