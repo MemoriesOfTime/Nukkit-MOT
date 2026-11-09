@@ -27,9 +27,21 @@ public interface CompressionProvider {
         public byte getPrefix() {
             return (byte) 0xff;
         }
+
+        @Override
+        public String toString() {
+            return "none";
+        }
     };
 
     CompressionProvider ZLIB = new CompressionProvider() {
+        // 带 zlib 头（0x78）的封装编码，1.20.60+ 的前缀表里没有对应值
+        // Header-bearing (0x78) codec: the 1.20.60+ prefix table has no value for it
+        @Override
+        public boolean supportsPrefix() {
+            return false;
+        }
+
         @Override
         public byte[] compress(BinaryStream packet, int level) throws Exception {
             return Zlib.deflatePre16Packet(packet.getBuffer(), level);
@@ -43,6 +55,11 @@ public interface CompressionProvider {
         @Override
         public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
             return Zlib.inflate(compressed, maxSize);
+        }
+
+        @Override
+        public String toString() {
+            return "zlib-header";
         }
     };
 
@@ -66,6 +83,11 @@ public interface CompressionProvider {
         public byte getPrefix() {
             return (byte) 0x00;
         }
+
+        @Override
+        public String toString() {
+            return "zlib-raw";
+        }
     };
 
     CompressionProvider SNAPPY = new CompressionProvider() {
@@ -88,9 +110,20 @@ public interface CompressionProvider {
         public byte getPrefix() {
             return 0x01;
         }
+
+        @Override
+        public String toString() {
+            return "snappy";
+        }
     };
 
     CompressionProvider NETEASE_UNKNOWN = new CompressionProvider() {
+        // 出站压缩即 ZLIB_RAW 的 raw deflate，与 0x00 前缀一致
+        // Outbound compression is ZLIB_RAW's raw deflate and shares its 0x00 prefix
+        @Override
+        public byte getPrefix() {
+            return (byte) 0x00;
+        }
 
         @Override
         public byte[] compress(BinaryStream packet, int level) throws Exception {
@@ -132,6 +165,10 @@ public interface CompressionProvider {
                 }
             }
         }
+        @Override
+        public String toString() {
+            return "netease-auto";
+        }
     };
 
     byte[] compress(BinaryStream packet, int level) throws Exception;
@@ -142,8 +179,23 @@ public interface CompressionProvider {
         return this.decompress(compressed);
     }
 
+    /**
+     * 能否写出 1.20.60+ 的每批压缩前缀。默认 {@code true} 保持既有契约：在此方法存在之前，
+     * 任何能在 1.20.60+ 上工作的实现都必须已实现 {@link #getPrefix()}；无法写出前缀的编码器需显式返回 {@code false}。
+     * <p>Whether this provider can emit the per-batch 1.20.60+ compression prefix. The default is {@code true}
+     * to preserve the pre-existing contract: before this method existed, any provider usable on 1.20.60+ had
+     * to implement {@link #getPrefix()}. Codecs without a prefixed form must override this to {@code false}.
+     */
+    default boolean supportsPrefix() {
+        return true;
+    }
+
+    /**
+     * 本批的压缩前缀，仅在 {@link #supportsPrefix()} 为 {@code true} 时有意义。
+     * <p>Compression prefix of one batch; meaningful only when {@link #supportsPrefix()} is {@code true}.
+     */
     default byte getPrefix() {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException("Compression provider has no batch prefix");
     }
 
     static CompressionProvider from(PacketCompressionAlgorithm algorithm, int raknetProtocol) {
