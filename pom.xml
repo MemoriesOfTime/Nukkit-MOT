@@ -66,6 +66,16 @@
 
     <repositories>
         <repository>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
             <id>opencollab-repo-release</id>
             <url>https://repo.opencollab.dev/maven-releases/</url>
             <releases>
@@ -86,8 +96,24 @@
             </snapshots>
         </repository>
         <repository>
-            <id>repo-lanink-cn</id>
-            <url>https://repo.lanink.cn/repository/maven-public/</url>
+            <id>mot-repository-maven-releases</id>
+            <url>https://repo.lanink.cn/repository/maven-releases</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>mot-repository-maven-snapshots</id>
+            <url>https://repo.lanink.cn/repository/maven-snapshots</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
         </repository>
         <repository>
             <id>okaeri-releases</id>
