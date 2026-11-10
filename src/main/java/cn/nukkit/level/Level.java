@@ -3330,14 +3330,17 @@ public class Level implements ChunkManager, Metadatable {
                     return item;
                 }
 
-                if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated() && target.onActivate(item, player)) {
-                    if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-                        this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-                        this.addParticle(new ItemBreakParticle(target, item));
-                        item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-                    }
+                if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated()) {
+                    int damageBefore = item.getDamage();
+                    if (target.onActivate(item, player)) {
+                        if (item.getDamage() > damageBefore && item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                            this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                            this.addParticle(new ItemBreakParticle(target, item));
+                            item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+                        }
 
-                    return item;
+                        return item;
+                    }
                 }
 
                 if (item.canBeActivated() && item.onActivate(this, player, block, target, face, fx, fy, fz)) {
@@ -3356,14 +3359,17 @@ public class Level implements ChunkManager, Metadatable {
             if (item.getId() == ItemID.BUCKET && ItemBucket.getDamageByTarget(item.getDamage()) == BlockID.WATER) {
                 player.getLevel().sendBlocks(new Player[]{player}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
             }
-        } else if (target.canBeActivated() && target.onActivate(item, null)) {
-            if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-                this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-                this.addParticle(new ItemBreakParticle(target, item));
-                item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-            }
+        } else if (target.canBeActivated()) {
+            int damageBefore = item.getDamage();
+            if (target.onActivate(item, null)) {
+                if (item.getDamage() > damageBefore && item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                    this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                    this.addParticle(new ItemBreakParticle(target, item));
+                    item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+                }
 
-            return item;
+                return item;
+            }
         }
 
         Block hand;
