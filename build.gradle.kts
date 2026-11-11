@@ -72,10 +72,20 @@ sourceSets.main {
 repositories {
     mavenLocal()
     mavenCentral()
-    maven("https://repo.opencollab.dev/maven-releases/")
-    maven("https://repo.opencollab.dev/maven-snapshots/")
-    maven("https://repo.lanink.cn/repository/maven-public/")
+    maven("https://repo.opencollab.dev/maven-releases/") {
+        mavenContent { releasesOnly() }
+    }
+    maven("https://repo.opencollab.dev/maven-snapshots/") {
+        mavenContent { snapshotsOnly() }
+    }
+    maven("https://repo.lanink.cn/repository/maven-releases/") {
+        mavenContent { releasesOnly() }
+    }
+    maven("https://repo.lanink.cn/repository/maven-snapshots/") {
+        mavenContent { snapshotsOnly() }
+    }
     maven("https://repo.okaeri.cloud/releases")
+    maven("https://maven.daporkchop.net/")
 }
 
 val mockitoAgent by configurations.creating {
