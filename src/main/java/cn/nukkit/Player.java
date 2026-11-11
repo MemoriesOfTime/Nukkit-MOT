@@ -117,6 +117,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -488,6 +489,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
+    private CrossbowInput crossbowInput;
     /**
      * Server tick of the last accepted spear jab ({@link InventoryTransactionPacket#USE_ITEM_ACTION_USE_AS_ATTACK}).
      */
@@ -1270,6 +1272,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setUsingItem(boolean value) {
+        if (!value && this.crossbowInput != null) {
+            this.crossbowInput.reset();
+        }
         this.startAction = value ? this.server.getTick() : -1;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, value);
     }
@@ -2484,6 +2489,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Resolve transient items under the accepted transition's old mode: recover finite
         // items and discard creative items before a delayed close can use the new mode.
         // Cancelled transitions must leave the inventory available to its current owner.
+        this.resetCrossbowInputState();
         this.resetCraftingGridType();
         this.resolveOpenTradeInputs();
 
@@ -3685,6 +3691,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return super.entityBaseTick(tickDiff) || hasUpdated;
     }
 
+    boolean tryAcceptClickAir() {
+        long currentClickAirTime = System.currentTimeMillis();
+        if (!this.server.doNotLimitInteractions && currentClickAirTime - this.lastClickAirTime < 100) {
+            return false;
+        }
+        this.lastClickAirTime = currentClickAirTime;
+        return true;
+    }
+
     /**
      * Start hold-to-use from AuthInput START_USING_ITEM / PlayerAction START_USING_ITEM
      * using the <em>server</em> held stack. Java chew/drink is local, so the client
@@ -3692,6 +3707,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * {@code DATA_FLAG_ACTION} after this path succeeds.
      */
     boolean tryStartUsingHeldItem(Item item) {
+        if (item instanceof ItemCrossbow crossbow) {
+            return this.crossbowInput().start(crossbow);
+        }
         if (!UsingItemReceive.shouldStartUsing(
                 this.spawned && this.isAlive(),
                 this.isSpectator() && this.server.useClientSpectator,
@@ -3719,6 +3737,26 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         this.setUsingItem(true);
         return true;
+    }
+
+    private CrossbowInput crossbowInput() {
+        if (this.crossbowInput == null) {
+            this.crossbowInput = new CrossbowInput(this);
+        }
+        return this.crossbowInput;
+    }
+
+    @ApiStatus.Internal
+    public long getCrossbowInputGeneration() {
+        return this.crossbowInput == null ? 0 : this.crossbowInput.generation();
+    }
+
+    @ApiStatus.Internal
+    public void resetCrossbowInputState() {
+        if (this.crossbowInput != null) {
+            if (this.crossbowInput.isCharging()) this.setUsingItem(false);
+            else this.crossbowInput.reset();
+        }
     }
 
     /**
@@ -4709,6 +4747,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.handleAuthInputItemStackRequest(authPacket);
 
                 if (!this.isMovementServerAuthoritative()) {
+                    this.handleAuthInputCrossbow(authPacket);
                     return;
                 }
 
@@ -4841,7 +4880,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Item authHeldItem = !authStartUsingItem || this.inventory == null
                         ? null : this.inventory.getItemInHand();
                 boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
-                if (UsingItemReceive.shouldStartUsingFromAuthInput(
+                // 弩的开始输入留到移动接受后处理。
+                // Defer crossbow starts until movement has been accepted.
+                if (!(authHeldItem instanceof ItemCrossbow) && UsingItemReceive.shouldStartUsingFromAuthInput(
                         this.spawned && this.isAlive(),
                         this.isSpectator() && this.server.useClientSpectator,
                         this.isUsingItem(),
@@ -5102,6 +5143,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 double distSqrt = clientPosition.distanceSquared(this);
                 if (this.forceMovement == null && distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
+                    this.handleAuthInputCrossbow(authPacket);
                     break;
                 }
 
@@ -5136,6 +5178,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.newPosition = clientPosition;
                     }
                     this.forceMovement = null;
+                    this.handleAuthInputCrossbow(authPacket);
                 }
 
                 break;
@@ -5748,6 +5791,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private void handleAuthInputCrossbow(PlayerAuthInputPacket authPacket) {
+        if (UsingItemReceive.authInputStartsUsingItem(authPacket)
+                && this.inventory != null && this.inventory.getItemInHandFast() instanceof ItemCrossbow) {
+            this.tryStartUsingHeldItem(this.inventory.getItemInHand());
+        }
+        InventoryTransactionPacket authUse = authPacket.getItemUseTransaction();
+        if (authUse != null && authUse.transactionData instanceof UseItemData use
+                && use.actionType == InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR
+                && this.inventory != null && this.inventory.getItemInHandFast() instanceof ItemCrossbow) {
+            this.crossbowInput().click(use, CrossbowInput.Source.AUTH_INPUT);
+        }
+    }
+
     public void handleInventoryTransactionPacket(InventoryTransactionPacket transactionPacket) {
         if (!this.spawned || !this.isAlive()) {
             log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
@@ -6128,6 +6184,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
+                    if (useItemData.actionType == InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR
+                            && (inventory.getItemInHandFast() instanceof ItemCrossbow
+                            || useItemData.itemInHand instanceof ItemCrossbow)) {
+                        this.crossbowInput().click(useItemData);
+                        break;
+                    }
+
                     boolean heldSlotChanged = inventory.getHeldItemIndex() != useItemData.hotbarSlot;
                     if (heldSlotChanged) {
                         inventory.equipItem(useItemData.hotbarSlot);
@@ -6262,11 +6325,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break;
                         case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR:
-                            long currentClickAirTime = System.currentTimeMillis();
-                            if (!server.doNotLimitInteractions && (currentClickAirTime - lastClickAirTime) < 100) {
+                            if (!this.tryAcceptClickAir()) {
                                 return;
                             }
-                            lastClickAirTime = currentClickAirTime;
 
                             Vector3 directionVector = this.getDirectionVector();
                             if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
@@ -6282,10 +6343,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             item = this.inventory.getItemInHand();
-                            if (item instanceof ItemCrossbow && (this.isSpectator() || !item.onClickAir(this, directionVector))) {
-                                return;
-                            }
-
                             if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
                                 server.getLogger().debug(this.username + ": CLICK_AIR held item mismatch, server="
                                         + item + ", client=" + useItemData.itemInHand);
@@ -6511,6 +6568,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     try {
                         switch (releaseItemData.actionType) {
                             case InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE:
+                                if (this.inventory.getItemInHandFast() instanceof ItemCrossbow) {
+                                    this.crossbowInput().release(releaseItemData);
+                                    return;
+                                }
                                 if (this.isUsingItem()) {
                                     item = this.inventory.getItemInHand();
                                     int ticksUsed = this.server.getTick() - this.startAction;
@@ -7458,6 +7519,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             pendingLoginVerification = null;
         }
         if (this.connected && !this.closed) {
+            this.resetCrossbowInputState();
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
                 pk.reason = failReason != null ? failReason : DisconnectFailReason.DISCONNECTED;
@@ -7806,6 +7868,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.server.getPluginManager().callEvent(ev);
 
         if (!ev.isCancelled()) {
+            this.resetCrossbowInputState();
             if (this.fishing != null) {
                 this.stopFishing(false);
             }
@@ -8477,6 +8540,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.resetCrossbowInputState();
             this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
@@ -9149,6 +9213,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     protected void preSwitchLevel() {
+        this.resetCrossbowInputState();
         // Remove old chunks
         this.unloadChunks(true);
     }
