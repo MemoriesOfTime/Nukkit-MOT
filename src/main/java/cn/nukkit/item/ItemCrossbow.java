@@ -8,6 +8,7 @@ import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityShootBowEvent;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
+import cn.nukkit.inventory.BaseInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.math.NukkitMath;
@@ -65,66 +66,89 @@ public class ItemCrossbow extends ItemBow {
 
     @Override
     public boolean onUse(Player player, int ticksUsed) {
-        int needTickUsed = 20;
-        Enchantment enchantment = this.getEnchantment(Enchantment.ID_CROSSBOW_QUICK_CHARGE);
-        if (enchantment != null) {
-            needTickUsed -= enchantment.getLevel() * 5; //0.25s
-        }
+        this.tryCharge(player, ticksUsed);
+        return true;
+    }
 
-        if (ticksUsed < needTickUsed) {
-            return true;
+    public enum ChargeResult {
+        CHARGED, ALREADY_CHARGED, TOO_EARLY, NO_AMMO, INVALIDATED, CANCELLED
+    }
+
+    public ChargeResult tryCharge(Player player, int ticksUsed) {
+        var heldInventory = player.getInventory();
+        long revision = heldInventory.getHeldItemRevision();
+        if (!this.equalsExact(heldInventory.getItemInHand())) {
+            return ChargeResult.INVALIDATED;
+        }
+        if (this.isLoaded()) {
+            return ChargeResult.ALREADY_CHARGED;
+        }
+        if (ticksUsed < this.getChargeDuration()) {
+            return ChargeResult.TOO_EARLY;
         }
 
         Item chargedItem;
-
-        Inventory inventory = player.getOffhandInventory();
-
+        BaseInventory inventory = player.getOffhandInventory();
         if ((chargedItem = this.getFireworksOrArrow(inventory)) == null &&
-                (chargedItem = this.getArrow(inventory = player.getInventory())) == null) {
+                (chargedItem = this.getArrow(inventory = heldInventory)) == null) {
             if (player.isCreative()) {
                 chargedItem = Item.get(Item.ARROW, 0, 1);
             } else {
                 player.getOffhandInventory().sendContents(player);
                 inventory.sendContents(player);
-                return true;
+                return ChargeResult.NO_AMMO;
             }
         }
-
-        if (!this.isLoaded()) {
-            if (!player.isCreative()) {
-                if (!this.isUnbreakable()) {
-                    Enchantment durability = this.getEnchantment(Enchantment.ID_DURABILITY);
-                    if (!(durability != null && durability.getLevel() > 0 && (100 / (durability.getLevel() + 1)) <= Utils.random.nextInt(100))) {
-                        this.setDamage(this.getDamage() + (chargedItem.getId() == ItemID.FIREWORKS ? 3 : 1));
-                        if (this.getDamage() >= DURABILITY_CROSSBOW) {
-                            this.count--;
-                            player.level.addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_BREAK);
-                        }
-                        player.getInventory().setItemInHand(this);
-                    }
+        int ammunitionSlot = -1;
+        if (!player.isCreative()) {
+            for (var entry : inventory.getContents().entrySet()) {
+                if (entry.getValue().getCount() > 0 && entry.getValue().equals(chargedItem)) {
+                    ammunitionSlot = entry.getKey();
+                    break;
                 }
-
-                inventory.removeItem(chargedItem);
             }
-
-            int launchCount = 1;
-
-            boolean multishot = getEnchantmentLevel(Enchantment.ID_CROSSBOW_MULTISHOT) > 0;
-            if (multishot) {
-                launchCount = 3;
+            if (ammunitionSlot < 0) {
+                return ChargeResult.NO_AMMO;
             }
-
-            this.loadArrow(player, chargedItem, launchCount);
-
-            player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_CROSSBOW_LOADING_END);
-
-            EntityEventPacket packet = new EntityEventPacket();
-            packet.event = EntityEventPacket.CHARGED_CROSSBOW;
-            packet.eid = player.getId();
-            player.dataPacket(packet);
         }
 
-        return true;
+        ItemCrossbow charged = (ItemCrossbow) this.clone();
+        if (!player.isCreative() && !this.isUnbreakable()) {
+            Enchantment durability = this.getEnchantment(Enchantment.ID_DURABILITY);
+            if (!(durability != null && durability.getLevel() > 0
+                    && (100 / (durability.getLevel() + 1)) <= Utils.random.nextInt(100))) {
+                charged.setDamage(charged.getDamage() + (chargedItem.getId() == ItemID.FIREWORKS ? 3 : 1));
+                if (charged.getDamage() >= DURABILITY_CROSSBOW) charged.count--;
+            }
+        }
+        int launchCount = getEnchantmentLevel(Enchantment.ID_CROSSBOW_MULTISHOT) > 0 ? 3 : 1;
+        charged.createNamedTag(chargedItem, launchCount);
+        charged.loadTick = player.getServer().getTick();
+        if (!heldInventory.commitCrossbowChange(revision, this, charged,
+                player.isCreative() ? null : inventory, ammunitionSlot)) {
+            heldInventory.sendContents(player);
+            player.getOffhandInventory().sendContents(player);
+            return revision != heldInventory.getHeldItemRevision()
+                    ? ChargeResult.INVALIDATED : ChargeResult.CANCELLED;
+        }
+
+        this.setDamage(charged.getDamage());
+        this.setCount(charged.getCount());
+        this.setCompoundTag(charged.getCompoundTag());
+        this.loadTick = charged.loadTick;
+        if (this.count <= 0) {
+            player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_BREAK);
+        }
+        player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_CROSSBOW_LOADING_END);
+        EntityEventPacket packet = new EntityEventPacket();
+        packet.event = EntityEventPacket.CHARGED_CROSSBOW;
+        packet.eid = player.getId();
+        player.dataPacket(packet);
+        return ChargeResult.CHARGED;
+    }
+
+    public int getChargeDuration() {
+        return Math.max(0, 20 - this.getEnchantmentLevel(Enchantment.ID_CROSSBOW_QUICK_CHARGE) * 5);
     }
 
     @Override
@@ -164,6 +188,15 @@ public class ItemCrossbow extends ItemBow {
         Item chargedItem = getChargedItem();
 
         if (!chargedItem.isNull() && Server.getInstance().getTick() - this.loadTick > 10) {
+            var inventory = player.getInventory();
+            ItemCrossbow unloaded = (ItemCrossbow) this.clone();
+            unloaded.clearChargedItem();
+            // 先卸弹再调用射弹事件，取消库存写入或重入不能复制射弹。
+            // Unload before projectile callbacks so cancelled writes and reentry cannot duplicate shots.
+            if (!inventory.commitCrossbowChange(inventory.getHeldItemRevision(), this, unloaded, null, -1)) {
+                inventory.sendContents(player);
+                return false;
+            }
             int penetrationLevel = getEnchantmentLevel(Enchantment.ID_CROSSBOW_PIERCING);
             Vector3 aimDir = Vector3.directionFromRotation(player.pitch, player.yaw);
             ThreadLocalRandom random = ThreadLocalRandom.current();
@@ -217,7 +250,6 @@ public class ItemCrossbow extends ItemBow {
                     }
                 }
                 player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_CROSSBOW_SHOOT);
-                this.useArrow(player);
             } else {
                 for (int i = 0; i < launchCount; i++) {
                     float angleOffset = launchCount == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
@@ -225,8 +257,8 @@ public class ItemCrossbow extends ItemBow {
                     ((ItemFirework) chargedItem).spawnFirework(player.level, pos, dir, player);
                 }
                 player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_CROSSBOW_SHOOT);
-                this.useArrow(player);
             }
+            this.clearChargedItem();
             return true;
         }
         return false;
