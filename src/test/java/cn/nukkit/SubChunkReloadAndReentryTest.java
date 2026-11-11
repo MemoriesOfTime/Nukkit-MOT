@@ -1,11 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.block.BlockID;
-import cn.nukkit.level.ClientCacheBlobStore;
-import cn.nukkit.level.DimensionEnum;
-import cn.nukkit.level.Level;
-import cn.nukkit.level.PlayerBlobCacheState;
-import cn.nukkit.level.PlayerSubChunkRequestState;
+import cn.nukkit.level.*;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
@@ -657,6 +653,7 @@ class SubChunkReloadAndReentryTest {
             field(player, "connected", true);
             field(player, "usedChunks", new HashMap<>(java.util.Map.of(HASH, Boolean.FALSE)));
             field(player, "loadQueue", new LongLinkedOpenHashSet());
+            field(player, "pendingChunkRetries", Player.newPendingRetryQueue());
             field(player, "subChunkRequestState", new PlayerSubChunkRequestState());
             field(player, "gameVersion", VERSION);
             field(player, "protocol", VERSION.getProtocol());

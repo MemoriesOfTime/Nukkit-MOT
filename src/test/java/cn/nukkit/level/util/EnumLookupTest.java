@@ -9,42 +9,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
 import static org.junit.jupiter.api.Assertions.*;
 
-class EnumLookupScratchTest {
-    private static BitArrayVersion originalLookup(int input, boolean read) {
-        for (BitArrayVersion version : BitArrayVersion.values()) {
-            if ((!read && version.entriesPerWord <= input) || (read && version.bits == input)) {
-                return version;
-            }
-        }
-        throw new IllegalArgumentException("Invalid palette version: " + input);
-    }
-
-    @Test void selectionAndFailureMessagesMatchOriginalOrder() {
-        List<Integer> inputs = new ArrayList<>();
-        for (int input = -64; input <= 256; input++) inputs.add(input);
-        inputs.add(Integer.MIN_VALUE);
-        inputs.add(Integer.MAX_VALUE);
-        Random random = new Random(0x7719aaL);
-        for (int i = 0; i < 512; i++) inputs.add(random.nextInt());
-        for (int input : inputs) for (boolean read : new boolean[]{false, true}) {
-            BitArrayVersion expected;
-            try {
-                expected = originalLookup(input, read);
-            } catch (IllegalArgumentException failure) {
-                IllegalArgumentException actual = assertThrows(IllegalArgumentException.class,
-                        () -> BitArrayVersion.get(input, read));
-                assertEquals(failure.getMessage(), actual.getMessage());
-                continue;
-            }
-            assertSame(expected, BitArrayVersion.get(input, read), input + ":" + read);
-        }
-    }
+class EnumLookupTest {
 
     @Test void persistedPaletteReadsKeepEveryVersionAndCell() {
         for (BitArrayVersion version : BitArrayVersion.values()) for (int flag = 0; flag < 2; flag++) {

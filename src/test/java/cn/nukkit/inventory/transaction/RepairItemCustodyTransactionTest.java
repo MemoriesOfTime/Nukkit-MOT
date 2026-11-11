@@ -5,12 +5,7 @@ import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
-import cn.nukkit.inventory.CraftingGrid;
-import cn.nukkit.inventory.CraftingManager;
-import cn.nukkit.inventory.Inventory;
-import cn.nukkit.inventory.PlayerInventory;
-import cn.nukkit.inventory.PlayerOffhandInventory;
-import cn.nukkit.inventory.PlayerUIInventory;
+import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
 import cn.nukkit.inventory.transaction.action.CraftingTransferMaterialAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
@@ -26,7 +21,8 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class RepairItemCustodyTransactionTest {
@@ -57,7 +53,7 @@ class RepairItemCustodyTransactionTest {
     void mutatingEventInputsCannotHideOriginalMetadata() throws Exception {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = markedInput(225, "example:original");
-        check(first, second, Item.get(Item.IRON_SHOVEL, 163, 1), false,
+        check(first, second, Item.get(Item.IRON_SHOVEL, 162, 1), false,
                 event -> event.getTransaction().getInputList().forEach(Item::clearNamedTag));
     }
 
@@ -65,7 +61,7 @@ class RepairItemCustodyTransactionTest {
     void conflictingInputMetadataRefusesWithoutSpendingEitherInput() throws Exception {
         Item first = markedInput(200, "example:first");
         Item second = markedInput(225, "example:second");
-        Item output = Item.get(Item.IRON_SHOVEL, 163, 1).setNamedTag(first.getNamedTag().copy());
+        Item output = Item.get(Item.IRON_SHOVEL, 162, 1).setNamedTag(first.getNamedTag().copy());
         check(first, second, output, false, event -> { });
     }
 
@@ -74,7 +70,7 @@ class RepairItemCustodyTransactionTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1).setCustomName("First shovel");
         first.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_EFFICIENCY).setLevel(2));
         first.setNamedTag(first.getNamedTag().putInt("RepairCost", 3));
-        check(first, Item.get(Item.IRON_SHOVEL, 225, 1), Item.get(Item.IRON_SHOVEL, 163, 1),
+        check(first, Item.get(Item.IRON_SHOVEL, 225, 1), Item.get(Item.IRON_SHOVEL, 162, 1),
                 true, event -> { });
     }
 
@@ -84,7 +80,7 @@ class RepairItemCustodyTransactionTest {
     }
 
     private static void checkSecondInputMetadata(String eventOrigin, boolean accepted) throws Exception {
-        Item output = Item.get(Item.IRON_SHOVEL, 163, 1);
+        Item output = Item.get(Item.IRON_SHOVEL, 162, 1);
         if (eventOrigin != null) {
             output.setNamedTag(new CompoundTag()
                     .putString("example:origin", eventOrigin).putString("example:audit", "event"));
@@ -98,7 +94,7 @@ class RepairItemCustodyTransactionTest {
         try (Fixture f = new Fixture()) {
             assertTrue(f.grid.setItem(0, first, false));
             assertTrue(f.grid.setItem(1, second, false));
-            Item requestedOutput = Item.get(Item.IRON_SHOVEL, 163, 1);
+            Item requestedOutput = Item.get(Item.IRON_SHOVEL, 162, 1);
             if (first.hasCompoundTag() && !first.hasCustomName()) {
                 requestedOutput.setNamedTag(first.getNamedTag().copy());
             }

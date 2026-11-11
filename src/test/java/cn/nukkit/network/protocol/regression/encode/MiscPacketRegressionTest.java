@@ -21,8 +21,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Base64;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -483,6 +482,143 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
         if (protocolVersion >= 388) {
             assertEquals("*", cbPacket.getGameVersion());
         }
+    }
+
+    @Test
+    void testBiomeDefinitionListPacketV2168WithDefinitions() throws Exception {
+        var nukkitPacket = new BiomeDefinitionListPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+
+        var gson = new com.google.gson.GsonBuilder()
+                .registerTypeAdapter(java.awt.Color.class, new com.google.gson.TypeAdapter<java.awt.Color>() {
+                    @Override
+                    public void write(com.google.gson.stream.JsonWriter out, java.awt.Color color) {
+                    }
+
+                    @Override
+                    public java.awt.Color read(com.google.gson.stream.JsonReader in) throws java.io.IOException {
+                        if (in.peek() == com.google.gson.stream.JsonToken.NULL) {
+                            in.nextNull();
+                            return null;
+                        }
+                        int r = 0, g = 0, b = 0, a = 255;
+                        in.beginObject();
+                        while (in.hasNext()) {
+                            switch (in.nextName()) {
+                                case "r" -> r = in.nextInt();
+                                case "g" -> g = in.nextInt();
+                                case "b" -> b = in.nextInt();
+                                case "a" -> a = in.nextInt();
+                                default -> in.skipValue();
+                            }
+                        }
+                        in.endObject();
+                        return new java.awt.Color(r, g, b, a);
+                    }
+                })
+                .registerTypeAdapter(cn.nukkit.block.Block.class, new com.google.gson.JsonDeserializer<cn.nukkit.block.Block>() {
+                    @Override
+                    public cn.nukkit.block.Block deserialize(com.google.gson.JsonElement json, java.lang.reflect.Type typeOfT,
+                                                              com.google.gson.JsonDeserializationContext context) {
+                        com.google.gson.JsonObject obj = json.getAsJsonObject();
+                        return cn.nukkit.block.Block.get(obj.get("id").getAsInt(), obj.get("meta").getAsInt());
+                    }
+                })
+                .create();
+        var definitions = gson.fromJson(
+                cn.nukkit.utils.Utils.loadJsonResource("biome/stripped_biome_definitions_844.json"),
+                new com.google.gson.reflect.TypeToken<java.util.LinkedHashMap<String,
+                        cn.nukkit.network.protocol.types.biome.BiomeDefinitionData>>() {}.getType());
+        var field = BiomeDefinitionListPacket.class.getDeclaredField("biomeDefinitions");
+        field.setAccessible(true);
+        field.set(nukkitPacket, definitions);
+
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.BiomeDefinitionListPacket.class);
+        assertNotNull(cbPacket);
+    }
+
+    @Test
+    void testResourcePacksInfoPacketV2168WithPackEntry() {
+        var nukkitPacket = new ResourcePacksInfoPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+        nukkitPacket.resourcePackEntries = new cn.nukkit.resourcepacks.ResourcePack[]{testResourcePack()};
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ResourcePacksInfoPacket.class);
+        assertNotNull(cbPacket);
+        assertEquals(1, cbPacket.getResourcePackInfos().size());
+        assertEquals("1.0.0", cbPacket.getResourcePackInfos().get(0).getPackVersion());
+    }
+
+    @Test
+    void testResourcePackStackPacketV2168WithPackEntry() {
+        var nukkitPacket = new ResourcePackStackPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.resourcePackStack = new cn.nukkit.resourcepacks.ResourcePack[]{testResourcePack()};
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.ResourcePackStackPacket.class);
+        assertNotNull(cbPacket);
+    }
+
+    @Test
+    void testGameRulesChangedPacketV2168WithRules() {
+        var nukkitPacket = new GameRulesChangedPacket();
+        nukkitPacket.protocol = ProtocolInfo.v1_26_40;
+        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(ProtocolInfo.v1_26_40, false);
+        Map<cn.nukkit.level.GameRule, GameRules.Value> gameRulesMap = new HashMap<>();
+        gameRulesMap.put(cn.nukkit.level.GameRule.DO_DAYLIGHT_CYCLE,
+                new GameRules.Value(GameRules.Type.BOOLEAN, false));
+        gameRulesMap.put(cn.nukkit.level.GameRule.SHOW_COORDINATES,
+                new GameRules.Value(GameRules.Type.BOOLEAN, true));
+        nukkitPacket.gameRulesMap = gameRulesMap;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.GameRulesChangedPacket.class);
+        assertNotNull(cbPacket);
+        assertEquals(2, cbPacket.getGameRules().size());
+    }
+
+    private static cn.nukkit.resourcepacks.ResourcePack testResourcePack() {
+        return new cn.nukkit.resourcepacks.ResourcePack() {
+            @Override
+            public String getPackName() {
+                return "Test Pack";
+            }
+
+            @Override
+            public UUID getPackId() {
+                return UUID.fromString("00000000-0000-0000-0000-000000000001");
+            }
+
+            @Override
+            public String getPackVersion() {
+                return "1.0.0";
+            }
+
+            @Override
+            public int getPackSize() {
+                return 1024;
+            }
+
+            @Override
+            public byte[] getSha256() {
+                return new byte[32];
+            }
+
+            @Override
+            public byte[] getPackChunk(int off, int len) {
+                return new byte[0];
+            }
+        };
     }
 
     // ==================== MovementEffectPacket ====================

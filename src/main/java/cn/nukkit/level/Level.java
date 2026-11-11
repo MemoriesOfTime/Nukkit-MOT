@@ -462,6 +462,7 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
+    private volatile boolean chunkLoadsClosing;
     // 每世界在飞异步读取上限,为共享池提供背压(取代原每世界有界队列)
     // Per-level in-flight cap for async reads, backpressure for the shared pool (replaces the old bounded queue)
     private Semaphore asyncChunkLoadSlots;
@@ -807,6 +808,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public void close() {
         boolean interrupted = false;
+        this.chunkLoadsClosing = true;
+        for (PendingChunkLoad pending : this.pendingChunkLoads.values()) {
+            pending.invalidated = true;
+        }
         this.providerLock.writeLock().lock();
         try {
             interrupted = this.drainAsyncChunkLoads();
@@ -2810,7 +2815,11 @@ public class Level implements ChunkManager, Metadatable {
 
         try {
             for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
-                callback.accept(blockPrevious, block);
+                try {
+                    callback.accept(blockPrevious, block);
+                } catch (Exception e) {
+                    Server.getInstance().getLogger().error("Error while calling block set callback", e);
+                }
             }
         } catch (Exception e) {
             Server.getInstance().getLogger().error("Error while calling block set callback", e);
@@ -3321,14 +3330,17 @@ public class Level implements ChunkManager, Metadatable {
                     return item;
                 }
 
-                if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated() && target.onActivate(item, player)) {
-                    if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-                        this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-                        this.addParticle(new ItemBreakParticle(target, item));
-                        item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-                    }
+                if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated()) {
+                    int damageBefore = item.getDamage();
+                    if (target.onActivate(item, player)) {
+                        if (item.getDamage() > damageBefore && item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                            this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                            this.addParticle(new ItemBreakParticle(target, item));
+                            item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+                        }
 
-                    return item;
+                        return item;
+                    }
                 }
 
                 if (item.canBeActivated() && item.onActivate(this, player, block, target, face, fx, fy, fz)) {
@@ -3347,14 +3359,17 @@ public class Level implements ChunkManager, Metadatable {
             if (item.getId() == ItemID.BUCKET && ItemBucket.getDamageByTarget(item.getDamage()) == BlockID.WATER) {
                 player.getLevel().sendBlocks(new Player[]{player}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
             }
-        } else if (target.canBeActivated() && target.onActivate(item, null)) {
-            if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-                this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-                this.addParticle(new ItemBreakParticle(target, item));
-                item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-            }
+        } else if (target.canBeActivated()) {
+            int damageBefore = item.getDamage();
+            if (target.onActivate(item, null)) {
+                if (item.getDamage() > damageBefore && item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                    this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                    this.addParticle(new ItemBreakParticle(target, item));
+                    item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+                }
 
-            return item;
+                return item;
+            }
         }
 
         Block hand;
@@ -5377,7 +5392,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     public boolean requestChunkLoadAsync(int x, int z) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
+        if (this.chunkLoadsClosing || levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
             return false;
         }
 
@@ -5397,7 +5412,7 @@ public class Level implements ChunkManager, Metadatable {
                 this.asyncChunkLoadExecutor.execute(() -> {
                     this.runningAsyncChunkLoads.incrementAndGet();
                     try {
-                        if (pending.invalidated) {
+                        if (this.chunkLoadsClosing || pending.invalidated) {
                             return;
                         }
                         pending.chunk = levelProvider.readChunkOffThread(x, z);
@@ -5438,7 +5453,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     synchronized void mountChunk(PendingChunkLoad pending) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || levelProvider.getLevel() == null
+        if (this.chunkLoadsClosing || levelProvider == null || levelProvider.getLevel() == null
             || levelProvider != pending.provider || pending.invalidated
                 || levelProvider.isChunkLoaded(pending.hash)) {
             return;

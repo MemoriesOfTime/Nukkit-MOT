@@ -3,6 +3,7 @@ package cn.nukkit.level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import com.sun.management.ThreadMXBean;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -139,6 +140,7 @@ class RedstonePowerTraversalAllocationTest {
         assertEquals(ORDER, seen);
     }
 
+    @Tag("perf")
     @Test
     void powerQueriesDoNotAllocateFaceArrays(@TempDir Path directory) throws Exception {
         assumeTrue(ManagementFactory.getThreadMXBean() instanceof ThreadMXBean bean

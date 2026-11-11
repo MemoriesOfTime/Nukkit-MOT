@@ -78,6 +78,30 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         removeInvalidUnknownTile(x, y, z);
     }
 
+    /**
+     * 原生共享空 section 的空气写入是无操作；真实写入方负责物化和缓存失效。
+     * <p>
+     * Air writes to a native shared empty section are no-ops; real writers handle materialization and cache invalidation.
+     */
+    private boolean canSkipEmptyAirWrite(int sectionY) {
+        if (getClass() != cn.nukkit.level.format.leveldb.structure.LevelDBChunk.class || !this.isInit
+                || this.tiles != null || this.tileList != null || this.unknownTiles != null) {
+            return false;
+        }
+        var chunk = (cn.nukkit.level.format.leveldb.structure.LevelDBChunk) this;
+        if (!chunk.hasStableSectionOffset()) {
+            return false;
+        }
+        ChunkSection[] sections = this.sections;
+        // Match getSection(float), including its conversion before adding the offset.
+        int index = (int) (chunk.getSectionOffset() + (float) sectionY);
+        if (sections == null || index < 0 || index >= sections.length) {
+            return false;
+        }
+        ChunkSection section = sections[index];
+        return section != null && section.getClass() == EmptyChunkSection.class;
+    }
+
     @Override
     public int getFullBlock(int x, int y, int z) {
         return getFullBlock(x, y, z, 0);
@@ -134,6 +158,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     public boolean setFullBlockId(int x, int y, int z, int layer, int fullId) {
         int Y = y >> 4;
         try {
+            if (fullId == 0 && canSkipEmptyAirWrite(Y)) return false;
             setChanged();
             return this.getSection(Y).setFullBlockId(x, y & 0x0f, z, layer, fullId);
         } catch (ChunkException e) {
@@ -156,6 +181,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId, int meta) {
         int Y = y >> 4;
         try {
+            if (blockId == 0 && canSkipEmptyAirWrite(Y)) return false;
             setChanged();
             return this.getSection(Y).setBlockAtLayer(x, y & 0x0f, z, layer, blockId, meta);
         } catch (ChunkException e) {

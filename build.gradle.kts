@@ -71,10 +71,20 @@ sourceSets.main {
 repositories {
     mavenLocal()
     mavenCentral()
-    maven("https://repo.opencollab.dev/maven-releases/")
-    maven("https://repo.opencollab.dev/maven-snapshots/")
-    maven("https://repo.lanink.cn/repository/maven-public/")
+    maven("https://repo.opencollab.dev/maven-releases/") {
+        mavenContent { releasesOnly() }
+    }
+    maven("https://repo.opencollab.dev/maven-snapshots/") {
+        mavenContent { snapshotsOnly() }
+    }
+    maven("https://repo.lanink.cn/repository/maven-releases/") {
+        mavenContent { releasesOnly() }
+    }
+    maven("https://repo.lanink.cn/repository/maven-snapshots/") {
+        mavenContent { snapshotsOnly() }
+    }
     maven("https://repo.okaeri.cloud/releases")
+    maven("https://maven.daporkchop.net/")
 }
 
 val mockitoAgent by configurations.creating {
@@ -97,6 +107,7 @@ dependencies {
     constraints {
         implementation("net.jodah:expiringmap:${libs.versions.expiringmap.get()}")
         implementation("org.slf4j:slf4j-api:${libs.versions.slf4j.api.get()}")
+        implementation("org.jspecify:jspecify:${libs.versions.jspecify.get()}")
         // Maven nearest-wins 解析出 2.18.0，Gradle highest-wins 会漂到 2.20，strictly 钉死对齐
         // Maven resolves 2.18.0 while Gradle highest-wins drifts to 2.20; pin strictly
         implementation("com.fasterxml.jackson.core:jackson-annotations") { version { strictly("2.18.0") } }
@@ -134,6 +145,7 @@ dependencies {
     api(libs.netty.epoll)
     api(libs.netty.codec.haproxy)
     api(libs.netty.codec.http)
+    api(libs.netty.handler)
     api(libs.nukkitx.natives)
 
     api(libs.cloudburst.common) {
@@ -145,6 +157,7 @@ dependencies {
 
     api(libs.fastutil)
     api(libs.guava)
+    api(libs.checker.qual)
     api(libs.gson)
     api(libs.caffeine) {
         exclude("org.checkerframework", "checker-qual")
@@ -385,7 +398,11 @@ tasks {
     }
 
     test {
-        useJUnitPlatform()
+        useJUnitPlatform {
+            // 分配测量默认不跑；用 `./gradlew perfTest` 显式执行。
+            excludeTags("perf")
+        }
+        maxHeapSize = "2g"
         // 隐式异常（NPE/AIOOBE）不走 fast-throw 预分配，测试才可比异常消息文本
         // Keep implicit-exception messages intact so tests can compare them
         jvmArgs("-XX:-OmitStackTraceInFastThrow")
@@ -394,6 +411,56 @@ tasks {
                 classpath.from(mockitoAgent)
             }
         )
+    }
+
+    register<Test>("perfTest") {
+        group = "verification"
+        description = "Runs allocation/perf-tagged tests (excluded from test)"
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        maxHeapSize = "2g"
+        useJUnitPlatform {
+            includeTags("perf")
+        }
+        jvmArgs("-XX:-OmitStackTraceInFastThrow")
+        jvmArgumentProviders.add(
+            objects.newInstance<JavaAgentArgumentProvider>().apply {
+                classpath.from(mockitoAgent)
+            }
+        )
+    }
+
+    register<JavaExec>("packetCoverage") {
+        group = "verification"
+        description = "Generates packet cross-codec coverage report from the last test run"
+        dependsOn("test")
+        classpath = sourceSets.test.get().runtimeClasspath
+        mainClass.set("cn.nukkit.network.protocol.regression.PacketCoverageReport")
+    }
+
+    // 分配量基准：类名 *Benchmark、以 main() 运行，test 任务不会拾取。
+    // 按需执行 `./gradlew benchmark`；绝对字节数受 JIT/GC/JDK 影响，不作为门禁。
+    // Allocation benchmarks (main() entry points). Not part of `test`; run explicitly.
+    val benchmarkViewer = register<JavaExec>("benchmarkViewer") {
+        group = "verification"
+        description = "Runs the viewer snapshot allocation benchmark"
+        classpath = sourceSets.test.get().runtimeClasspath
+        mainClass.set("cn.nukkit.entity.EntityViewerSnapshotBenchmark")
+        jvmArgs("-XX:-DoEscapeAnalysis", "-Xms256m", "-Xmx512m")
+    }
+
+    val benchmarkZombie = register<JavaExec>("benchmarkZombie") {
+        group = "verification"
+        description = "Runs the zombie melee attack allocation benchmark"
+        classpath = sourceSets.test.get().runtimeClasspath
+        mainClass.set("cn.nukkit.entity.mob.EntityZombieAttackBenchmark")
+        jvmArgs("-XX:-DoEscapeAnalysis", "-Xms256m", "-Xmx512m")
+    }
+
+    register("benchmark") {
+        group = "verification"
+        description = "Runs all allocation benchmarks"
+        dependsOn(benchmarkViewer, benchmarkZombie)
     }
 
     // Minify all .json resources in the build output to shrink the JAR.
