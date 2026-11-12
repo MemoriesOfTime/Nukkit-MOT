@@ -19,6 +19,7 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.util.internal.PlatformDependent;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.netty.channel.nethernet.AddressSource;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 import org.cloudburstmc.netty.channel.nethernet.SourcedAddress;
@@ -464,16 +465,24 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     }
 
     /**
-     * 玩家地址：共用端口模式下媒体对端是回环 leg，取信令来源；独立端口取选中的 ICE pair。
-     * The player's address: the signaling source in shared-port mode, where the media peer is a
-     * loopback leg, and the selected ICE pair otherwise.
+     * 共用端口通过中继还原客户端 UDP 地址，无法映射时回退信令地址；独立端口取选中的 ICE pair。
+     * <p>
+     * Shared ports resolve the client's UDP address through the relay, falling back to signaling;
+     * dedicated ports use the selected ICE pair.
      */
     public InetSocketAddress playerAddress(NetherNetChildChannel channel) {
-        return playerAddress(channel, this.relay != null);
+        return playerAddress(channel, this.relay);
     }
 
-    static InetSocketAddress playerAddress(NetherNetChildChannel channel, boolean relayed) {
-        if (relayed) {
+    static InetSocketAddress playerAddress(NetherNetChildChannel channel, NetherNetMediaRelay relay) {
+        if (relay != null) {
+            SourcedAddress media = channel.mediaAddress();
+            if (media != null && media.source() != AddressSource.UNKNOWN) {
+                InetSocketAddress client = relay.clientFor(media.address());
+                if (client != null) {
+                    return client;
+                }
+            }
             SourcedAddress signaled = channel.signaledAddress();
             InetSocketAddress address = signaled == null ? null : signaled.address();
             InetAddress inet = address == null ? null : address.getAddress();
@@ -501,9 +510,6 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
                 continue;
             }
-            // 共用端口模式下媒体对端是回环 leg，玩家地址取信令来源；独立端口取选中的 ICE pair
-            // In shared-port mode the media peer is a loopback leg, so the player address comes
-            // from signaling; a dedicated media port uses the selected ICE pair
             InetSocketAddress address = this.playerAddress(session.getChannel());
             InetAddress inetAddress = address == null ? null : address.getAddress();
             if (inetAddress != null && this.isAddressBlocked(inetAddress)) {

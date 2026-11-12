@@ -208,6 +208,7 @@ class NetherNetInterfaceTest {
                                                         InetSocketAddress media) {
         NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
         when(channel.signaledAddress()).thenReturn(new SourcedAddress(signaling, AddressSource.SIGNALING, null));
+        when(channel.mediaAddress()).thenReturn(new SourcedAddress(media, AddressSource.ICE, null));
         when(channel.remoteAddress()).thenReturn(media);
         when(channel.isOpen()).thenReturn(true);
         when(channel.isActive()).thenReturn(true);
@@ -217,16 +218,59 @@ class NetherNetInterfaceTest {
     }
 
     @Test
-    void sharedPortTakesThePlayerAddressFromSignaling() {
+    void sharedPortTakesThePlayerAddressFromTheRelayLeg() {
         NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
-        InetSocketAddress client = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress client = new InetSocketAddress("203.0.113.10", 51234);
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
         InetSocketAddress leg = new InetSocketAddress("127.0.0.1", 52000);
-        when(channel.signaledAddress()).thenReturn(new SourcedAddress(client, AddressSource.SIGNALING, null));
+        when(channel.mediaAddress()).thenReturn(new SourcedAddress(leg, AddressSource.ICE, null));
+        when(channel.signaledAddress()).thenReturn(new SourcedAddress(signaling, AddressSource.SIGNALING, null));
+        when(channel.remoteAddress()).thenReturn(leg);
+        NetherNetMediaRelay relay = mock(NetherNetMediaRelay.class);
+        when(relay.clientFor(leg)).thenReturn(client);
+
+        assertEquals(client, NetherNetInterface.playerAddress(channel, relay),
+                "the relay knows the client's real UDP address; the signaling one carries a TCP port and means nothing");
+    }
+
+    @Test
+    void sharedPortFallsBackToSignalingWhileNoLegCanBeResolved() {
+        NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress leg = new InetSocketAddress("127.0.0.1", 52000);
+        when(channel.mediaAddress()).thenReturn(new SourcedAddress(leg, AddressSource.ICE, null));
+        when(channel.signaledAddress()).thenReturn(new SourcedAddress(signaling, AddressSource.SIGNALING, null));
         when(channel.remoteAddress()).thenReturn(leg);
 
-        assertEquals(client, NetherNetInterface.playerAddress(channel, true),
-                "the media peer is the loopback leg, so identity comes from signaling");
-        assertEquals(leg, NetherNetInterface.playerAddress(channel, false),
+        assertEquals(signaling, NetherNetInterface.playerAddress(channel, mock(NetherNetMediaRelay.class)),
+                "a reaped leg leaves the signaling source as the fallback");
+    }
+
+    @Test
+    void sharedPortResolvesNothingBeforeTheSelectedPairIsAdopted() {
+        NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress media = new InetSocketAddress("203.0.113.11", 52000);
+        when(channel.mediaAddress()).thenReturn(
+                new SourcedAddress(new InetSocketAddress(0), AddressSource.UNKNOWN, null));
+        when(channel.signaledAddress()).thenReturn(new SourcedAddress(signaling, AddressSource.SIGNALING, null));
+        when(channel.remoteAddress()).thenReturn(media);
+        NetherNetMediaRelay relay = mock(NetherNetMediaRelay.class);
+
+        assertEquals(signaling, NetherNetInterface.playerAddress(channel, relay),
+                "with no selected pair yet there is no leg to resolve");
+        verify(relay, never()).clientFor(any());
+    }
+
+    @Test
+    void dedicatedPortTakesTheSelectedPair() {
+        NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
+        InetSocketAddress signaling = new InetSocketAddress("203.0.113.10", 41000);
+        InetSocketAddress media = new InetSocketAddress("203.0.113.10", 51234);
+        when(channel.signaledAddress()).thenReturn(new SourcedAddress(signaling, AddressSource.SIGNALING, null));
+        when(channel.remoteAddress()).thenReturn(media);
+
+        assertEquals(media, NetherNetInterface.playerAddress(channel, null),
                 "a dedicated media port reports the selected pair");
     }
 
@@ -238,7 +282,7 @@ class NetherNetInterfaceTest {
                 new SourcedAddress(new InetSocketAddress(0), AddressSource.UNKNOWN, null));
         when(channel.remoteAddress()).thenReturn(leg);
 
-        assertEquals(leg, NetherNetInterface.playerAddress(channel, true));
+        assertEquals(leg, NetherNetInterface.playerAddress(channel, mock(NetherNetMediaRelay.class)));
     }
 
     @Test
