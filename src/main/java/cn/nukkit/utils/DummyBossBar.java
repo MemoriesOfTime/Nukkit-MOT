@@ -24,6 +24,30 @@ public class DummyBossBar {
     private float length;
     private BossBarColor color;
 
+    private static final int ADD = 1;
+    private static final int ATTRIBUTES = 2;
+    private static final int SHOW = 4;
+    private static final int HEALTH = 8;
+    private static final int TEXTURE = 16;
+    private static final int NAME = 32;
+    private static final int TITLE = 64;
+    private static final int MOVE = 128;
+    private static final int HIDE = 256;
+    private static final int REMOVE = 512;
+    private static final int CREATE = ADD | ATTRIBUTES | SHOW | HEALTH;
+    private static final int DESTROY = HIDE | REMOVE;
+
+    private int pendingPackets;
+    private int sendingPackets;
+    private int generation;
+    private final int[] packetGenerations = new int[10];
+    private boolean deferPackets;
+    private String pendingShowText;
+    private float pendingShowLength;
+    private boolean hasAcceptedShow;
+    private String acceptedText;
+    private float acceptedLength;
+
     private DummyBossBar(Builder builder) {
         this.player = builder.player;
         this.bossBarId = builder.bossBarId;
@@ -104,8 +128,10 @@ public class DummyBossBar {
     public void setText(String text) {
         if (!this.text.equals(text)) {
             this.text = text;
-            this.updateBossEntityNameTag();
-            this.sendSetBossBarTitle();
+            markPending(NAME | TITLE);
+        }
+        if (!deferPackets && (pendingPackets & (ADD | SHOW)) == 0) {
+            retryGroup(NAME, TITLE);
         }
     }
 
@@ -126,8 +152,10 @@ public class DummyBossBar {
     public void setLength(float length) {
         if (this.length != length) {
             this.length = length;
-            this.sendAttributes();
-            this.sendSetBossBarLength();
+            markPending(ATTRIBUTES | HEALTH);
+        }
+        if (!deferPackets && (pendingPackets & (ADD | SHOW)) == 0) {
+            retryGroup(ATTRIBUTES, HEALTH);
         }
     }
 
@@ -137,7 +165,10 @@ public class DummyBossBar {
     public void setColor(BossBarColor color) {
         if (this.color == null || !this.color.equals(color)) {
             this.color = color;
-            this.sendSetBossBarTexture();
+            markPending(TEXTURE);
+        }
+        if (!deferPackets && (pendingPackets & (ADD | SHOW)) == 0) {
+            retryPacket(TEXTURE);
         }
     }
 
@@ -163,7 +194,7 @@ public class DummyBossBar {
         return this.color;
     }
 
-    private void createBossEntity() {
+    private boolean createBossEntity() {
         AddEntityPacket pkAdd = new AddEntityPacket();
         pkAdd.type = EntityCreeper.NETWORK_ID;
         pkAdd.entityUniqueId = bossBarId;
@@ -182,60 +213,62 @@ public class DummyBossBar {
                 .putLong(Entity.DATA_LEAD_HOLDER_EID, -1)
                 .putString(Entity.DATA_NAMETAG, text) // Set the entity name
                 .putFloat(Entity.DATA_SCALE, 0); // And make it invisible
-        player.dataPacket(pkAdd);
+        return submit(ADD, pkAdd);
     }
 
-    private void sendAttributes() {
+    private boolean sendAttributes() {
         UpdateAttributesPacket pkAttributes = new UpdateAttributesPacket();
         pkAttributes.entityId = bossBarId;
         Attribute attr = Attribute.getAttribute(Attribute.MAX_HEALTH);
         attr.setMaxValue(100); // Max value - We need to change the max value first, or else the "setValue" will return a IllegalArgumentException
         attr.setValue(length); // Entity health
         pkAttributes.entries = new Attribute[]{attr};
-        player.dataPacket(pkAttributes);
+        return submit(ATTRIBUTES, pkAttributes);
     }
 
-    private void sendShowBossBar() {
+    private boolean sendShowBossBar() {
         BossEventPacket pkBoss = new BossEventPacket();
         pkBoss.bossEid = bossBarId;
         pkBoss.type = BossEventPacket.TYPE_SHOW;
-        pkBoss.title = text;
-        pkBoss.healthPercent = player.protocol >= 361 ? this.length / 100 : this.length;
-        player.dataPacket(pkBoss);
+        pkBoss.title = pendingShowText;
+        pkBoss.healthPercent = player.protocol >= 361 ? pendingShowLength / 100 : pendingShowLength;
+        return submit(SHOW, pkBoss);
     }
 
-    private void sendHideBossBar() {
+    private boolean sendHideBossBar() {
         BossEventPacket pkBoss = new BossEventPacket();
         pkBoss.bossEid = bossBarId;
         pkBoss.type = BossEventPacket.TYPE_HIDE;
-        player.dataPacket(pkBoss);
+        return submit(HIDE, pkBoss);
     }
 
-    private void sendSetBossBarTexture() {
+    private boolean sendSetBossBarTexture() {
         BossEventPacket pk = new BossEventPacket();
         pk.bossEid = this.bossBarId;
         pk.type = BossEventPacket.TYPE_TEXTURE;
         pk.color = this.color.ordinal();
-        player.dataPacket(pk);
+        return submit(TEXTURE, pk);
     }
 
-    private void sendSetBossBarTitle() {
+    private boolean sendSetBossBarTitle() {
         BossEventPacket pkBoss = new BossEventPacket();
         pkBoss.bossEid = bossBarId;
         pkBoss.type = BossEventPacket.TYPE_TITLE;
         pkBoss.title = text;
         pkBoss.healthPercent = player.protocol >= 361 ? this.length / 100 : this.length;
-        player.dataPacket(pkBoss);
+        return submit(TITLE, pkBoss);
     }
 
-    private void sendSetBossBarLength() {
+    private boolean sendSetBossBarLength() {
         if (player.protocol >= 361) { // Again, what the hell is this and where is the documentation?
             BossEventPacket pkBoss = new BossEventPacket();
             pkBoss.bossEid = bossBarId;
             pkBoss.type = BossEventPacket.TYPE_HEALTH_PERCENT;
             pkBoss.healthPercent = this.length / 100;
-            player.dataPacket(pkBoss);
+            return submit(HEALTH, pkBoss);
         }
+        pendingPackets &= ~HEALTH;
+        return true;
     }
 
     /**
@@ -243,6 +276,13 @@ public class DummyBossBar {
      * Update boss entity's position when teleport and each 5s.
      */
     public void updateBossEntityPosition() {
+        markPending(MOVE);
+        if (!deferPackets && (pendingPackets & ADD) == 0) {
+            retryPacket(MOVE);
+        }
+    }
+
+    private boolean moveBossEntity() {
         MoveEntityAbsolutePacket pk = new MoveEntityAbsolutePacket();
         pk.eid = this.bossBarId;
         pk.x = this.player.x;
@@ -251,41 +291,139 @@ public class DummyBossBar {
         pk.headYaw = 0;
         pk.yaw = 0;
         pk.pitch = 0;
-        player.dataPacket(pk);
+        return submit(MOVE, pk);
     }
 
-    private void updateBossEntityNameTag() {
+    private boolean updateBossEntityNameTag() {
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.bossBarId;
         pk.metadata = new EntityMetadata().putString(Entity.DATA_NAMETAG, this.text);
-        player.dataPacket(pk);
+        return submit(NAME, pk);
     }
 
-    private void removeBossEntity() {
+    private boolean removeBossEntity() {
         RemoveEntityPacket pkRemove = new RemoveEntityPacket();
         pkRemove.eid = bossBarId;
-        player.dataPacket(pkRemove);
+        return submit(REMOVE, pkRemove);
+    }
+
+    /** Pending means refused by the sending API, not missing client acknowledgement. */
+    public boolean hasPendingPackets() {
+        return pendingPackets != 0;
+    }
+
+    /** Applies one frame and attempts each pending kind at most once on the player thread. */
+    public boolean updateState(String text, float length, BossBarColor color) {
+        boolean previousDefer = deferPackets;
+        deferPackets = true;
+        try {
+            setText(text);
+            setLength(length);
+            setColor(color);
+        } finally {
+            deferPackets = previousDefer;
+        }
+        return retryPendingPackets();
+    }
+
+    /** Retries original kinds only; accepted stages are not resent. */
+    public boolean retryPendingPackets() {
+        if (sendingPackets != 0) return false;
+        if (!retryGroup(HIDE, REMOVE) || !retryPacket(ADD)) return false;
+        if ((pendingPackets & SHOW) != 0) {
+            if (!retryPacket(ATTRIBUTES) || !retryPacket(MOVE) || !retryPacket(SHOW)) return false;
+        }
+        boolean accepted = retryGroup(NAME, TITLE);
+        accepted &= retryGroup(ATTRIBUTES, HEALTH);
+        accepted &= retryPacket(TEXTURE);
+        accepted &= retryPacket(MOVE);
+        return accepted && pendingPackets == 0;
+    }
+
+    private void markPending(int kinds) {
+        pendingPackets |= kinds;
+        for (int remaining = kinds; remaining != 0; remaining &= remaining - 1) {
+            int bit = Integer.lowestOneBit(remaining);
+            packetGenerations[Integer.numberOfTrailingZeros(bit)] = ++generation;
+        }
+    }
+
+    private boolean retryGroup(int first, int second) {
+        boolean accepted = retryPacket(first);
+        accepted &= retryPacket(second);
+        return accepted;
+    }
+
+    private void resetPending() {
+        markPending(CREATE | DESTROY | NAME | TITLE | TEXTURE | MOVE);
+        pendingPackets = 0;
+    }
+
+    private boolean retryPacket(int kind) {
+        if ((pendingPackets & kind) == 0) return true;
+        if (sendingPackets != 0) return false;
+        return switch (kind) {
+            case ADD -> createBossEntity();
+            case ATTRIBUTES -> sendAttributes();
+            case SHOW -> sendShowBossBar();
+            case HEALTH -> sendSetBossBarLength();
+            case TEXTURE -> sendSetBossBarTexture();
+            case NAME -> updateBossEntityNameTag();
+            case TITLE -> sendSetBossBarTitle();
+            case MOVE -> moveBossEntity();
+            case HIDE -> sendHideBossBar();
+            case REMOVE -> removeBossEntity();
+            default -> throw new IllegalArgumentException("Unknown boss bar packet kind");
+        };
+    }
+
+    private boolean submit(int kind, DataPacket packet) {
+        int index = Integer.numberOfTrailingZeros(kind);
+        int sentGeneration = packetGenerations[index];
+        float sentLength = kind == SHOW ? pendingShowLength : length;
+        sendingPackets |= kind;
+        try {
+            if (player.dataPacket(packet)) {
+                if (kind == SHOW || kind == TITLE) {
+                    acceptedText = ((BossEventPacket) packet).title;
+                }
+                if (kind == SHOW || kind == HEALTH) acceptedLength = sentLength;
+                if (kind == SHOW) hasAcceptedShow = true;
+                if (packetGenerations[index] == sentGeneration) {
+                    pendingPackets &= ~kind;
+                    if (kind == SHOW) pendingShowText = null;
+                }
+            }
+            return packetGenerations[index] == sentGeneration && (pendingPackets & kind) == 0;
+        } finally {
+            sendingPackets &= ~kind;
+        }
     }
 
     public void create() {
-        createBossEntity();
-        sendAttributes();
-        sendShowBossBar();
-        sendSetBossBarLength();
-        if (color != null) this.sendSetBossBarTexture();
+        int pendingDestroy = pendingPackets & DESTROY;
+        resetPending();
+        markPending(pendingDestroy | CREATE | (color == null ? 0 : TEXTURE));
+        pendingShowText = text;
+        pendingShowLength = length;
+        retryPendingPackets();
     }
 
-    /**
-     * Once the player has teleported, resend Show BossBar
-     */
+    /** Once the player has teleported, resend Show BossBar. */
     public void reshow() {
-        updateBossEntityPosition();
-        sendShowBossBar();
-        sendSetBossBarLength();
+        // A teleport refresh must not bypass a cancelled field update through SHOW.
+        if ((pendingPackets & SHOW) == 0) {
+            pendingShowText = hasAcceptedShow && (pendingPackets & TITLE) != 0 ? acceptedText : text;
+            pendingShowLength = hasAcceptedShow && (pendingPackets & HEALTH) != 0 ? acceptedLength : length;
+        }
+        markPending(MOVE | SHOW | HEALTH);
+        retryPendingPackets();
     }
 
     public void destroy() {
-        sendHideBossBar();
-        removeBossEntity();
+        resetPending();
+        markPending(DESTROY);
+        pendingShowText = null;
+        retryPendingPackets();
     }
 }
