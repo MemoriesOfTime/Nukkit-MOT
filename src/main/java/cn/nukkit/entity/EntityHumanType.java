@@ -299,6 +299,10 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             return false;
         }
 
+        if (!applyAttackCooldown(this, source) && !source.isCancelled()) {
+            return false;
+        }
+
         PlayerInventory inv = this.inventory;
 
         boolean vanillaArmor = Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction();
