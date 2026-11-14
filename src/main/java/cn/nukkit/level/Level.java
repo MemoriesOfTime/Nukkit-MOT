@@ -329,22 +329,28 @@ public class Level implements ChunkManager, Metadatable {
     private final Map<Long, Deque<DataPacket>> chunkPackets = new ConcurrentHashMap<>();
 
     /**
-     * Chunks waiting out their unload grace period, oldest first: chunk hash -> {@link #unloadClock()}
-     * time the grace started. Every chunk waits the same {@link #CHUNK_UNLOAD_DELAY_MILLIS}, and a chunk
-     * queued again moves to the end, so insertion order is due order: an unload pass takes due chunks
-     * from the head and stops at the first one that is not due, instead of walking the whole queue.
-     * <p>
-     * Guarded by its own monitor, never held while a chunk is unloaded: chunk requests also arrive
-     * from other threads (plugins, the async load mount).
+     * 未使用区块的到期卸载队列：最旧优先，重新入队移到队尾，见 {@link ChunkUnloadQueue}。
+     * <p>Chunks waiting out their unload grace period, oldest first; see {@link ChunkUnloadQueue}.
      */
-    private final Long2LongLinkedOpenHashMap unloadQueue = new Long2LongLinkedOpenHashMap();
-    // Queue timestamps order deadlines; separate revisions identify equal-millisecond replacements.
-    // Both are guarded by unloadQueue. Allocate owner storage only once this level admits work.
-    private Long2LongOpenHashMap unloadQueueRevisions;
-    private long nextUnloadQueueRevision;
+    private final ChunkUnloadQueue unloadQueue = new ChunkUnloadQueue();
 
-    /** How long a chunk nobody uses stays loaded before it is unloaded. */
-    static final long CHUNK_UNLOAD_DELAY_MILLIS = 20000;
+    // drain 的 Level 侧判断，缓存以避免每次卸载分配回调 / Level-side decisions for drain, cached to avoid per-pass callbacks.
+    private final ChunkUnloadQueue.Target unloadTarget = new ChunkUnloadQueue.Target() {
+        @Override
+        public boolean isChunkInUse(long hash) {
+            return Level.this.isChunkInUse(hash);
+        }
+
+        @Override
+        public boolean isChunkSaveBacklogged() {
+            return Level.this.isChunkSaveBacklogged();
+        }
+
+        @Override
+        public boolean unloadChunk(long hash) {
+            return Level.this.unloadChunk(Level.getHashX(hash), Level.getHashZ(hash), true);
+        }
+    };
 
     private int time;
 
@@ -5366,7 +5372,7 @@ public class Level implements ChunkManager, Metadatable {
                 loader.onChunkLoaded(chunk);
             }
         } else {
-            this.queueUnloadChunk(index);
+            this.unloadQueue.request(index);
         }
         return chunk;
     }
@@ -5483,32 +5489,9 @@ public class Level implements ChunkManager, Metadatable {
         this.finishChunkLoad(pending.hash, pending.x, pending.z, chunk);
     }
 
-    private void queueUnloadChunk(int x, int z) {
-        this.queueUnloadChunk(Level.chunkHash(x, z));
-    }
-
-    /** Starts (or restarts) the grace period of a chunk; it moves to the end of the queue. */
-    private void queueUnloadChunk(long index) {
-        synchronized (this.unloadQueue) {
-            long now = unloadClock();
-            long revision = Math.incrementExact(this.nextUnloadQueueRevision);
-            if (this.unloadQueueRevisions == null) this.unloadQueueRevisions = new Long2LongOpenHashMap();
-            this.nextUnloadQueueRevision = revision;
-            this.unloadQueueRevisions.put(index, revision);
-            this.unloadQueue.putAndMoveToLast(index, now);
-        }
-    }
-
     /** Whether the chunk is waiting to be unloaded. */
     public boolean isUnloadChunkRequested(long hash) {
-        synchronized (this.unloadQueue) {
-            return this.unloadQueue.containsKey(hash);
-        }
-    }
-
-    /** Monotonic milliseconds for the unload grace period: a wall-clock jump must not stall or rush the queue. */
-    static long unloadClock() {
-        return System.nanoTime() / 1_000_000L;
+        return this.unloadQueue.contains(hash);
     }
 
     public boolean unloadChunkRequest(int x, int z) {
@@ -5520,7 +5503,7 @@ public class Level implements ChunkManager, Metadatable {
             return false;
         }
 
-        this.queueUnloadChunk(x, z);
+        this.unloadQueue.request(Level.chunkHash(x, z));
 
         return true;
     }
@@ -5530,10 +5513,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void cancelUnloadChunkRequest(long hash) {
-        synchronized (this.unloadQueue) {
-            this.unloadQueue.remove(hash);
-            if (this.unloadQueueRevisions != null) this.unloadQueueRevisions.remove(hash);
-        }
+        this.unloadQueue.cancel(hash);
     }
 
     public boolean unloadChunk(int x, int z) {
@@ -5872,7 +5852,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public void doGarbageCollection(long allocatedTime) {
         long start = System.currentTimeMillis();
-        if (unloadChunks(start, allocatedTime, false)) {
+        if (unloadChunks(allocatedTime, false)) {
             allocatedTime -= (System.currentTimeMillis() - start);
             provider.doGarbageCollection(allocatedTime);
         }
@@ -5882,10 +5862,15 @@ public class Level implements ChunkManager, Metadatable {
         this.unloadChunks(false);
     }
 
+    /** 强制卸载忽略宽限期、写积压与单次计数；命令 /gc 依赖一次清空 / A forced pass ignores grace, backlog and the count cap. */
     public void unloadChunks(boolean force) {
         this.unloadChunks(50, force);
     }
 
+    /**
+     * @param maxUnload 非 force 时单次最多卸载数 / per-pass cap unless forced
+     * @param force     忽略宽限期、写积压与计数 / ignore grace, backlog and the cap
+     */
     public void unloadChunks(int maxUnload, boolean force) {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return;
@@ -5894,16 +5879,15 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        this.drainUnloadQueue(force, maxUnload, Long.MAX_VALUE);
+        this.unloadQueue.drain(this.unloadTarget, force, maxUnload, Long.MAX_VALUE);
     }
 
     /**
-     * @param now           current time
-     * @param allocatedTime allocated time
-     * @param force         force
-     * @return true if there is allocated time remaining
+     * @param allocatedTime 本次卸载可用的毫秒数 / milliseconds this pass may use
+     * @param force         忽略宽限期、写积压与计数 / ignore grace, backlog and the count cap
+     * @return true 表示还有剩余预算给 provider GC / true when budget remains for the provider GC
      */
-    private boolean unloadChunks(long now, long allocatedTime, boolean force) {
+    private boolean unloadChunks(long allocatedTime, boolean force) {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return false;
         }
@@ -5913,89 +5897,8 @@ public class Level implements ChunkManager, Metadatable {
             return true;
         }
 
-        return this.drainUnloadQueue(force, Integer.MAX_VALUE, now + allocatedTime);
-    }
-
-    /**
-     * Unloads the due chunks at the head of the unload queue.
-     * <p>
-     * Both unload passes used to walk the whole queue through a snapshot iterator of a non-blocking
-     * map on every call - in the idle part of every tick for every level, and once more every ten
-     * ticks - although at most the head of it could be due. Such a map never shrinks and keeps a
-     * removed key until its next resize, so the walk also crossed every chunk queued since, and
-     * allocated an entry object per live chunk. The head of a time-ordered queue answers the same
-     * question in one step.
-     *
-     * @param force     unload every queued chunk that is not in use, due or not
-     * @param maxUnload how many chunks this pass may unload
-     * @param deadline  {@link System#currentTimeMillis()} at which the pass stops after an unload
-     * @return false when the pass stopped on the deadline
-     */
-    private boolean drainUnloadQueue(boolean force, int maxUnload, long deadline) {
-        long dueBefore = unloadClock() - CHUNK_UNLOAD_DELAY_MILLIS;
-        // A forced pass visits every queued chunk once; a refused one goes back to the end.
-        int visits;
-        synchronized (this.unloadQueue) {
-            visits = force ? this.unloadQueue.size() : Integer.MAX_VALUE;
-        }
-        int unloaded = 0;
-        while (unloaded < maxUnload && visits-- > 0) {
-            long index;
-            long queuedAt;
-            long revision;
-            synchronized (this.unloadQueue) {
-                if (this.unloadQueue.isEmpty()) {
-                    return true;
-                }
-                index = this.unloadQueue.firstLongKey();
-                queuedAt = this.unloadQueue.get(index);
-                revision = this.unloadQueueRevisions == null ? 0L : this.unloadQueueRevisions.get(index);
-            }
-            if (!force && queuedAt > dueBefore) {
-                // The head is the oldest chunk: nothing behind it is due either.
-                return true;
-            }
-            if (this.isChunkInUse(index)) {
-                // A loader holds the chunk again; releasing it queues the chunk anew.
-                this.settleUnloadRequest(index, revision, true);
-                continue;
-            }
-            // Recheck between unloads: the previous chunk and its dirty neighbours may fill the writer.
-            // The chunk stays at the head for the next pass, without splitting one unload's neighbour saves.
-            if (!force && this.isChunkSaveBacklogged()) {
-                return true;
-            }
-            boolean done = this.unloadChunk(getHashX(index), getHashZ(index), true);
-            // A refused unload (a cancelled ChunkUnloadEvent) waits a full grace period again
-            // instead of firing the event on every pass.
-            this.settleUnloadRequest(index, revision, done);
-            if (done) {
-                unloaded++;
-                if (System.currentTimeMillis() >= deadline) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Removes a handled chunk from the unload queue, or moves a refused one to its end with a fresh
-     * grace period - unless the request changed meanwhile (cancelled, or queued again while the chunk
-     * was being unloaded), which then stays as it is.
-     */
-    private void settleUnloadRequest(long index, long revision, boolean remove) {
-        synchronized (this.unloadQueue) {
-            long current = this.unloadQueueRevisions == null ? 0L : this.unloadQueueRevisions.get(index);
-            if (!this.unloadQueue.containsKey(index) || current != revision) {
-                return;
-            }
-            if (remove) {
-                this.cancelUnloadChunkRequest(index);
-            } else {
-                this.queueUnloadChunk(index);
-            }
-        }
+        return this.unloadQueue.drain(this.unloadTarget, force, Integer.MAX_VALUE,
+                this.unloadQueue.now() + allocatedTime);
     }
 
     @Override
