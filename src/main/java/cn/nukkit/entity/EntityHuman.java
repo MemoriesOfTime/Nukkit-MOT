@@ -16,7 +16,9 @@ import cn.nukkit.utils.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +42,24 @@ public class EntityHuman extends EntityHumanType {
     protected String minecraftId;
 
     protected Skin skin;
+
+    // Keep a reservation while packet callbacks run, even if despawn removes hasSpawned.
+    // Entity's constructor publishes EntitySpawnEvent before this class's initializers run.
+    private volatile Map<Integer, SpawnAttempt> spawnAttempts;
+
+    private static final class SpawnAttempt {
+        private final int loaderId;
+        private final Player viewer;
+        private volatile boolean cancelled;
+        private boolean listRegistrationStarted;
+        private boolean actorSubmissionStarted;
+        private boolean actorAccepted;
+
+        private SpawnAttempt(int loaderId, Player viewer) {
+            this.loaderId = loaderId;
+            this.viewer = viewer;
+        }
+    }
 
     @Override
     public float getWidth() {
@@ -319,92 +339,202 @@ public class EntityHuman extends EntityHumanType {
 
     @Override
     public void spawnTo(Player player) {
-        if (this != player && !this.hasSpawned.containsKey(player.getLoaderId())) {
-            this.hasSpawned.put(player.getLoaderId(), player);
-
-            if (!this.getSkin().isValid()) {
-                throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
+        int loaderId = player.getLoaderId();
+        if (this == player || this.closed || this.hasSpawned.containsKey(loaderId)) {
+            return;
+        }
+        Map<Integer, SpawnAttempt> attempts = getSpawnAttempts();
+        SpawnAttempt attempt = new SpawnAttempt(loaderId, player);
+        if (attempts.putIfAbsent(loaderId, attempt) != null) {
+            return;
+        }
+        if (this.hasSpawned.putIfAbsent(loaderId, player) != null) {
+            attempts.remove(loaderId, attempt);
+            return;
+        }
+        Throwable failure = null;
+        try {
+            spawnTo(player, attempt);
+        } catch (RuntimeException | Error e) {
+            failure = e;
+            throw e;
+        } finally {
+            try {
+                if (!attempt.actorAccepted || !isCurrentSpawn(attempt)) {
+                    this.hasSpawned.remove(loaderId, player);
+                    retireSpawn(attempt, failure != null);
+                }
+            } catch (RuntimeException | Error cleanupFailure) {
+                if (failure == null) {
+                    throw cleanupFailure;
+                }
+                if (failure != cleanupFailure) {
+                    failure.addSuppressed(cleanupFailure);
+                }
+            } finally {
+                attempts.remove(loaderId, attempt);
             }
+        }
+    }
 
-            boolean netEaseSkinHandshake = !(this instanceof Player)
-                    && PlayerEntitySkinSender.requiresRetainedEntry(player);
-            boolean postSpawnSkinHandshake = !(this instanceof Player)
-                    && PlayerEntitySkinSender.requiresPostSpawnSkin(player, this.getSkin());
-            boolean retainNpcListEntry = netEaseSkinHandshake || postSpawnSkinHandshake;
+    private Map<Integer, SpawnAttempt> getSpawnAttempts() {
+        Map<Integer, SpawnAttempt> attempts = this.spawnAttempts;
+        if (attempts == null) {
+            synchronized (this) {
+                attempts = this.spawnAttempts;
+                if (attempts == null) {
+                    this.spawnAttempts = attempts = new ConcurrentHashMap<>();
+                }
+            }
+        }
+        return attempts;
+    }
+
+    private boolean isCurrentSpawn(SpawnAttempt attempt) {
+        return !attempt.cancelled && !this.closed && !attempt.viewer.closed
+                && this.spawnAttempts.get(attempt.loaderId) == attempt
+                && this.hasSpawned.get(attempt.loaderId) == attempt.viewer;
+    }
+
+    private void retireSpawn(SpawnAttempt attempt, boolean failed) {
+        try {
+            // A send callback can retire the reservation before AddPlayer is actually queued.
+            // Compensate after that send returns; a prior RemoveEntity would precede the actor.
+            if (attempt.actorAccepted || (failed && attempt.actorSubmissionStarted)) {
+                RemoveEntityPacket remove = new RemoveEntityPacket();
+                remove.eid = this.getId();
+                attempt.viewer.dataPacket(remove);
+            }
+        } finally {
+            if (!(this instanceof Player) && attempt.listRegistrationStarted) {
+                boolean registered = attempt.viewer.sentSkins.contains(this.uuid);
+                PlayerEntitySkinSender.sendRemoveAndClear(attempt.viewer, this.uuid);
+                if (!registered && (attempt.cancelled || failed)) {
+                    // The callback may have removed the entry before the outer ADD was queued.
+                    PlayerListPacket remove = new PlayerListPacket();
+                    remove.type = PlayerListPacket.TYPE_REMOVE;
+                    remove.entries = new PlayerListPacket.Entry[]{new PlayerListPacket.Entry(this.uuid)};
+                    attempt.viewer.dataPacket(remove);
+                }
+            }
+        }
+    }
+
+    private void spawnTo(Player player, SpawnAttempt attempt) {
+        if (!this.getSkin().isValid()) {
+            throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
+        }
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
+
+        boolean netEaseSkinHandshake = !(this instanceof Player)
+                && PlayerEntitySkinSender.requiresRetainedEntry(player);
+        boolean postSpawnSkinHandshake = !(this instanceof Player)
+                && PlayerEntitySkinSender.requiresPostSpawnSkin(player, this.getSkin());
+        boolean retainNpcListEntry = netEaseSkinHandshake || postSpawnSkinHandshake;
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
+        attempt.listRegistrationStarted = !(this instanceof Player);
+        if (this instanceof Player) {
+            if (!player.sentSkins.contains(this.uuid)) {
+                this.server.updatePlayerListData(
+                        new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
+                        new Player[]{player});
+            }
+        } else if (netEaseSkinHandshake) {
+            if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
+                    player, this.uuid, this.getId(), this.getName(), this.getSkin(), "",
+                    this::getSkin)) {
+                return;
+            }
+        } else if (postSpawnSkinHandshake) {
+            if (!PlayerEntitySkinSender.registerPostSpawnSkinIfAbsent(
+                    player, this.uuid, this.getId(), this.getName(), "", this::getSkin)) {
+                return;
+            }
+        } else {
+            this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.getSkin(), new Player[]{player});
+        }
+
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
+        PlayerInventory playerInventory = this.getInventory();
+
+        AddPlayerPacket pk = new AddPlayerPacket();
+        pk.uuid = this.uuid;
+        pk.username = this.getName();
+        pk.entityUniqueId = this.getId();
+        pk.entityRuntimeId = this.getId();
+        pk.x = (float) this.x;
+        pk.y = (float) this.y;
+        pk.z = (float) this.z;
+        pk.speedX = (float) this.motionX;
+        pk.speedY = (float) this.motionY;
+        pk.speedZ = (float) this.motionZ;
+        pk.yaw = (float) this.yaw;
+        pk.headYaw = (float) this.headYaw;
+        pk.pitch = (float) this.pitch;
+        pk.item = playerInventory != null ? playerInventory.getItemInHand() : Item.AIR_ITEM;
+        pk.metadata = this.dataProperties.clone();
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
+        attempt.actorSubmissionStarted = true;
+        if (!player.dataPacket(pk)) {
+            return;
+        }
+        attempt.actorAccepted = true;
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
+
+        if (postSpawnSkinHandshake) {
+            PlayerEntitySkinSender.sendSkinAfterSpawn(player, this.uuid, this.getSkin());
+        }
+
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
+        if (playerInventory != null) {
             if (this instanceof Player) {
-                if (!player.sentSkins.contains(this.uuid)) {
-                    this.server.updatePlayerListData(
-                            new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
-                            new Player[]{player});
-                }
-            } else if (netEaseSkinHandshake) {
-                if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
-                        player, this.uuid, this.getId(), this.getName(), this.getSkin(), "",
-                        this::getSkin)) {
-                    this.hasSpawned.remove(player.getLoaderId());
-                    return;
-                }
-            } else if (postSpawnSkinHandshake) {
-                if (!PlayerEntitySkinSender.registerPostSpawnSkinIfAbsent(
-                        player, this.uuid, this.getId(), this.getName(), "", this::getSkin)) {
-                    this.hasSpawned.remove(player.getLoaderId());
-                    return;
-                }
+                playerInventory.sendArmorContents(player);
             } else {
-                this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.getSkin(), new Player[]{player});
+                playerInventory.sendArmorContentsIfNotAr(player);
             }
+        }
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
+        this.offhandInventory.sendContents(player);
+        if (!isCurrentSpawn(attempt)) {
+            return;
+        }
 
-            PlayerInventory playerInventory = this.getInventory();
+        if (this.riding != null) {
+            SetEntityLinkPacket pkk = new SetEntityLinkPacket();
+            pkk.vehicleUniqueId = this.riding.getId();
+            pkk.riderUniqueId = this.getId();
+            pkk.type = 1;
+            pkk.immediate = 1;
+            player.dataPacket(pkk);
+        }
 
-            AddPlayerPacket pk = new AddPlayerPacket();
-            pk.uuid = this.uuid;
-            pk.username = this.getName();
-            pk.entityUniqueId = this.getId();
-            pk.entityRuntimeId = this.getId();
-            pk.x = (float) this.x;
-            pk.y = (float) this.y;
-            pk.z = (float) this.z;
-            pk.speedX = (float) this.motionX;
-            pk.speedY = (float) this.motionY;
-            pk.speedZ = (float) this.motionZ;
-            pk.yaw = (float) this.yaw;
-            pk.headYaw = (float) this.headYaw;
-            pk.pitch = (float) this.pitch;
-            pk.item = playerInventory != null ? playerInventory.getItemInHand() : Item.AIR_ITEM;
-            pk.metadata = this.dataProperties.clone();
-            player.dataPacket(pk);
-
-            if (postSpawnSkinHandshake) {
-                PlayerEntitySkinSender.sendSkinAfterSpawn(player, this.uuid, this.getSkin());
-            }
-
-            if (playerInventory != null) {
-                if (this instanceof Player) {
-                    playerInventory.sendArmorContents(player);
-                } else {
-                    playerInventory.sendArmorContentsIfNotAr(player);
-                }
-            }
-            this.offhandInventory.sendContents(player);
-
-            if (this.riding != null) {
-                SetEntityLinkPacket pkk = new SetEntityLinkPacket();
-                pkk.vehicleUniqueId = this.riding.getId();
-                pkk.riderUniqueId = this.getId();
-                pkk.type = 1;
-                pkk.immediate = 1;
-                player.dataPacket(pkk);
-            }
-
-            // Retained handshake entries are removed by PlayerEntitySkinSender after the skin settles.
-            if (!(this instanceof Player) && !retainNpcListEntry) {
-                this.server.removePlayerListData(this.uuid, player);
-            }
+        // Retained handshake entries are removed by PlayerEntitySkinSender after the skin settles.
+        if (!(this instanceof Player) && !retainNpcListEntry) {
+            this.server.removePlayerListData(this.uuid, player);
         }
     }
 
     @Override
     public void despawnFrom(Player player) {
+        Map<Integer, SpawnAttempt> attempts = this.spawnAttempts;
+        SpawnAttempt attempt = attempts == null ? null : attempts.get(player.getLoaderId());
+        if (attempt != null && attempt.viewer == player) {
+            attempt.cancelled = true;
+        }
         boolean removeRetainedNpcEntry = !(this instanceof Player)
                 && this.hasSpawned.containsKey(player.getLoaderId());
         super.despawnFrom(player);
