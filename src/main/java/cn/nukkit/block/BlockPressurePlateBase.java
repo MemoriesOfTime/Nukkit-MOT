@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.Event;
@@ -78,6 +79,7 @@ public abstract class BlockPressurePlateBase extends BlockFlowable {
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = block.down();
         if (!isSupportValid(this.down())) {
+            BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.PRESSURE_PLATE_SUPPORT);
             return false;
         }
 
