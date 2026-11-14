@@ -31,9 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  */
 class ReflectionUsageGuardTest {
 
-    /** 存量基线（2026-11-07 复核后统计）。只允许调低。 */
+    /** 存量基线（2026-11-14 复核后统计）。只允许调低。 */
     private static final int BASELINE_OFFENDING_FILES = 181;
-    private static final int BASELINE_OCCURRENCES = 360;
+    private static final int BASELINE_OCCURRENCES = 359;
 
     private static final Pattern PRIVATE_STATE_ACCESS = Pattern.compile(
             "getDeclaredField\\(|getDeclaredMethod\\(|privateLookupIn\\(");

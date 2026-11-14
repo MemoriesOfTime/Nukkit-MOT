@@ -13,13 +13,14 @@ import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import org.junit.jupiter.api.*;
 
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -206,29 +207,46 @@ class StateBlockStorageNetworkCacheTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void paletteRebuildOnSameObjectDoesNotReuseOldIds() throws Exception {
+    void paletteRebuildOnSameObjectDoesNotReuseOldIds() {
         GameVersion version = GameVersion.V1_20_0;
-        BlockPalette original = GlobalBlockPalette.getPaletteByProtocol(version);
-        Field field = GlobalBlockPalette.class.getDeclaredField("paletteCache");
-        field.setAccessible(true);
-        Map<GameVersion, BlockPalette> palettes = (Map<GameVersion, BlockPalette>) field.get(null);
-        BlockPalette replacement = new BlockPalette(original.getGameVersion());
-        Map<Integer, Integer> oldIds = new java.util.HashMap<>();
-        replacement.getLegacyToRuntimeIdMap().forEach((id, runtime) -> oldIds.put(id, runtime));
-        palettes.put(original.getGameVersion(), replacement);
+        BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(version);
+        Int2IntMap legacyToRuntime = palette.getLegacyToRuntimeIdMap();
+        int stoneRuntime = legacyToRuntime.get(Block.STONE << Block.DATA_BITS);
+        int planksRuntime = legacyToRuntime.get(Block.PLANKS << Block.DATA_BITS);
+        assertTrue(stoneRuntime >= 0 && planksRuntime >= 0);
+        assertNotEquals(stoneRuntime, planksRuntime);
+
+        int stateCount = 0;
+        for (int runtime : legacyToRuntime.values()) {
+            stateCount = Math.max(stateCount, runtime + 1);
+        }
+        // 与 CustomBlockManager 一样在原实例上重映射；除交换的这对外映射恒等，故重跑一次即可还原。
+        Int2IntOpenHashMap swap = new Int2IntOpenHashMap(stateCount);
+        for (int runtime = 0; runtime < stateCount; runtime++) {
+            swap.put(runtime, runtime);
+        }
+        swap.put(stoneRuntime, planksRuntime);
+        swap.put(planksRuntime, stoneRuntime);
+
         GlobalBlockPalette.setUseHashedBlockNetworkIds(false);
+        boolean mutated = false;
         try {
             StateBlockStorage storage = populated();
             byte[] before = encoded(storage, version, false);
-            replacement.clearStates();
-            oldIds.forEach((full, runtime) -> replacement.registerState(full >> Block.DATA_BITS, full & Block.DATA_MASK,
-                    runtime + 50000, new cn.nukkit.nbt.tag.CompoundTag().putString("name", "minecraft:test").putInt("version", 1)));
-            replacement.lock();
+
+            palette.remapRuntimeIds(swap, stateCount);
+            palette.lock();
+            mutated = true;
+
             byte[] after = encoded(storage, version, false);
             assertFalse(java.util.Arrays.equals(before, after));
             assertArrayEquals(reference(storage, version, false), after);
-        } finally { palettes.put(original.getGameVersion(), original); }
+        } finally {
+            if (mutated) {
+                palette.remapRuntimeIds(swap, stateCount);
+                palette.lock();
+            }
+        }
     }
 
     @Test
