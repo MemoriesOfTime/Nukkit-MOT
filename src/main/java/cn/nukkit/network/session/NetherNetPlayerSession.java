@@ -11,12 +11,13 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.login.NetworkSessionState;
+import cn.nukkit.network.session.login.SessionLoginContext;
 import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -27,6 +28,7 @@ import org.apache.logging.log4j.message.FormattedMessage;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +53,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     private final NetherNetChildChannel channel;
 
     private final Queue<DataPacket> inbound = PlatformDependent.newSpscQueue();
+    private final InboundBatchBacklog inboundBacklog = new InboundBatchBacklog();
     private final AtomicInteger queuedInboundPackets = new AtomicInteger();
     private final AtomicLong queuedInboundBytes = new AtomicLong();
     private final Queue<DataPacket> outbound = PlatformDependent.newMpscQueue();
@@ -67,10 +70,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
      * close(), so Netty never fires channelInactive and the session must notice on its own.
      */
     private volatile boolean transportWasActive;
+    // Set once at login: whether the login chain's identity key matched the key this transport's
+    // signaling assertion proved, over the DTLS fingerprints of this very connection.
+    private volatile boolean identityKeyBound;
 
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
     private boolean compressionInitialized;
+    /** 已因缺少压缩前缀断开；置位后不再为每个 batch 记一次失败。 Set once the session closed for a missing prefix, so later batches stay quiet. */
+    private boolean prefixUnavailableClosed;
 
     private final ArrayDeque<Long> malformedBatches = new ArrayDeque<>();
     private long lastMalformedLogNanos;
@@ -101,7 +109,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         this.lastIngressRefillNanos = acceptedAt;
         this.state.getConnection().setSessionCreatedNanos(acceptedAt);
         this.state.getConnection().setChildChannelAcceptedNanos(acceptedAt);
-        this.state.getConnection().setRemoteAddress(String.valueOf(channel.remoteAddress()));
+        this.state.getConnection().setRemoteAddress(String.valueOf(this.clientAddress()));
         this.state.getProtocol().setRaknetProtocol(RAKNET_PROTOCOL);
         this.state.getSecurity().setCompressionIn(this.compressionIn);
         this.state.getSecurity().setCompressionOut(this.compressionOut);
@@ -130,49 +138,23 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         }
 
         boolean ci = this.shouldUsePrefixedCompression();
+        CompressionProvider receivedCompression = this.compressionIn;
 
-        if (this.inboundThrottled) {
-            this.dropInboundBatchBecauseThrottled(len);
+        // Recovered consumer capacity may free a full retained backlog before admission.
+        this.drainDeferredInbound();
+        if (this.disconnectReason != null) return;
+        int payloadBytes = len;
+        if (!this.inboundBacklog.canOffer(payloadBytes)) {
+            this.rejectInboundBacklog(payloadBytes);
             return;
         }
-        if (!this.reserveDecodeIngressBudget(ingressNowNanos)) {
-            this.dropInboundBatchBecauseThrottled(len);
-            return;
-        }
-
-        byte[] packetBuffer = new byte[len];
+        byte[] packetBuffer = new byte[payloadBytes];
         payload.readBytes(packetBuffer);
-
-        RakNetPlayerSession.InboundBatchDecodeResult decoded = this.processInboundBatch(packetBuffer, ci);
-        this.settleIngressBudget(decoded.workBytes(), decoded.framedPackets(), ingressNowNanos);
-        if (decoded.success()) {
-            this.enqueueDecodedBatch(decoded.packets());
+        if (!this.inboundBacklog.offer(packetBuffer, ci, receivedCompression)) {
+            // Disconnect may close the backlog while the event loop copies this frame.
             return;
         }
-        if (this.isPlayingSession()) {
-            if (!this.keepPlayingSessionAfterMalformedBatch(ingressNowNanos)) {
-                this.disconnect("Sent malformed packet");
-            }
-            return;
-        }
-
-        InetAddress malformedAddress = this.channel.remoteAddress() instanceof java.net.InetSocketAddress address
-                ? address.getAddress() : null;
-        boolean blockMalformedAddress = RakNetPlayerSession.shouldBlockAddressAfterMalformed(
-                this.state.getLogin().getPhase(), malformedAddress);
-        this.disconnect("Sent malformed packet");
-        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
-            try {
-                this.channel.close();
-                if (blockMalformedAddress && malformedAddress != null) {
-                    this.server.blockAddress(malformedAddress, 60);
-                }
-            } catch (Throwable throwable) {
-                if (Nukkit.DEBUG > 1) {
-                    log.info("Error while closing channel", throwable);
-                }
-            }
-        }, 10);
+        this.drainDeferredInbound();
     }
 
     @Override
@@ -195,6 +177,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         }
 
         this.disconnectReason = reason;
+        this.inboundBacklog.close();
         this.state.getLogin().setDisconnectCauseHint(reason);
         this.state.getLogin().setPhase(SessionLoginPhase.DISCONNECTED);
         if (this.tickFuture != null) {
@@ -237,13 +220,13 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                             callback.run();
                         } else {
                             log.warn("Failed to send direct packet {} to {}",
-                                    packet.getClass().getSimpleName(), this.channel.remoteAddress(), result.cause());
+                                    packet.getClass().getSimpleName(), this.clientAddress(), result.cause());
                             this.disconnect("Internal Server Error");
                         }
                     });
                 } catch (Throwable throwable) {
                     log.warn("Failed to prepare direct packet {} for {}",
-                            packet.getClass().getSimpleName(), this.channel.remoteAddress(), throwable);
+                            packet.getClass().getSimpleName(), this.clientAddress(), throwable);
                     this.disconnect("Internal Server Error");
                 }
             });
@@ -263,6 +246,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         this.transportWasActive = true;
 
         try {
+            this.drainDeferredInbound();
             List<DataPacket> toBatch = new ObjectArrayList<>();
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
@@ -295,7 +279,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
-            log.error("[{}] Failed to tick NetherNetPlayerSession", this.channel.remoteAddress(), e);
+            log.error("[{}] Failed to tick NetherNetPlayerSession", this.clientAddress(), e);
         }
     }
 
@@ -330,6 +314,11 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     private void sendPackets(Collection<DataPacket> packets) {
+        if (PacketBatcher.supports(this.compressionOut)) {
+            // Built-in codecs finish reading before returning; sendPacket copies the result into Netty.
+            PacketBatcher.send(packets, batched -> this.sendPackets(batched, true));
+            return;
+        }
         BinaryStream batched = new BinaryStream();
         for (DataPacket packet : packets) {
             if (packet instanceof BatchPacket) {
@@ -350,8 +339,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     private void sendPackets(BinaryStream batched) {
+        this.sendPackets(batched, false);
+    }
+
+    private void sendPackets(BinaryStream batched, boolean borrowed) {
+        CompressionProvider provider = this.compressionOut;
         try {
-            this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
+            int level = Server.getInstance().networkCompressionLevel;
+            this.sendPacket(borrowed ? PacketBatcher.compressBorrowed(provider, batched, level)
+                    : provider.compress(batched, level));
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }
@@ -371,14 +367,36 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
      */
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
+        if (ci && !this.compressionOut.supportsPrefix()) {
+            return this.failUnsupportedPrefix();
+        }
 
-        ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 1 : 0) + compressedPayload.length);
+        ByteBuf finalPayload = Unpooled.directBuffer((ci ? 1 : 0) + compressedPayload.length);
         if (ci) {
             finalPayload.writeByte(this.compressionOut.getPrefix());
         }
         finalPayload.writeBytes(compressedPayload);
 
         return this.channel.writeAndFlush(finalPayload);
+    }
+
+    /**
+     * 协商出的编码写不出 ≥1.20.60 的前缀：传输层与游戏版本互相矛盾，继续发只会逐批静默丢包，因此断开一次。
+     * <p>The negotiated codec cannot emit the ≥1.20.60 prefix: transport and game version contradict each
+     * other and every further batch would be dropped silently, so the session is closed once instead.
+     */
+    private ChannelFuture failUnsupportedPrefix() {
+        if (!this.prefixUnavailableClosed) {
+            this.prefixUnavailableClosed = true;
+            log.error("Closing session {}: compression {} has no batch prefix but protocol {} requires one (raknetProtocol={})",
+                    this.playerLabel(), this.compressionOut, this.getBedrockProtocol(),
+                    this.state.getProtocol().getRaknetProtocol());
+            this.disconnect("Your client does not support this game version over this connection");
+        }
+        // 批次未写出：必须如实失败，否则 DIRECT_WRITE 监听器会按成功执行回调
+        // The batch was never written: report honest failure, or DIRECT_WRITE listeners run success callbacks
+        return this.channel.newFailedFuture(
+                new CompressionPrefixUnavailableException(this.compressionOut, this.getBedrockProtocol()));
     }
 
     @Override
@@ -462,7 +480,10 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     public boolean isLoginPhaseTimedOut(long nowNanos, int timeoutMillis) {
-        return RakNetPlayerSession.isLoginPhaseTimedOut(this.state.getLogin().getPhase(), this.state.getLogin().getLastActivityNanos(), nowNanos, timeoutMillis);
+        SessionLoginContext login = this.state.getLogin();
+        return RakNetPlayerSession.isLoginPhaseTimedOut(
+                login.getPhase(), login.getLastActivityNanos(), login.getPhaseStartedNanos(),
+                this.channel.isActive(), nowNanos, timeoutMillis);
     }
 
     /**
@@ -507,16 +528,23 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                 && protocol >= ProtocolInfo.v1_20_60;
     }
 
-    private String playerLabel() {
-        return this.player == null ? String.valueOf(this.channel.remoteAddress()) : this.player.getName();
+    private InetSocketAddress clientAddress() {
+        if (this.server != null) {
+            return this.server.playerAddress(this.channel);
+        }
+        return this.channel.remoteAddress() instanceof InetSocketAddress address ? address : null;
     }
 
-    private RakNetPlayerSession.InboundBatchDecodeResult processInboundBatch(byte[] packetBuffer, boolean ci) {
+    private String playerLabel() {
+        return this.player == null ? String.valueOf(this.clientAddress()) : this.player.getName();
+    }
+
+    private RakNetPlayerSession.InboundBatchDecodeResult processInboundBatch(byte[] packetBuffer, boolean ci, CompressionProvider receivedCompression) {
         try {
             if (!ci) {
                 List<DataPacket> decoded = new ObjectArrayList<>();
                 Network.BatchProcessResult measured = this.server.getNetwork().processBatchMeasured(
-                        packetBuffer, decoded, this.compressionIn, RAKNET_PROTOCOL, this.player, false);
+                        packetBuffer, decoded, receivedCompression, RAKNET_PROTOCOL, this.player, false);
                 if (!measured.success()) {
                     this.logMalformedBatch(measured.failure(),
                             "[{}] Failed to decode batch packet ({} bytes, non-prefixed, compression={})",
@@ -525,7 +553,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                             measured.decompressedBytes(), measured.framedPackets(), measured.failure());
                 }
                 return RakNetPlayerSession.InboundBatchDecodeResult.legacy(
-                        this.compressionIn, decoded, measured.decompressedBytes(), measured.framedPackets());
+                        receivedCompression, decoded, measured.decompressedBytes(), measured.framedPackets());
             }
 
             RakNetPlayerSession.InboundBatchDecodeResult result = RakNetPlayerSession.decodeInboundPrefixedBatch(
@@ -662,17 +690,65 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         return Math.max(packet.getCount(), 1);
     }
 
-    private void dropInboundBatchBecauseThrottled(int compressedBytes) {
-        this.throttledInboundBatches++;
-        long nowNanos = System.nanoTime();
-        if (this.lastInboundThrottleLogNanos != 0L
-                && nowNanos - this.lastInboundThrottleLogNanos < RakNetPlayerSession.DIAGNOSTIC_LOG_INTERVAL_NANOS) {
+    /** Called only on the event loop. Never decrypt retained payloads a second time. */
+    void drainDeferredInbound() {
+        while (this.disconnectReason == null) {
+            List<DataPacket> pending = this.inboundBacklog.pendingDecoded();
+            if (pending != null) {
+                if (!this.enqueueDecodedBatch(pending)) return;
+                this.inboundBacklog.clearDecoded();
+            }
+            if (this.inboundThrottled || this.inboundBacklog.isEmpty()) return;
+            long nowNanos = System.nanoTime();
+            if (!this.reserveDecodeIngressBudget(nowNanos)) return;
+            InboundBatchBacklog.EncodedBatch batch = this.inboundBacklog.poll();
+            if (batch == null) return;
+            RakNetPlayerSession.InboundBatchDecodeResult decoded = this.processInboundBatch(batch.payload(), batch.prefixed(), batch.compression());
+            this.settleIngressBudget(decoded.workBytes(), decoded.framedPackets(), nowNanos);
+            if (decoded.success()) {
+                if (!this.enqueueDecodedBatch(decoded.packets())) {
+                    // At most one legal batch: 1300 packets / 6 MiB. Later batches stay encoded.
+                    this.inboundBacklog.holdDecoded(decoded.packets());
+                    return;
+                }
+            } else {
+                this.handleMalformedInboundBatch(nowNanos);
+            }
+        }
+    }
+
+    private void handleMalformedInboundBatch(long nowNanos) {
+        if (this.isPlayingSession()) {
+            if (!this.keepPlayingSessionAfterMalformedBatch(nowNanos)) {
+                this.disconnect("Sent malformed packet");
+            }
             return;
         }
-        this.lastInboundThrottleLogNanos = nowNanos;
-        log.warn("[{}] Inbound backpressure dropped batch (compressedBytes={}, queuedPackets={}, queuedBytes={}, droppedBatches={})",
-                this.playerLabel(), compressedBytes, this.queuedInboundPackets.get(),
-                this.queuedInboundBytes.get(), this.throttledInboundBatches);
+
+        InetSocketAddress remote = this.clientAddress();
+        InetAddress malformedAddress = remote == null ? null : remote.getAddress();
+        boolean blockMalformedAddress = RakNetPlayerSession.shouldBlockAddressAfterMalformed(
+                this.state.getLogin().getPhase(), malformedAddress);
+        this.disconnect("Sent malformed packet");
+        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+            try {
+                this.channel.close();
+                if (blockMalformedAddress && malformedAddress != null) {
+                    this.server.blockAddress(malformedAddress, 60);
+                }
+            } catch (Throwable throwable) {
+                if (Nukkit.DEBUG > 1) {
+                    log.info("Error while closing channel", throwable);
+                }
+            }
+        }, 10);
+    }
+
+    private void rejectInboundBacklog(int payloadBytes) {
+        log.warn("[{}] Reliable inbound backlog exhausted (payloadBytes={}, batches={}, bytes={}); closing session",
+                this.playerLabel(), payloadBytes, this.inboundBacklog.batchCount(), this.inboundBacklog.byteCount());
+        this.disconnect("Reliable inbound backlog exhausted");
+        this.channel.close();
     }
 
     private void logInboundThrottle(int queuedPackets, long queuedBytes, int batchPackets, long batchBytes) {
@@ -683,7 +759,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
             return;
         }
         this.lastInboundThrottleLogNanos = nowNanos;
-        log.warn("[{}] Inbound backpressure rejected decoded batch (queuedPackets={}, queuedBytes={}, batchPackets={}, batchBytes={}, droppedBatches={})",
+        log.warn("[{}] Inbound backpressure deferred decoded batch (queuedPackets={}, queuedBytes={}, batchPackets={}, batchBytes={}, deferredAttempts={})",
                 this.playerLabel(), queuedPackets, queuedBytes, batchPackets, batchBytes,
                 this.throttledInboundBatches);
     }
@@ -698,5 +774,18 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         Object[] withCause = Arrays.copyOf(arguments, arguments.length + 1);
         withCause[arguments.length] = failure == null ? "unknown" : failure.toString();
         log.warn(message + ", cause={}", withCause);
+    }
+
+    /**
+     * Whether the login chain is bound to this transport: the peer proved, before the transport was
+     * accepted, that it holds the key the chain is signed with. NetherNet's replacement for the
+     * Bedrock encryption handshake RakNet uses for the same proof.
+     */
+    public boolean isIdentityKeyBound() {
+        return this.identityKeyBound;
+    }
+
+    public void setIdentityKeyBound(boolean identityKeyBound) {
+        this.identityKeyBound = identityKeyBound;
     }
 }

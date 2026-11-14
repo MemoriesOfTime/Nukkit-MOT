@@ -31,6 +31,9 @@ class ConfigCommentsTest {
         assertTrue(yaml.contains("运营者身份 PEM 文件"), "nested identity-file field should be localized");
         assertFalse(yaml.contains("Operator identity PEM file"), "English annotation fallback should not leak through");
         assertTrue(yaml.contains("为选择启用的异步任务使用虚拟线程"), "virtual-threads comment should be localized");
+        assertTrue(yaml.contains("启用客户端区块缓存（blob 哈希"), "client cache field should be localized");
+        assertTrue(yaml.contains("启用子区块按需拉取"), "sub-chunk pull field should be localized");
+        assertFalse(yaml.contains("requires client support"), "chunk cache English fallback should not leak through");
     }
 
     @Test
@@ -40,6 +43,8 @@ class ConfigCommentsTest {
         assertTrue(yaml.contains("NetherNet (WebRTC) transport settings, runs alongside RakNet"), "nested section header should resolve from eng properties");
         assertTrue(yaml.contains("Extra ICE STUN/TURN servers"), "nested ice-servers field should resolve from eng properties");
         assertTrue(yaml.contains("Use virtual threads for opt-in async tasks"), "virtual-threads comment should resolve from eng properties");
+        assertTrue(yaml.contains("Enable client chunk cache (blob hashes"), "client cache field should resolve from eng properties");
+        assertTrue(yaml.contains("Enable sub-chunk request pull mode"), "sub-chunk pull field should resolve from eng properties");
     }
 
     private String saveWithComments(String lang) throws IOException {

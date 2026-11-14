@@ -8,6 +8,7 @@ import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.entity.projectile.EntityBlueWitherSkull;
 import cn.nukkit.entity.projectile.EntityWitherSkull;
+import cn.nukkit.event.entity.CreatureSpawnEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
@@ -16,6 +17,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.level.Explosion;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Location;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
@@ -31,7 +33,9 @@ import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -104,6 +108,9 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
+        if (creature instanceof EntitySmite) {
+            return false;
+        }
         if (creature instanceof Player player) {
             if (!player.isSurvival() && !player.isAdventure()) {
                 return false;
@@ -392,6 +399,10 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
      * Returns true if the wither entity is successfully spawned, otherwise false
      */
     public static boolean checkAndSpawnWither(Block block) {
+        return checkAndSpawnWither(block, null);
+    }
+
+    public static boolean checkAndSpawnWither(Block block, Player creator) {
         Block check = block;
         BlockFace skullFace = null;
         if (Server.getInstance().mobsFromBlocks && block.getLevel().getGameRules().getBoolean(GameRule.DO_MOB_SPAWNING)) {
@@ -430,15 +441,6 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
                             }
                         }
 
-                        for (int i = 0; i <= 2; i++) {
-                            Block location = check.getSide(blockFace, i);
-                            location.level.breakBlock(location);
-                        }
-                        for (int i = -1; i <= 1; i++) {
-                            Block location = check.getSide(blockFace).getSide(face, i);
-                            location.level.breakBlock(location);
-                            location.level.breakBlock(location.getSide(blockFace.getOpposite()));
-                        }
                         Block pos = check.getSide(blockFace, 2);
                         CompoundTag nbt = new CompoundTag()
                                 .putList("Pos", new ListTag<DoubleTag>()
@@ -453,7 +455,41 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
                                         .add(new FloatTag(0f))
                                         .add(new FloatTag(0f)));
 
-                        EntityWither wither = (EntityWither) Entity.createEntity("Wither", check.level.getChunk(check.getChunkX(), check.getChunkZ()), nbt);
+                        var sourceLevel = check.level;
+                        int sourceChunkX = check.getChunkX();
+                        int sourceChunkZ = check.getChunkZ();
+                        record RitualCell(int x, int y, int z, int layer, int id, int damage) {
+                            static RitualCell capture(Block block) {
+                                return new RitualCell(block.getFloorX(), block.getFloorY(), block.getFloorZ(),
+                                        block.layer, block.getId(), block.getDamage());
+                            }
+                            Block removal(Level level) {
+                                Block current = level.getBlock(x, y, z, layer);
+                                Block block = Block.get(current.getId(), current.getDamage());
+                                block.x = x; block.y = y; block.z = z; block.layer = layer; block.level = level;
+                                return block;
+                            }
+                        }
+                        List<RitualCell> structure = new ArrayList<>(9);
+                        for (int i = 0; i <= 2; i++) structure.add(RitualCell.capture(check.getSide(blockFace, i)));
+                        for (int i = -1; i <= 1; i++) {
+                            Block location = check.getSide(blockFace).getSide(face, i);
+                            structure.add(RitualCell.capture(location));
+                            structure.add(RitualCell.capture(location.getSide(blockFace.getOpposite())));
+                        }
+                        CreatureSpawnEvent event = new CreatureSpawnEvent(NETWORK_ID,
+                                new cn.nukkit.level.Position(pos.x + 0.5, pos.y, pos.z + 0.5, sourceLevel),
+                                nbt, CreatureSpawnEvent.SpawnReason.BUILD_WITHER, creator);
+                        Server.getInstance().getPluginManager().callEvent(event);
+                        if (event.isCancelled()) return false;
+                        // A nested build or listener replacement owns its cells. Never consume them twice.
+                        for (RitualCell original : structure) {
+                            Block current = sourceLevel.getBlock(original.x(), original.y(), original.z(), original.layer());
+                            if (current.getId() != original.id() || current.getDamage() != original.damage()) return false;
+                        }
+                        for (RitualCell location : structure) sourceLevel.breakBlock(location.removal(sourceLevel));
+                        EntityWither wither = (EntityWither) Entity.createEntity("Wither",
+                                sourceLevel.getChunk(sourceChunkX, sourceChunkZ), nbt);
                         if (wither != null) {
                             wither.stayTime = 220;
                             wither.spawnToAll();

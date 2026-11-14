@@ -29,7 +29,11 @@ import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.*;
+import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.vibration.VibrationEvent;
 import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
@@ -460,6 +464,14 @@ public abstract class Entity extends Location implements Metadatable {
     public final Map<Integer, Player> hasSpawned = new ConcurrentHashMap<>();
 
     protected final Map<Integer, Effect> effects = new ConcurrentHashMap<>();
+
+    private static final ThreadLocal<EffectTickSnapshot> EFFECT_TICK_SNAPSHOT =
+            ThreadLocal.withInitial(EffectTickSnapshot::new);
+
+    private static final class EffectTickSnapshot {
+        private final Effect[] effects = new Effect[16];
+        private boolean inUse;
+    }
 
     protected UUID entityUniqueId;
 
@@ -1087,7 +1099,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void addEffect(Effect effect, EntityPotionEffectEvent.Cause cause) {
-        if (effect == null) {
+        if (effect == null || !this.isAlive()) {
             return;
         }
 
@@ -1704,20 +1716,23 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void sendData(Player[] players, EntityMetadata data) {
+        if (players.length == 0 && !(this instanceof Player)) {
+            return;
+        }
+
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.id;
-        //pk.metadata = data == null ? this.dataProperties : data;
+        // encode() only reads the snapshot, so the same metadata can go to every viewer
+        pk.metadata = data == null ? this.dataProperties.clone() : data;
         pk.syncedProperties = this.propertySyncData();
 
         for (Player player : players) {
             if (player == this) {
                 continue;
             }
-            pk.metadata = data == null ? this.dataProperties.clone() : data;
             player.dataPacket(pk);
         }
         if (this instanceof Player player) {
-            pk.metadata = data == null ? this.dataProperties.clone() : data;
             player.dataPacket(pk);
         }
     }
@@ -2183,14 +2198,34 @@ public abstract class Entity extends Location implements Metadatable {
         updatePassengers();
 
         if (!this.effects.isEmpty()) {
-            for (Effect effect : this.effects.values().toArray(new Effect[0])) {
-                if (effect.canTick()) {
-                    effect.applyEffect(this);
-                }
-                effect.setDuration(effect.getDuration() - tickDiff);
+            EffectTickSnapshot lease = EFFECT_TICK_SNAPSHOT.get();
+            boolean ownsBuffer = !lease.inUse;
+            if (ownsBuffer) {
+                lease.inUse = true;
+            }
+            Effect[] snapshot = null;
+            try {
+                snapshot = this.effects.values().toArray(ownsBuffer ? lease.effects : new Effect[0]);
+                for (Effect effect : snapshot) {
+                    if (snapshot == lease.effects && effect == null) {
+                        break;
+                    }
+                    if (effect.canTick()) {
+                        effect.applyEffect(this);
+                    }
+                    effect.setDuration(effect.getDuration() - tickDiff);
 
-                if (effect.getDuration() <= 0) {
-                    this.removeEffect(effect.getId(), EntityPotionEffectEvent.Cause.EXPIRATION);
+                    if (effect.getDuration() <= 0) {
+                        this.removeEffect(effect.getId(), EntityPotionEffectEvent.Cause.EXPIRATION);
+                    }
+                }
+            } finally {
+                if (snapshot != null && snapshot != lease.effects) {
+                    Arrays.fill(snapshot, null);
+                }
+                if (ownsBuffer) {
+                    Arrays.fill(lease.effects, null);
+                    lease.inUse = false;
                 }
             }
         }
@@ -2828,19 +2863,47 @@ public abstract class Entity extends Location implements Metadatable {
         return this.level.getBlockIdAt(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(y), NukkitMath.floorDouble(this.z)) == Block.BUBBLE_COLUMN;
     }
 
-    public boolean isSubmerged() {
-        double y = this.y + this.getEyeHeight();
-        int blockX = NukkitMath.floorDouble(this.x);
-        int blockY = NukkitMath.floorDouble(y);
-        int blockZ = NukkitMath.floorDouble(this.z);
-        // Every living entity asks this every tick, and the answer is almost always "no": read the two
-        // ids from the entity's own chunk and materialise blocks only when one of them can be water.
+    /**
+     * 仅从已加载的内置读取路径获取普通方块 ID；返回 -1 时必须物化方块。
+     * <p>
+     * Reads ordinary block IDs only through loaded built-in paths; -1 requires materialisation.
+     */
+    protected final int getBuiltinBlockIdAt(int x, int y, int z, int layer) {
+        Level level = this.level;
+        if (level == null || level.getClass() != Level.class || !level.isYInRange(y)) {
+            return -1;
+        }
         FullChunk chunk = this.chunk;
-        if (chunk != null && this.level != null && chunk.getX() == blockX >> 4 && chunk.getZ() == blockZ >> 4
-                && this.level.isYInRange(blockY)
-                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 0))
-                && !mayMaterialiseAsWater(chunk.getBlockId(blockX & 0x0f, blockY, blockZ & 0x0f, 1))) {
-            return false;
+        if (chunk == null || chunk.getX() != x >> 4 || chunk.getZ() != z >> 4) {
+            chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+        }
+        if (chunk == null || chunk.getClass() != LevelDBChunk.class) {
+            return -1;
+        }
+        ChunkSection section = ((LevelDBChunk) chunk).getSection(y >> 4);
+        if (section.getClass() == EmptyChunkSection.class) {
+            return Block.AIR;
+        }
+        if (section.getClass() != LevelDBChunkSection.class) {
+            return -1;
+        }
+        int id = section.getBlockId(x & 0xF, y & 0xF, z & 0xF, layer);
+        return id >= 0 && id < Block.MAX_BLOCK_ID ? id : -1;
+    }
+
+    public boolean isSubmerged() {
+        int blockX = NukkitMath.floorDouble(this.x);
+        int blockY = NukkitMath.floorDouble(this.y + this.getEyeHeight());
+        int blockZ = NukkitMath.floorDouble(this.z);
+        int id0 = this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 0);
+        if (id0 >= 0) {
+            if (id0 == Block.WATER || id0 == Block.STILL_WATER) {
+                return true;
+            }
+            int id1 = this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 1);
+            if (id1 >= 0) {
+                return id1 == Block.WATER || id1 == Block.STILL_WATER;
+            }
         }
         Block block = this.level.getBlock(this.temporalVector.setComponents(blockX, blockY, blockZ));
         return block instanceof BlockWater || this.level.getBlock(block, 1) instanceof BlockWater;
@@ -2855,7 +2918,20 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfWater() {
-        Block block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+        int fx = this.getFloorX();
+        int fy = this.getFloorY();
+        int fz = this.getFloorZ();
+        int id0 = this.getBuiltinBlockIdAt(fx, fy, fz, 0);
+        if (id0 >= 0) {
+            if (id0 == Block.WATER || id0 == Block.STILL_WATER) {
+                return true;
+            }
+            int id1 = this.getBuiltinBlockIdAt(fx, fy, fz, 1);
+            if (id1 >= 0 && id1 != Block.WATER && id1 != Block.STILL_WATER) {
+                return false;
+            }
+        }
+        Block block = level.getBlock(fx, fy, fz);
         return block.isWater() || block.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING && block.getLevelBlockAtLayer(1).isWater();
     }
 
@@ -2864,12 +2940,14 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfSolid() {
-        double y = this.y + this.getEyeHeight();
+        int blockX = NukkitMath.floorDouble(this.x);
+        int blockY = NukkitMath.floorDouble(this.y + this.getEyeHeight());
+        int blockZ = NukkitMath.floorDouble(this.z);
+        if (this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 0) == Block.AIR) {
+            return false;
+        }
         Block block = this.level.getBlock(
-                this.temporalVector.setComponents(
-                        NukkitMath.floorDouble(this.x),
-                        NukkitMath.floorDouble(y),
-                        NukkitMath.floorDouble(this.z))
+                this.temporalVector.setComponents(blockX, blockY, blockZ)
         );
 
         AxisAlignedBB bb = block.getBoundingBox();
@@ -2880,9 +2958,10 @@ public abstract class Entity extends Location implements Metadatable {
 
         // Check eye position against block BB to avoid false suffocation in non-full blocks like stairs
         double halfWidth = this.getWidth() * 0.4;
+        double eyeY = this.y + this.getEyeHeight();
         return bb.intersectsWith(
-                this.x - halfWidth, y - 0.0001, this.z - halfWidth,
-                this.x + halfWidth, y + 0.0001, this.z + halfWidth
+                this.x - halfWidth, eyeY - 0.0001, this.z - halfWidth,
+                this.x + halfWidth, eyeY + 0.0001, this.z + halfWidth
         );
     }
 
@@ -2927,7 +3006,13 @@ public abstract class Entity extends Location implements Metadatable {
             AxisAlignedBB bb = this.boundingBox.clone();
             bb.setMinY(bb.getMinY() - 0.75);
 
-            this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+            if (this instanceof Player) {
+                // fastMove updates fall state before Player's final movement check.
+                bb.setMaxY(this.boundingBox.getMinY() + 1.0E-4);
+                this.onGround = CollisionHelper.hasExposedBlockSupport(this.level, this, bb);
+            } else {
+                this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
+            }
         }
         this.isCollided = this.onGround;
         this.updateFallState(this.onGround);
@@ -3163,7 +3248,8 @@ public abstract class Entity extends Location implements Metadatable {
 
             if (!this.justCreated) {
                 Map<Integer, Player> newChunk = this.level.getChunkPlayers(cx, cz);
-                for (Player player : new ArrayList<>(this.hasSpawned.values())) {
+                for (Object viewer : this.hasSpawned.values().toArray()) {
+                    Player player = (Player) viewer;
                     if (!newChunk.containsKey(player.getLoaderId())) {
                         this.despawnFrom(player);
                     } else {
@@ -3363,7 +3449,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void despawnFromAll() {
-        for (Player player : new ArrayList<>(this.hasSpawned.values())) {
+        for (Object viewer : this.hasSpawned.values().toArray()) {
+            Player player = (Player) viewer;
             this.despawnFrom(player);
         }
     }

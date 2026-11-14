@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
  */
 public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable, BlockEntityHolder<BlockEntityPistonArm> {
 
+    private static final BlockFace[] POWER_SCAN_FACES = BlockFace.values();
+
     public boolean sticky = false;
 
     public BlockPistonBase() {
@@ -129,10 +131,10 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         }
 
         BlockEntity blockEntity = this.level.getBlockEntity(this);
-        if (blockEntity instanceof BlockEntityPistonArm arm) {
+        if (blockEntity instanceof BlockEntityPistonArm arm && arm.state % 2 == 0) {
             boolean powered = this.isPowered();
 
-            if (arm.state % 2 == 0 && arm.powered != powered) {
+            if (arm.powered != powered) {
                 if (this.checkState(powered)) {
                     arm.powered = powered;
                     if (arm.chunk != null) {
@@ -173,7 +175,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
     private boolean isPowered() {
         BlockFace face = this.getBlockFace();
 
-        for (BlockFace side : BlockFace.values()) {
+        for (BlockFace side : POWER_SCAN_FACES) {
             if (side == face) {
                 continue;
             }

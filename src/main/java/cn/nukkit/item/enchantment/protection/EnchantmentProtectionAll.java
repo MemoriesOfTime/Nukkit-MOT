@@ -34,9 +34,9 @@ public class EnchantmentProtectionAll extends EnchantmentProtection {
     public float getProtectionFactor(EntityDamageEvent e) {
         DamageCause cause = e.getCause();
 
-        // legacy 额外排除 MAGIC(保护附魔不减免魔法)
+        // Legacy excludes other MAGIC, but Protection applies to instant potion damage.
         if (level <= 0 || cause == DamageCause.VOID || cause == DamageCause.CUSTOM || cause == DamageCause.HUNGER
-                || (cause == DamageCause.MAGIC && !Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction())) {
+                || (cause == DamageCause.MAGIC && !e.isInstantPotionDamage() && !Server.getInstance().getServerConfig().gameFeatureSettings().vanillaArmorReduction())) {
             return 0;
         }
 

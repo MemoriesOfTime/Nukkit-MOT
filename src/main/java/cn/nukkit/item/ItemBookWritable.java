@@ -152,13 +152,20 @@ public abstract class ItemBookWritable extends Item {
             pages = tag.getList("pages", CompoundTag.class);
         }
 
+        if (pages.size() >= 50) {
+            return false;
+        }
+
         if (pages.size() <= pageId) {
             for (int current = pages.size(); current <= pageId; current++) {
                 pages.add(createPageTag());
             }
             pages.get(pageId).putString("text", pageText);
         } else {
-            pages.add(pageId, createPageTag(pageText));
+            // ListTag.add(index, tag) replaces an existing tag; insertion must shift pages.
+            List<CompoundTag> existingPages = pages.getAll();
+            existingPages.add(pageId, createPageTag(pageText));
+            pages.setAll(existingPages);
         }
         this.setCompoundTag(tag);
         return true;
@@ -180,6 +187,7 @@ public abstract class ItemBookWritable extends Item {
                     String pageContents2 = pages.get(pageId2).getString("text");
                     pages.get(pageId1).putString("text", pageContents2);
                     pages.get(pageId2).putString("text", pageContents1);
+                    this.setCompoundTag(tag);
                     return true;
                 }
             }

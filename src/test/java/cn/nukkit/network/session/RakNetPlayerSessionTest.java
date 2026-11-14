@@ -19,6 +19,7 @@ import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
+import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
@@ -39,18 +40,22 @@ import java.nio.ByteOrder;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static cn.nukkit.network.session.NetworkPlayerSession.ImmediatePacketMode.DIRECT_WRITE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class RakNetPlayerSessionTest {
 
     private static final int RAKNET_PROTOCOL = 11;
+    /** 生产端前缀守卫的断连原因，用来区分「前缀不可用」和其他断开来源。 The prefix guard's disconnect reason, keeping this close distinguishable from any other. */
+    private static final String UNSUPPORTED_PREFIX_REASON =
+            "Your client does not support this game version over this connection";
     private static Network network;
 
     @BeforeAll
@@ -563,8 +568,8 @@ class RakNetPlayerSessionTest {
 
             receiveBatch(fixture.session, encryptBatch(clientCipher, key, 1, payload));
 
-            assertEquals(1, fixture.session.queuedInboundPacketCount(),
-                    "soft backpressure must advance both the cipher stream and checksum counter");
+            assertEquals(2, fixture.session.queuedInboundPacketCount(),
+                    "soft backpressure must retain both batches and advance the cipher exactly once");
             assertNull(fixture.session.getDisconnectReason());
             verify(fixture.channel, never()).close();
         }
@@ -721,6 +726,59 @@ class RakNetPlayerSessionTest {
     }
 
     @Test
+    void prefixIncapableCompressionClosesOnceInsteadOfDroppingEveryBatch() throws Exception {
+        SessionFixture fixture = createSession(false);
+        fixture.session.setCompression(CompressionProvider.ZLIB);
+        fixture.session.sendPacket(testPacket());
+
+        invokeNetworkTick(fixture.session);
+        invokeNetworkTick(fixture.session);
+
+        verify(fixture.channel, never()).writeAndFlush(any(ByteBuf.class));
+        assertEquals(SessionLoginPhase.DISCONNECTED, fixture.session.getState().getLogin().getPhase());
+        assertEquals(UNSUPPORTED_PREFIX_REASON, fixture.session.getState().getLogin().getDisconnectCauseHint());
+
+        SessionFixture prefixed = createSession(false);
+        prefixed.session.setCompression(CompressionProvider.ZLIB_RAW);
+        prefixed.session.sendPacket(testPacket());
+        invokeNetworkTick(prefixed.session);
+
+        verify(prefixed.channel).writeAndFlush(any(ByteBuf.class));
+    }
+
+    @Test
+    void legacyCustomCompressionProviderStillFramesBatches() throws Exception {
+        // 只实现旧接口（compress/decompress/getPrefix）的插件编码器不能因新增的能力方法被断开
+        // A plugin codec implementing only the old surface must not be disconnected by the new capability method
+        CompressionProvider legacy = new CompressionProvider() {
+            @Override
+            public byte[] compress(BinaryStream packet, int level) throws Exception {
+                return CompressionProvider.ZLIB_RAW.compress(packet, level);
+            }
+
+            @Override
+            public byte[] decompress(byte[] compressed) throws Exception {
+                return CompressionProvider.ZLIB_RAW.decompress(compressed);
+            }
+
+            @Override
+            public byte getPrefix() {
+                return CompressionProvider.ZLIB_RAW.getPrefix();
+            }
+        };
+
+        SessionFixture fixture = createSession(false);
+        fixture.session.setCompression(legacy);
+        fixture.session.sendPacket(testPacket());
+
+        invokeNetworkTick(fixture.session);
+
+        verify(fixture.channel).writeAndFlush(any(ByteBuf.class));
+        assertNotEquals(SessionLoginPhase.DISCONNECTED, fixture.session.getState().getLogin().getPhase());
+        assertNull(fixture.session.getState().getLogin().getDisconnectCauseHint());
+    }
+
+    @Test
     void directWriteStillEncodesImmediatelyOnEventLoop() {
         SessionFixture fixture = createSession(true);
 
@@ -733,6 +791,45 @@ class RakNetPlayerSessionTest {
 
         assertTrue(packet.isEncoded, "direct-write packets should still be encoded before the immediate write");
         verify(fixture.channel).writeAndFlush(any(ByteBuf.class));
+    }
+
+    @Test
+    void directWritePrefixFailureDoesNotRunSuccessCallback() {
+        // 前缀不可用时批次未写出：DIRECT_WRITE 必须看到失败，否则成功回调会在断连后照常执行
+        // The batch is never written when the prefix is unavailable: DIRECT_WRITE must observe failure,
+        // or the success callback still runs after the disconnect
+        SessionFixture fixture = createSession(true);
+        stubCompletedFutures(fixture.channel);
+
+        fixture.session.setCompression(CompressionProvider.ZLIB);
+
+        AtomicBoolean callbackRan = new AtomicBoolean();
+        fixture.session.sendImmediatePacket(testPacket(), () -> callbackRan.set(true), DIRECT_WRITE);
+
+        assertFalse(callbackRan.get(), "an unwritten packet must not report success to DIRECT_WRITE");
+        verify(fixture.channel, never()).writeAndFlush(any(ByteBuf.class));
+        assertEquals(SessionLoginPhase.DISCONNECTED, fixture.session.getState().getLogin().getPhase(),
+                "the phase set by the prefix close must survive the failure branch");
+        assertEquals(UNSUPPORTED_PREFIX_REASON, fixture.session.getState().getLogin().getDisconnectCauseHint(),
+                "the failure branch's disconnect must stay a no-op against the prefix close reason");
+    }
+
+    /**
+     * 用真实 Netty future 替换 mock 的已完成 future：监听器同步触发，防止 mock 吞掉回调掩盖回归。
+     * <p>Replaces the mock's completed futures with real Netty ones so listeners fire synchronously
+     * and a mock cannot swallow the callback and hide a regression.
+     */
+    private static void stubCompletedFutures(Channel channel) {
+        when(channel.newSucceededFuture()).thenAnswer(call -> {
+            DefaultChannelPromise promise = new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE);
+            promise.setSuccess();
+            return promise;
+        });
+        when(channel.newFailedFuture(any(Throwable.class))).thenAnswer(call -> {
+            DefaultChannelPromise promise = new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE);
+            promise.setFailure(call.getArgument(0));
+            return promise;
+        });
     }
 
     private static SessionFixture createSession(boolean executeImmediately) {
@@ -851,6 +948,13 @@ class RakNetPlayerSessionTest {
         return prefixed;
     }
 
+    private static TestPacket testPacket() {
+        TestPacket packet = new TestPacket();
+        packet.protocol = GameVersion.V1_21_130.getProtocol();
+        packet.gameVersion = GameVersion.V1_21_130;
+        return packet;
+    }
+
     private static List<DataPacket> testPackets(int count) {
         List<DataPacket> packets = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
@@ -894,5 +998,94 @@ class RakNetPlayerSessionTest {
         long late = RakNetPlayerSession.RESOURCE_PACK_PHASE_MAX_NANOS + 1;
         assertTrue(RakNetPlayerSession.isLoginPhaseTimedOut(SessionLoginPhase.RESOURCE_PACK,
                 start, start, true, late, (int) timeout));
+    }
+
+    private static final long[] COUNTERS = {0, 1, 127, 128, 255, 256, 65535, 65536,
+            0x0102030405060708L, Long.MAX_VALUE, Long.MIN_VALUE, -1};
+
+    @Test
+    void keepsKnownLittleEndianVectorAndReceivedTrailer() throws Exception {
+        byte[] key = new byte[32];
+        for (int i = 0; i < key.length; i++) key[i] = (byte) i;
+        RakNetPlayerSession session = session(key);
+        Field localField = RakNetPlayerSession.class.getDeclaredField("CHECKSUM_LOCAL");
+        localField.setAccessible(true);
+        byte[] receivedTrailer = ((ThreadLocal<byte[]>) localField.get(null)).get();
+        Arrays.fill(receivedTrailer, (byte) 0xa5);
+        byte[] expectedTrailer = receivedTrailer.clone();
+        ByteBuf payload = Unpooled.wrappedBuffer(new byte[]{0, 127, (byte) 128, (byte) 255, 1, 2, 3});
+        try {
+            byte[] actual = calculate(session, 0x0102030405060708L, payload);
+            assertEquals("4fd7df1ec998997f", HexFormat.of().formatHex(actual));
+            assertArrayEquals(expectedTrailer, receivedTrailer,
+                    "incoming verification must keep its received trailer after calculating the expected one");
+            actual[0] ^= (byte) 0xff;
+            assertEquals("4fd7df1ec998997f", HexFormat.of().formatHex(calculate(session, 0x0102030405060708L, payload)));
+        } finally {
+            payload.release();
+        }
+    }
+
+    @Test
+    void matchesIndependentDigestForCountersAndBufferViewsOnIndependentThreads() throws Exception {
+        var threads = Executors.newFixedThreadPool(3);
+        try {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int task = 0; task < 6; task++) {
+                final int seed = task;
+                futures.add(threads.submit(() -> {
+                    try {
+                        Random random = new Random(seed);
+                        byte[] key = new byte[32];
+                        random.nextBytes(key);
+                        RakNetPlayerSession session = session(key);
+                        for (int length : new int[]{0, 1, 7, 8, 31, 256, 1025}) {
+                            byte[] bytes = new byte[length];
+                            random.nextBytes(bytes);
+                            for (boolean direct : new boolean[]{false, true}) {
+                                ByteBuf backing = direct ? Unpooled.directBuffer(length + 13) : Unpooled.buffer(length + 13);
+                                try {
+                                    backing.writeZero(5).writeBytes(bytes).writeZero(8);
+                                    ByteBuf payload = backing.slice(2, length + 3).readerIndex(3);
+                                    int reader = payload.readerIndex();
+                                    int writer = payload.writerIndex();
+                                    for (long counter : COUNTERS) {
+                                        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                                        digest.update(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(counter).array());
+                                        digest.update(bytes);
+                                        digest.update(key);
+                                        assertArrayEquals(Arrays.copyOf(digest.digest(), 8), calculate(session, counter, payload));
+                                        assertEquals(reader, payload.readerIndex());
+                                        assertEquals(writer, payload.writerIndex());
+                                        assertEquals(1, backing.refCnt());
+                                    }
+                                } finally {
+                                    backing.release();
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        throw new AssertionError(e);
+                    }
+                }));
+            }
+            for (var future : futures) future.get();
+        } finally {
+            threads.shutdownNow();
+        }
+    }
+
+    private static RakNetPlayerSession session(byte[] key) throws Exception {
+        RakNetPlayerSession session = mock(RakNetPlayerSession.class, CALLS_REAL_METHODS);
+        Field field = RakNetPlayerSession.class.getDeclaredField("encryptionKey");
+        field.setAccessible(true);
+        field.set(session, new SecretKeySpec(key, "AES"));
+        return session;
+    }
+
+    private static byte[] calculate(RakNetPlayerSession session, long counter, ByteBuf payload) throws Exception {
+        Method method = RakNetPlayerSession.class.getDeclaredMethod("calculateChecksum", long.class, ByteBuf.class);
+        method.setAccessible(true);
+        return (byte[]) method.invoke(session, counter, payload);
     }
 }

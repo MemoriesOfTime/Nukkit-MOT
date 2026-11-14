@@ -30,16 +30,16 @@ public class BlockPurpur extends BlockSolidMeta {
         super(meta);
     }
 
+    private static final String[] NAMES = new String[]{
+            "Purpur Block",
+            "",
+            "Purpur Pillar",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Purpur Block",
-                "",
-                "Purpur Pillar",
-                ""
-        };
-
-        return names[this.getDamage() & 0x03];
+        return NAMES[this.getDamage() & 0x03];
     }
 
     @Override
@@ -79,7 +79,8 @@ public class BlockPurpur extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(Block.PURPUR_BLOCK), this.getDamage() & 0x03, 1);
+        int damage = this.getDamage() & 0x03;
+        return new ItemBlock(Block.get(Block.PURPUR_BLOCK, damage), damage, 1);
     }
 
     @Override

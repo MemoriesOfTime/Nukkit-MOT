@@ -157,6 +157,7 @@ public class BlockSeaPickle extends BlockFlowable {
                     BlockSpreadEvent event = new BlockSpreadEvent(
                             up, this, new BlockSeaPickle(random.nextInt(3))
                     );
+                    Server.getInstance().getPluginManager().callEvent(event);
                     if (!event.isCancelled()) {
                         level.setBlock(up, 1, new BlockWater(), true, false);
                         level.setBlock(up, event.getNewState(), true, true);

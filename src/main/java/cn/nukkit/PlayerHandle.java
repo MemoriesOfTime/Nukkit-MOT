@@ -6,6 +6,8 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.level.Location;
+import cn.nukkit.level.PlayerBlobCacheState;
+import cn.nukkit.level.PlayerSubChunkRequestState;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
@@ -16,6 +18,7 @@ import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.LoginChainData;
+import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.collect.BiMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
@@ -64,6 +67,14 @@ public final class PlayerHandle {
 
     public NetworkPlayerSession getNetworkSession() {
         return player.networkSession;
+    }
+
+    public PlayerBlobCacheState getBlobCacheState() {
+        return player.blobCacheState;
+    }
+
+    public PlayerSubChunkRequestState getSubChunkRequestState() {
+        return player.subChunkRequestState;
     }
 
     public void queueResourcePackChunk(ResourcePack resourcePack, int chunkIndex) {
@@ -115,8 +126,26 @@ public final class PlayerHandle {
         return player.permanentWindows;
     }
 
+    /**
+     * 仅主线程可访问原始可变队列 / Raw mutable queue, main thread only.
+     *
+     * @deprecated 使用 {@link #getLoadQueueSnapshot()} 或 {@link #requestChunkRetry(long)} / Use the snapshot or the semantic retry API.
+     */
+    @Deprecated
     public LongLinkedOpenHashSet getLoadQueue() {
+        Preconditions.checkState(player.getServer().isPrimaryThread(), "loadQueue is main-thread only");
         return player.loadQueue;
+    }
+
+    /** 返回主线程队列快照 / Return a main-thread snapshot of the queue. */
+    public LongLinkedOpenHashSet getLoadQueueSnapshot() {
+        Preconditions.checkState(player.getServer().isPrimaryThread(), "loadQueue is main-thread only");
+        return new LongLinkedOpenHashSet(player.loadQueue);
+    }
+
+    /** 可从任意线程请求重试，由主线程校验并应用 / Thread-safe retry request, validated and applied on the main thread. */
+    public void requestChunkRetry(long index) {
+        player.requestChunkRetry(index);
     }
 
     public Map<UUID, Player> getHiddenPlayers() {
@@ -320,6 +349,9 @@ public final class PlayerHandle {
     }
 
     public void setChunkRadius(int chunkRadius) {
+        if (player.chunkRadius != chunkRadius) {
+            player.nextChunkOrderRun = 0;
+        }
         player.chunkRadius = chunkRadius;
     }
 
@@ -541,13 +573,5 @@ public final class PlayerHandle {
 
     private NetworkSessionState getSessionState() {
         return player.networkSession != null ? player.networkSession.getState() : null;
-    }
-
-    public int getFailedMobEquipmentPacket() {
-        return player.failedMobEquipmentPacket;
-    }
-
-    public void setFailedMobEquipmentPacket(int failedCount) {
-        player.failedMobEquipmentPacket = failedCount;
     }
 }

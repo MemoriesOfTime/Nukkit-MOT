@@ -52,6 +52,11 @@ public class ListTag<T extends Tag> extends Tag {
         type = dis.readByte();
         int size = dis.readInt();
 
+        // Unknown types fall back to EndTag, whose decoder consumes no bytes.
+        if (dis.isReadSafely() && type != TAG_End && Tag.newTag(type, null) instanceof EndTag) {
+            throw new IOException("Unsupported list element type: " + Byte.toUnsignedInt(type));
+        }
+
         if (type == TAG_End) {
             list = new ArrayList<>();
             return;
@@ -187,6 +192,9 @@ public class ListTag<T extends Tag> extends Tag {
     public Tag copy() {
         ListTag<T> res = new ListTag<>(getName());
         res.type = type;
+        if (list != null && list.getClass() == ArrayList.class) {
+            ((ArrayList<T>) res.list).ensureCapacity(list.size());
+        }
         for (T t : list) {
             @SuppressWarnings("unchecked")
             T copy = (T) t.copy();

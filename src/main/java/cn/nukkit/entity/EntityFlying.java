@@ -25,9 +25,9 @@ public abstract class EntityFlying extends BaseEntity {
         }
 
         Vector3 target = this.target;
-        if (!(target instanceof EntityCreature) ||
+        if (this.shouldRunTargetCheck() && (!(target instanceof EntityCreature) ||
                 (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) ||
-                !((Entity) target).canBeFollowed()) {
+                !((Entity) target).canBeFollowed())) {
 
             for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
                 if (!(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {

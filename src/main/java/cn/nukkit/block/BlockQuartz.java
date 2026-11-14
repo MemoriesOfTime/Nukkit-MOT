@@ -51,16 +51,16 @@ public class BlockQuartz extends BlockSolidMeta {
         return 4;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Quartz Block",
+            "Chiseled Quartz Block",
+            "Quartz Pillar",
+            "Quartz Pillar"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Quartz Block",
-                "Chiseled Quartz Block",
-                "Quartz Pillar",
-                "Quartz Pillar"
-        };
-
-        return names[this.getDamage() & 0x03];
+        return NAMES[this.getDamage() & 0x03];
     }
 
     @Override
@@ -75,7 +75,8 @@ public class BlockQuartz extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(QUARTZ_BLOCK), this.getDamage() & 0x03, 1);
+        int itemMeta = this.getDamage() & 0x03;
+        return new ItemBlock(Block.get(QUARTZ_BLOCK, itemMeta), itemMeta, 1);
     }
 
     @Override

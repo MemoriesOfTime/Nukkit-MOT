@@ -13,8 +13,13 @@ import lombok.ToString;
 @ToString
 public class UseItemData implements TransactionData {
 
+    public static final int TRIGGER_UNKNOWN = 0;
+    public static final int TRIGGER_PLAYER_INPUT = 1;
+    public static final int TRIGGER_SIMULATION_TICK = 2;
+
     public int actionType;
     public int triggerType;
+    public boolean hasTriggerType;
     public BlockVector3 blockPos;
     public BlockFace face;
     public int hotbarSlot;
