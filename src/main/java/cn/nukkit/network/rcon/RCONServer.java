@@ -181,28 +181,35 @@ public class RCONServer extends Thread {
 
     private void write(SelectionKey key) throws IOException {
         SocketChannel channel = (SocketChannel) key.channel();
+        List<RCONPacket> queue;
+        RCONPacket packet;
+        synchronized (this.sendQueues) {
+            queue = this.sendQueues.get(channel);
+            packet = queue.get(0);
+        }
+
+        // Only this selector thread consumes replies. The tick thread only appends under
+        // sendQueues: packet encoding and socket work must not hold up its next response.
+        ByteBuffer buffer = packet.toBuffer();
+        try {
+            channel.write(buffer);
+        } catch (IOException exception) {
+            key.cancel();
+            channel.close();
+            this.rconSessions.remove(channel);
+            synchronized (this.sendQueues) {
+                this.sendQueues.remove(channel);
+            }
+            return;
+        }
 
         synchronized (this.sendQueues) {
-            List<RCONPacket> queue = this.sendQueues.get(channel);
-
-            ByteBuffer buffer = queue.get(0).toBuffer();
-            try {
-                channel.write(buffer);
-                queue.remove(0);
-            } catch (IOException exception) {
-                key.cancel();
-                channel.close();
-                this.rconSessions.remove(channel);
-                this.sendQueues.remove(channel);
-                return;
-            }
-
+            queue.remove(0);
             if (queue.isEmpty()) {
                 this.sendQueues.remove(channel);
             }
-
-            key.interestOps(SelectionKey.OP_READ);
         }
+        key.interestOps(SelectionKey.OP_READ);
     }
 
     private void send(SocketChannel channel, RCONPacket packet) {
