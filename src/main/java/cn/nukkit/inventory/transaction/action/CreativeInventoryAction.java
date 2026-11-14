@@ -20,18 +20,49 @@ public class CreativeInventoryAction extends InventoryAction {
 
     public CreativeInventoryAction(Item source, Item target, int action) {
         super(source, target);
+        this.actionType = action;
     }
 
     /**
-     * Checks that the player is in creative, and (if creating an item) that the item exists in the creative inventory.
+     * Validates the creative credit/sink direction and exact session catalog membership for item creation.
      *
      * @param source player
      * @return valid
      */
     @Override
     public boolean isValid(Player source) {
-        return source.isCreative() &&
-                (this.actionType == TYPE_DELETE_ITEM || Item.isCreativeItem(source.getGameVersion(), this.sourceItem));
+        if (!source.isCreative() || this.sourceItem == null || this.targetItem == null) {
+            return false;
+        }
+        return switch (this.actionType) {
+            case TYPE_CREATE_ITEM -> this.sourceItem.getId() != Item.AIR
+                    && this.sourceItem.getCount() > 0
+                    && this.sourceItem.getCount() <= this.sourceItem.getMaxStackSize()
+                    && this.targetItem.getId() == Item.AIR
+                    && isCatalogItem(source);
+            case TYPE_DELETE_ITEM -> this.sourceItem.getId() == Item.AIR
+                    && (this.targetItem.getId() == Item.AIR || this.targetItem.getCount() > 0);
+            default -> false;
+        };
+    }
+
+    private boolean isCatalogItem(Player source) {
+        var version = source.getGameVersion();
+        if (version == null) {
+            return false;
+        }
+        for (Item item : Item.getCreativeItemsAndGroups().getItems(version)) {
+            if (this.sourceItem.equals(item, true, true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean onPreExecute(Player source) {
+        // Plugins may change the mode, catalog or action items after initial validation.
+        return this.isValid(source);
     }
 
     /**
