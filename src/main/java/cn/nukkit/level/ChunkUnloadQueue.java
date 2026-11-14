@@ -85,24 +85,25 @@ final class ChunkUnloadQueue {
     }
 
     /**
-     * 从队首卸载到期区块，遇到未到期或写积压即停；force 忽略宽限期与单次计数。
+     * 从队首卸载到期区块，遇到未到期或写积压即停；force 忽略宽限期、写积压与单次计数，改为遍历开始时的队列快照。
      * <p>Unloads the due chunks at the head, stopping at the first one that is not due or while the
-     * writer is backlogged. A forced pass ignores the grace period and the count cap.
+     * writer is backlogged. A forced pass ignores the grace period, backpressure and the count cap,
+     * and walks the entry snapshot taken when it started.
      *
      * @param target    对应的 Level 判断 / Level-side decisions
-     * @param force     卸载全部排队区块（含未到期），不受 maxUnload 限制 / unload every queued chunk, uncapped
+     * @param force     卸载开始前已排队的全部区块，不受 maxUnload 限制 / unload every chunk queued at the pass start, uncapped
      * @param maxUnload 非 force 时本次最多卸载数 / per-pass cap unless forced
      * @param deadline  {@link #now()} 时间轴的截止点，每次成功卸载后检查 / stop after an unload at this {@link #now()} value
      * @return false 表示因 deadline 停止 / false when the pass stopped on the deadline
      */
     boolean drain(Target target, boolean force, int maxUnload, long deadline) {
+        if (force) {
+            return this.drainForced(target, deadline);
+        }
+
         long dueBefore = this.now() - GRACE_MILLIS;
-        // force 每轮只访问一次队列快照：被拒的区块移到队尾，不会重复访问
-        // A forced pass visits every queued chunk once; a refused one goes back to the tail.
-        int visits = force ? this.size() : Integer.MAX_VALUE;
-        int limit = force ? Integer.MAX_VALUE : maxUnload;
         int unloaded = 0;
-        while (unloaded < limit && visits-- > 0) {
+        while (unloaded < maxUnload) {
             long hash;
             long queuedAt;
             long revision;
@@ -114,7 +115,7 @@ final class ChunkUnloadQueue {
                 queuedAt = this.queuedAt.get(hash);
                 revision = this.revisions.get(hash);
             }
-            if (!force && queuedAt > dueBefore) {
+            if (queuedAt > dueBefore) {
                 // 队首最旧，后面的区块都不会到期
                 return true;
             }
@@ -125,7 +126,7 @@ final class ChunkUnloadQueue {
             }
             // 每次卸载前复查一次：上一次的区块和脏邻居可能已填满写队列；区块留在队首，不拆开一次卸载的邻居保存
             // Recheck between unloads: the previous chunk and its dirty neighbours may fill the writer.
-            if (!force && target.isChunkSaveBacklogged()) {
+            if (target.isChunkSaveBacklogged()) {
                 return true;
             }
             boolean done = target.unloadChunk(hash);
@@ -140,6 +141,52 @@ final class ChunkUnloadQueue {
             }
         }
         return true;
+    }
+
+    /**
+     * force 按开始时的 (hash, revision) 快照逐个尝试：回调重排队列不会漏访或重复访问某个区块。
+     * 轮内重新入队仍按快照尝试，其新请求由 settle 保留；轮内取消则跳过。
+     * <p>A forced pass tries the (hash, revision) snapshot taken at its start, so callbacks reordering
+     * the queue neither skip a chunk nor get one tried twice: renewals survive via settle, cancels are honoured.
+     */
+    private boolean drainForced(Target target, long deadline) {
+        long[] hashes;
+        long[] revisions;
+        synchronized (this) {
+            if (this.queuedAt.isEmpty()) {
+                return true;
+            }
+            // 入队顺序即到期顺序，快照保持原顺序
+            // Insertion order is due order, so the snapshot keeps it.
+            hashes = this.queuedAt.keySet().toLongArray();
+            revisions = new long[hashes.length];
+            for (int i = 0; i < hashes.length; i++) {
+                revisions[i] = this.revisions.get(hashes[i]);
+            }
+        }
+        for (int i = 0; i < hashes.length; i++) {
+            long hash = hashes[i];
+            long revision = revisions[i];
+            if (!this.isQueued(hash)) {
+                // 轮内被取消：尊重取消 / cancelled during the pass, honour it
+                continue;
+            }
+            if (target.isChunkInUse(hash)) {
+                this.settle(hash, revision, true);
+                continue;
+            }
+            boolean done = target.unloadChunk(hash);
+            this.settle(hash, revision, done);
+            if (done && this.now() >= deadline) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 快照条目是否仍在队列（轮内取消会移除）。/ Whether a snapshot entry is still queued. */
+    private synchronized boolean isQueued(long hash) {
+        return this.queuedAt.containsKey(hash);
     }
 
     /**

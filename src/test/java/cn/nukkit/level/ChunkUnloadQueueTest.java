@@ -140,6 +140,86 @@ class ChunkUnloadQueueTest {
     }
 
     @Test
+    void aForcedPassTriesAChunkRequeuedByOtherCallbacks() {
+        long first = Level.chunkHash(1, 0);
+        long requeued = Level.chunkHash(2, 0);
+        long last = Level.chunkHash(3, 0);
+        this.queue.request(first);
+        this.queue.request(requeued);
+        this.queue.request(last);
+
+        List<Long> attempts = new ArrayList<>();
+        ChunkUnloadQueue.Target reentrant = new ChunkUnloadQueue.Target() {
+            @Override
+            public boolean isChunkInUse(long hash) {
+                return false;
+            }
+
+            @Override
+            public boolean isChunkSaveBacklogged() {
+                return false;
+            }
+
+            @Override
+            public boolean unloadChunk(long hash) {
+                attempts.add(hash);
+                if (hash == requeued) {
+                    return false;
+                }
+                // 模拟 ChunkUnloadEvent 回调：拒绝自身卸载并重新入队 requeued，把它移到队尾
+                // Simulates a ChunkUnloadEvent handler that rejects its own unload and re-queues requeued
+                ChunkUnloadQueueTest.this.queue.request(requeued);
+                return false;
+            }
+        };
+
+        this.queue.drain(reentrant, true, 50, Long.MAX_VALUE);
+
+        assertEquals(List.of(first, requeued, last), attempts,
+                "force 必须按开始时的快照访问每个区块一次 / a forced pass tries every chunk queued at its start");
+        assertTrue(this.queue.contains(first), "被拒的区块重新计时 / a refused chunk waits another grace");
+        assertTrue(this.queue.contains(requeued), "轮内重新入队的请求留到下一轮 / the renewed request waits for the next pass");
+        assertTrue(this.queue.contains(last));
+    }
+
+    @Test
+    void aForcedPassHonoursACancellationIssuedDuringThePass() {
+        long first = Level.chunkHash(4, 0);
+        long second = Level.chunkHash(5, 0);
+        long cancelled = Level.chunkHash(6, 0);
+        this.queue.request(first);
+        this.queue.request(second);
+        this.queue.request(cancelled);
+
+        List<Long> attempts = new ArrayList<>();
+        ChunkUnloadQueue.Target reentrant = new ChunkUnloadQueue.Target() {
+            @Override
+            public boolean isChunkInUse(long hash) {
+                return false;
+            }
+
+            @Override
+            public boolean isChunkSaveBacklogged() {
+                return false;
+            }
+
+            @Override
+            public boolean unloadChunk(long hash) {
+                attempts.add(hash);
+                if (hash == first) {
+                    ChunkUnloadQueueTest.this.queue.cancel(cancelled);
+                }
+                return false;
+            }
+        };
+
+        this.queue.drain(reentrant, true, 50, Long.MAX_VALUE);
+
+        assertEquals(List.of(first, second), attempts, "轮内取消的区块不得再卸载 / a chunk cancelled during the pass is skipped");
+        assertFalse(this.queue.contains(cancelled));
+    }
+
+    @Test
     void aCountLimitedPassStopsAtItsLimit() {
         for (int x = 0; x < 5; x++) {
             this.queue.request(Level.chunkHash(x, 1));

@@ -5862,7 +5862,7 @@ public class Level implements ChunkManager, Metadatable {
         this.unloadChunks(false);
     }
 
-    /** 强制卸载忽略宽限期、写积压与单次计数；命令 /gc 依赖一次清空 / A forced pass ignores grace, backlog and the count cap. */
+    /** 强制卸载忽略宽限期、写积压与单次计数，清空调用时的队列快照；命令 /gc 依赖此行为 / A forced pass ignores grace, backlog and the count cap and walks the snapshot taken when it starts. */
     public void unloadChunks(boolean force) {
         this.unloadChunks(50, force);
     }
