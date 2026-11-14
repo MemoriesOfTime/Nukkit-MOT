@@ -2226,11 +2226,19 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * <p>
      * Returns whether the item supports the specified version
      *
-     * @param protocolId 协议版本 protocol version
+     * @param version 协议版本 protocol version
      * @return 是否支持 whether supported
      */
-    public boolean isSupportedOn(GameVersion protocolId) {
-        return this.isSupportedOnMapping(protocolId);
+    public boolean isSupportedOn(GameVersion version) {
+        int id = this.getId();
+        if (version.getProtocol() < ProtocolInfo.v1_2_0) {
+            boolean legacy113Item = id == AIR || (id > 0 && id != STRING_IDENTIFIED_ITEM
+                    && (id <= 463 || id == 466 || (id >= 500 && id <= 511)));
+            if (!legacy113Item) {
+                return false;
+            }
+        }
+        return this.isSupportedOnMapping(version);
     }
 
     private boolean isSupportedOnMapping(GameVersion protocolId) {

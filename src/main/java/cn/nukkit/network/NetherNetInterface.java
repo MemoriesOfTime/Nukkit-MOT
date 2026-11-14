@@ -19,8 +19,10 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.util.internal.PlatformDependent;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.netty.channel.nethernet.AddressSource;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
+import org.cloudburstmc.netty.channel.nethernet.SourcedAddress;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherChannelOption;
 import org.cloudburstmc.netty.channel.nethernet.signaling.JoinRefusal;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetHTTPServerSignaling;
@@ -34,9 +36,8 @@ import tel.schich.libdatachannel.LibDataChannelArchDetect;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.net.*;
+import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -93,6 +94,8 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     private final Queue<NetherNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
     private final Set<NetherNetPlayerSession> pendingSessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<InetAddress, Long> blockedAddresses = new ConcurrentHashMap<>();
+    /** 玩家用域名连接时解析出的媒体候选；server-udp-ports 已配对外地址时不再参与。 Media candidates resolved from a host name a player typed, unused while server-udp-ports names external addresses. */
+    private final NetherNetHostCandidates hostCandidates = new NetherNetHostCandidates();
     /** 广告随附的 nonce（P2P 世界机制，专用服务器客户端不回传也不校验），启动时随机一次。 Rides along in the advertisement, random once at startup; a P2P-worlds mechanism, never verified. */
     private final AtomicReference<String> pongNonce = new AtomicReference<>(String.format("%016x", new SecureRandom().nextLong()));
 
@@ -151,7 +154,8 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             this.relay = null;
         }
 
-        this.signaling = new NetherNetHTTPServerSignaling.Builder()
+        boolean publishTypedNames = mediaPorts == null || mediaPorts.advertisedAddresses().isEmpty();
+        NetherNetHTTPServerSignaling.Builder signalingBuilder = new NetherNetHTTPServerSignaling.Builder()
                 .setIdentity(identity)
                 .setServeHttp(true)
                 // RakNet 已占用 server-port 的 UDP 侧，信令端口不可复用；媒体端口经 server-udp-ports
@@ -165,9 +169,25 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 .setStunServers(stunServers(settings))
                 .setAdvertisedAddresses(mediaPorts == null ? Set.of() : mediaPorts.advertisedAddresses())
                 .setTokenTrust(TokenTrust.ANY)
-                .setMotdProvider((host, remoteAddress, client) -> this.buildPong())
-                .setPlayerFilter((host, player) -> this.refusePlayer(player))
-                .build();
+                // 状态请求先到，顺手解析域名；玩家随后点加入时缓存通常已就绪（解析不在事件循环上等）
+                // The status request arrives first, so resolve the name there and the join that
+                // follows usually finds it cached (nothing waits on the event loop)
+                .setMotdProvider((host, remoteAddress, client) -> {
+                    if (publishTypedNames) {
+                        this.hostCandidates.prefetch(remoteAddress == null ? null : remoteAddress.getAddress(), host);
+                    }
+                    return this.buildPong();
+                })
+                .setPlayerFilter((host, player) -> {
+                    JoinRefusal refusal = this.refusePlayer(player);
+                    if (refusal == null && publishTypedNames) {
+                        InetSocketAddress remote = player.remoteAddress();
+                        this.hostCandidates.observe(player.networkId(), remote == null ? null : remote.getAddress(), host);
+                    }
+                    return refusal;
+                });
+        boolean https = NetherNetHttps.apply(signalingBuilder, settings, Path.of(server.getDataPath()));
+        this.signaling = signalingBuilder.build();
 
         this.eventLoopGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
 
@@ -184,6 +204,16 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                     sdp, internalPort, this.publishedAddresses(), externalPorts));
         } else if (mediaPorts != null) {
             channelSignaling = mediaPorts.decorate(this.signaling);
+        }
+        if (publishTypedNames) {
+            // 域名候选在模式改写之前追加：共用端口模式下它带的是内部回环端口，由随后的改写平移到对外端口
+            // Domain candidates are appended before the mode rewrite: in shared-port mode they
+            // carry the internal loopback port, which that rewrite moves to the public one
+            channelSignaling = new NetherNetHostAnswerSignaling(channelSignaling, this.hostCandidates,
+                    includeResolvedIpv6(sharedPort, server.isIpv6Enabled(),
+                            mediaPorts == null ? null : bindAddress.getAddress()),
+                    sharedPort ? NetherNetSharedPortSdp.PortSource.SHARED
+                            : NetherNetSharedPortSdp.PortSource.PER_FAMILY);
         }
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(this.eventLoopGroup)
@@ -228,6 +258,10 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             log.info(server.getLanguage().translateString("nukkit.nethernet.listening.auto",
                     bindAddress.getPort()));
         }
+        if (https) {
+            log.info(server.getLanguage().translateString(settings.httpsRejectPlaintext()
+                    ? "nukkit.nethernet.https.required" : "nukkit.nethernet.https.dual", bindAddress.getPort()));
+        }
     }
 
     private static String describeMedia(Server server, NetherNetUdpPorts mediaPorts, boolean sharedPort) {
@@ -245,6 +279,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 externalPort, mediaPorts.begin());
         return mediaPorts.advertisedAddresses().isEmpty()
                 ? description : description + " via " + mediaPorts.advertisedAddresses();
+    }
+
+    /** 共用端口受 RakNet IPv6 监听约束，独立媒体则由 ICE 绑定地址决定。 Shared mode needs an IPv6 listener; direct media follows its ICE bind. */
+    static boolean includeResolvedIpv6(boolean sharedPort, boolean ipv6Enabled, InetAddress bindAddress) {
+        return sharedPort ? ipv6Enabled : bindAddress == null || bindAddress.isAnyLocalAddress()
+                || bindAddress instanceof Inet6Address;
     }
 
     /**
@@ -424,6 +464,36 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         return null;
     }
 
+    /**
+     * 共用端口通过中继还原客户端 UDP 地址，无法映射时回退信令地址；独立端口取选中的 ICE pair。
+     * <p>
+     * Shared ports resolve the client's UDP address through the relay, falling back to signaling;
+     * dedicated ports use the selected ICE pair.
+     */
+    public InetSocketAddress playerAddress(NetherNetChildChannel channel) {
+        return playerAddress(channel, this.relay);
+    }
+
+    static InetSocketAddress playerAddress(NetherNetChildChannel channel, NetherNetMediaRelay relay) {
+        if (relay != null) {
+            SourcedAddress media = channel.mediaAddress();
+            if (media != null && media.source() != AddressSource.UNKNOWN) {
+                InetSocketAddress client = relay.clientFor(media.address());
+                if (client != null) {
+                    return client;
+                }
+            }
+            SourcedAddress signaled = channel.signaledAddress();
+            InetSocketAddress address = signaled == null ? null : signaled.address();
+            InetAddress inet = address == null ? null : address.getAddress();
+            if (inet != null && !inet.isAnyLocalAddress()) {
+                return address;
+            }
+        }
+        SocketAddress remote = channel.remoteAddress();
+        return remote instanceof InetSocketAddress address ? address : null;
+    }
+
     @Override
     public void setNetwork(Network network) {
         this.network = network;
@@ -440,12 +510,12 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             if (session.getDisconnectReason() != null || !session.getChannel().isActive()) {
                 continue;
             }
-            // 远端地址自会话构造首次读取起被 Netty 缓存为库给出的信令来源（真实客户端地址），
-            // ICE 连上后也不会变成 leg 地址，玩家创建、封禁与日志直接使用即可
-            // Netty caches the remote from the session's first read as the library's signaling
-            // source (the real client); it never turns into the leg address once ICE connects,
-            // so player creation, bans and logs can use it as is
-            InetSocketAddress address = (InetSocketAddress) session.getChannel().remoteAddress();
+            InetSocketAddress address = this.playerAddress(session.getChannel());
+            InetAddress inetAddress = address == null ? null : address.getAddress();
+            if (inetAddress != null && this.isAddressBlocked(inetAddress)) {
+                session.disconnect("Address blocked");
+                continue;
+            }
             try {
                 PlayerCreationEvent event = new PlayerCreationEvent(this, Player.class, Player.class, null, address);
                 this.server.getPluginManager().callEvent(event);
@@ -541,7 +611,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
                 return false;
             }
 
-            log.warn("Disconnecting timed out pending NetherNet session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            log.warn("Disconnecting timed out pending NetherNet session {} in phase {}", this.playerAddress(session.getChannel()), session.getState().getLogin().getPhase());
             this.stats.onLoginTimeout();
             session.disconnect("disconnectionScreen.timeout");
             return true;
@@ -555,7 +625,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             if (session.getDisconnectReason() != null || !session.isLoginPhaseTimedOut(nowNanos, timeoutMillis)) {
                 continue;
             }
-            log.warn("Disconnecting timed out NetherNet session {} in phase {}", session.getChannel().remoteAddress(), session.getState().getLogin().getPhase());
+            log.warn("Disconnecting timed out NetherNet session {} in phase {}", this.playerAddress(session.getChannel()), session.getState().getLogin().getPhase());
             this.stats.onLoginTimeout();
             session.disconnect("disconnectionScreen.timeout");
         }
@@ -669,7 +739,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         if (!(session instanceof NetherNetPlayerSession netherNetSession)) {
             return null;
         }
-        Channel channel = netherNetSession.getChannel();
+        NetherNetChildChannel channel = netherNetSession.getChannel();
         PublicKey identityKey = parseIdentityKey(identityPublicKeyBase64);
         String mismatch = identityKey == null
                 ? "the login chain carries no usable identity key"
@@ -681,7 +751,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
             // player instead can tell a replayed chain from its holder, exactly as RakNet's
             // encryption handshake lets it.
             if (mismatch != null) {
-                log.debug("NetherNet login from {} is not bound to its chain: {}", channel.remoteAddress(), mismatch);
+                log.debug("NetherNet login from {} is not bound to its chain: {}", this.playerAddress(channel), mismatch);
             }
             return null;
         }
@@ -726,6 +796,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     @Override
     public void shutdown() {
         this.accepting = false;
+        this.hostCandidates.close();
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();
@@ -738,6 +809,7 @@ public class NetherNetInterface implements AdvancedSourceInterface {
     @Override
     public void emergencyShutdown() {
         this.accepting = false;
+        this.hostCandidates.close();
         this.pendingSessions.forEach(session -> session.disconnect("Shutdown"));
         this.sessions.values().forEach(session -> session.disconnect("Shutdown"));
         this.channel.close().awaitUninterruptibly();

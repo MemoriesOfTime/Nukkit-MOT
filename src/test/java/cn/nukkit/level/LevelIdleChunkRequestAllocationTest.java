@@ -17,6 +17,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,6 +56,7 @@ class LevelIdleChunkRequestAllocationTest {
             GameVersion.V1_21_80
     };
 
+    @Tag("perf")
     @ParameterizedTest
     @ValueSource(ints = {0, 1, 16})
     void emptyRequestsStayWithinNativeAllocationBudget(int buckets, @TempDir Path directory)

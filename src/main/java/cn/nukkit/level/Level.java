@@ -110,6 +110,8 @@ public class Level implements ChunkManager, Metadatable {
     public static final int BLOCK_UPDATE_REDSTONE = 6;
     public static final int BLOCK_UPDATE_TICK = 7;
 
+    private static final BlockFace[] REDSTONE_UPDATE_FACES = BlockFace.values();
+
     public static final int TIME_DAY = 1000;
     public static final int TIME_NOON = 6000;
     public static final int TIME_SUNSET = 12000;
@@ -474,6 +476,7 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private ExecutorService asyncChunkLoadExecutor;
+    private volatile boolean chunkLoadsClosing;
     // 每世界在飞异步读取上限,为共享池提供背压(取代原每世界有界队列)
     // Per-level in-flight cap for async reads, backpressure for the shared pool (replaces the old bounded queue)
     private Semaphore asyncChunkLoadSlots;
@@ -817,6 +820,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public void close() {
         boolean interrupted = false;
+        this.chunkLoadsClosing = true;
+        for (PendingChunkLoad pending : this.pendingChunkLoads.values()) {
+            pending.invalidated = true;
+        }
         this.providerLock.writeLock().lock();
         try {
             interrupted = this.drainAsyncChunkLoads();
@@ -2007,7 +2014,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void updateAroundRedstone(@NotNull Vector3 pos, @Nullable BlockFace ignoredFace) {
-        for (BlockFace side : BlockFace.values()) {
+        for (BlockFace side : REDSTONE_UPDATE_FACES) {
             if (ignoredFace != null && side == ignoredFace) {
                 continue;
             }
@@ -2079,7 +2086,14 @@ public class Level implements ChunkManager, Metadatable {
     public void updateAround(Vector3 pos, int layer) {
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
-            this.queueNormalUpdate(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+            Block side = block.getSideAtLayer(layer, face);
+            // Layer 1 only holds waterlogging and is air almost everywhere. Updating that air
+            // fires a BlockUpdateEvent and a no-op onUpdate, so skip it. If water reaches the
+            // cell before the queue is drained, the setBlock that puts it there updates it.
+            if (layer == 1 && side.getId() == Block.AIR) {
+                continue;
+            }
+            this.queueNormalUpdate(new QueuedUpdate(side, face));
         }
     }
 
@@ -2813,7 +2827,11 @@ public class Level implements ChunkManager, Metadatable {
 
         try {
             for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
-                callback.accept(blockPrevious, block);
+                try {
+                    callback.accept(blockPrevious, block);
+                } catch (Exception e) {
+                    Server.getInstance().getLogger().error("Error while calling block set callback", e);
+                }
             }
         } catch (Exception e) {
             Server.getInstance().getLogger().error("Error while calling block set callback", e);
@@ -3324,14 +3342,17 @@ public class Level implements ChunkManager, Metadatable {
                     return item;
                 }
 
-                if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated() && target.onActivate(item, player)) {
-                    if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-                        this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-                        this.addParticle(new ItemBreakParticle(target, item));
-                        item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-                    }
+                if ((!player.isSneaking() || player.getInventory().getItemInHand().isNull()) && target.canBeActivated()) {
+                    int damageBefore = item.getDamage();
+                    if (target.onActivate(item, player)) {
+                        if (item.getDamage() > damageBefore && item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                            this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                            this.addParticle(new ItemBreakParticle(target, item));
+                            item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+                        }
 
-                    return item;
+                        return item;
+                    }
                 }
 
                 if (item.canBeActivated() && item.onActivate(this, player, block, target, face, fx, fy, fz)) {
@@ -3350,14 +3371,17 @@ public class Level implements ChunkManager, Metadatable {
             if (item.getId() == ItemID.BUCKET && ItemBucket.getDamageByTarget(item.getDamage()) == BlockID.WATER) {
                 player.getLevel().sendBlocks(new Player[]{player}, new Block[]{target.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1);
             }
-        } else if (target.canBeActivated() && target.onActivate(item, null)) {
-            if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-                this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-                this.addParticle(new ItemBreakParticle(target, item));
-                item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
-            }
+        } else if (target.canBeActivated()) {
+            int damageBefore = item.getDamage();
+            if (target.onActivate(item, null)) {
+                if (item.getDamage() > damageBefore && item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                    this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                    this.addParticle(new ItemBreakParticle(target, item));
+                    item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+                }
 
-            return item;
+                return item;
+            }
         }
 
         Block hand;
@@ -3385,13 +3409,7 @@ public class Level implements ChunkManager, Metadatable {
 
 
         if (!hand.canPassThrough() && hand.getBoundingBox() != null) {
-            List<Entity> entities = CollisionHelper.getCollidingEntities(this, hand.getBoundingBox());
-            //int realCount = 0;
-            for (Entity e : entities) {
-                if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator() || !e.canCollide())) {
-                    continue;
-                }
-                //++realCount;
+            if (this.isBlockPlacementObstructed(hand.getBoundingBox(), player)) {
                 return null;
             }
 
@@ -3564,6 +3582,24 @@ public class Level implements ChunkManager, Metadatable {
 
     public Entity[] getEntities() {
         return entities.values().toArray(new Entity[0]);
+    }
+
+    /**
+     * Checks whether an entity stands in the way of a block that would fill the given box.
+     * Arrows, dropped items, spectators, entities without collision and the placing player never block a placement.
+     *
+     * @param bb     the box the placed block would fill
+     * @param player the player placing the block, or {@code null}
+     * @return {@code true} when at least one entity blocks the placement
+     */
+    public boolean isBlockPlacementObstructed(AxisAlignedBB bb, @Nullable Player player) {
+        for (Entity e : CollisionHelper.getCollidingEntities(this, bb)) {
+            if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator()) || !e.canCollide()) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -5368,7 +5404,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     public boolean requestChunkLoadAsync(int x, int z) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
+        if (this.chunkLoadsClosing || levelProvider == null || !this.isAsyncChunkLoadEnabled()) {
             return false;
         }
 
@@ -5388,7 +5424,7 @@ public class Level implements ChunkManager, Metadatable {
                 this.asyncChunkLoadExecutor.execute(() -> {
                     this.runningAsyncChunkLoads.incrementAndGet();
                     try {
-                        if (pending.invalidated) {
+                        if (this.chunkLoadsClosing || pending.invalidated) {
                             return;
                         }
                         pending.chunk = levelProvider.readChunkOffThread(x, z);
@@ -5429,7 +5465,7 @@ public class Level implements ChunkManager, Metadatable {
      */
     synchronized void mountChunk(PendingChunkLoad pending) {
         LevelProvider levelProvider = this.getProvider();
-        if (levelProvider == null || levelProvider.getLevel() == null
+        if (this.chunkLoadsClosing || levelProvider == null || levelProvider.getLevel() == null
             || levelProvider != pending.provider || pending.invalidated
                 || levelProvider.isChunkLoaded(pending.hash)) {
             return;
@@ -6009,7 +6045,8 @@ public class Level implements ChunkManager, Metadatable {
             pk2.x = (float) x;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_X;
         }
-        if (entity.lastY != y) {
+        // lastY is the raw position, while y may include the entity's base offset
+        if (entity.lastY != entity.y) {
             pk2.y = (float) y;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_Y;
         }
@@ -6244,6 +6281,8 @@ public class Level implements ChunkManager, Metadatable {
         return (int) block.getY() >= this.getHighestBlockAt((int) block.getX(), (int) block.getZ());
     }
 
+    private static final BlockFace[] REDSTONE_POWER_FACES = BlockFace.values();
+
     public int getStrongPower(Vector3 pos, BlockFace direction) {
         return this.getBlock(pos).getStrongPower(direction);
     }
@@ -6251,7 +6290,7 @@ public class Level implements ChunkManager, Metadatable {
     public int getStrongPower(Vector3 pos) {
         int i = 0;
 
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             i = Math.max(i, this.getStrongPower(pos.getSideVec(face), face));
 
             if (i >= 15) {
@@ -6272,7 +6311,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean isBlockPowered(Vector3 pos) {
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             if (this.getRedstonePower(pos.getSideVec(face), face) > 0) {
                 return true;
             }
@@ -6283,7 +6322,7 @@ public class Level implements ChunkManager, Metadatable {
     public int isBlockIndirectlyGettingPowered(Vector3 pos) {
         int power = 0;
 
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : REDSTONE_POWER_FACES) {
             int blockPower = this.getRedstonePower(pos.getSideVec(face), face);
 
             if (blockPower >= 15) {

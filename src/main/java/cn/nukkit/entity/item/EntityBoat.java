@@ -48,10 +48,16 @@ public class EntityBoat extends EntityVehicle {
     public static final double SINKING_SPEED = 0.0005;
     public static final double SINKING_MAX_SPEED = 0.005;
 
-    protected float deltaRotation;
     protected boolean sinking = true;
     public int woodID;
-    private boolean inWater;
+
+    private final BoatPaddlePhysics paddlePhysics = new BoatPaddlePhysics();
+    private Player paddleController;
+    private boolean paddleUp;
+    private boolean paddleButtons;
+    private boolean paddleLeft;
+    private boolean paddleRight;
+    private int paddleInputTicks;
 
     public double paddleMotionX = 0d;
     public double paddleMotionY = 0d;
@@ -137,14 +143,20 @@ public class EntityBoat extends EntityVehicle {
     public boolean entityBaseTick(int tickDiff) {
         boolean hasUpdate = false;
 
-        double waterDiff = getWaterLevel();
+        WaterState waterState = this.collectWaterState();
+        double waterDiff = waterState.waterDiff();
 
-        boolean isPlayerOfNewerVersion = getPassenger() instanceof Player player && player.protocol >= ProtocolInfo.v1_21_130_28;
-        if (isPlayerOfNewerVersion) {
-            this.rotateVehicle();
+        Entity passenger = getPassenger();
+        Player paddleController = passenger instanceof Player player && player.protocol >= ProtocolInfo.v1_21_130_28 ? player : null;
+        if (paddleController != null) {
+            this.tickPaddleControl(paddleController, waterState.inWater());
+        } else {
+            double groundFriction = this.getGroundFriction();
+            this.motionX *= groundFriction;
+            this.motionZ *= groundFriction;
         }
 
-        boolean simulateWaves = (!(getPassenger() instanceof Player) || isPlayerOfNewerVersion) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
+        boolean simulateWaves = (paddleController != null || !(passenger instanceof Player)) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
 
         if (simulateWaves) {
             if (waterDiff > SINKING_DEPTH && !this.sinking) {
@@ -163,11 +175,6 @@ public class EntityBoat extends EntityVehicle {
         if (this.checkObstruction(this.x, this.y, this.z)) {
             hasUpdate = true;
         }
-
-        double groundFriction = this.getGroundFriction();
-        this.motionX *= groundFriction;
-        this.motionZ *= groundFriction;
-
 
         if (simulateWaves) {
             if (waterDiff > SINKING_DEPTH || this.sinking) {
@@ -260,11 +267,22 @@ public class EntityBoat extends EntityVehicle {
         }
     }
 
+    /**
+     * 返回船体参考点与水面高差；无副作用，供外部查询。
+     * Returns the water-surface offset of the hull anchor; side-effect free for external callers.
+     */
     public double getWaterLevel() {
+        return this.collectWaterState().waterDiff();
+    }
+
+    // 单次扫描同时返回高差与入水标记，保持 getWaterLevel() 无副作用。
+    // One scan returns both values, keeping getWaterLevel() side-effect free.
+    private WaterState collectWaterState() {
         double maxY = this.boundingBox.getMinY() + getBaseOffset();
-        AxisAlignedBB.BBConsumer<Double> consumer = new AxisAlignedBB.BBConsumer<>() {
+        class WaterProbe implements AxisAlignedBB.BBConsumer<Double> {
 
             private double diffY = Double.MAX_VALUE;
+            private boolean inWater;
 
             @Override
             public void accept(int x, int y, int z) {
@@ -274,19 +292,21 @@ public class EntityBoat extends EntityVehicle {
                     double level = block.getMaxY();
 
                     diffY = Math.min(maxY - level, diffY);
-                    inWater = true;
+                    this.inWater = true;
                 }
             }
 
             @Override
             public Double get() {
-                return diffY;
+                return this.diffY;
             }
-        };
+        }
+        WaterProbe probe = new WaterProbe();
+        this.boundingBox.forEach(probe);
+        return new WaterState(probe.get(), probe.inWater);
+    }
 
-        this.boundingBox.forEach(consumer);
-
-        return consumer.get();
+    private record WaterState(double waterDiff, boolean inWater) {
     }
 
     @Override
@@ -329,6 +349,13 @@ public class EntityBoat extends EntityVehicle {
         boolean r = super.dismountEntity(entity, sendLinks);
 
         if (r) {
+            if (entity == this.paddleController) {
+                // 立即重置，同一玩家重新上船也不会沿用旧角速度。
+                // Reset now so even the same player remounting cannot resume old angular velocity.
+                this.paddleController = null;
+                this.paddlePhysics.reset();
+                this.clearPaddleInput();
+            }
             updatePassengers();
             if (entity instanceof Player) {
                 entity.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0));
@@ -483,82 +510,167 @@ public class EntityBoat extends EntityVehicle {
      * Since 1.21.130, boat movement turns server-controlled
      */
     public void onPlayerInput(Player player, double motionX, double motionY) {
-        if (player.protocol < ProtocolInfo.v1_21_130_28) {
+        this.onPlayerInput(player, motionX, motionY, false);
+    }
+
+    /**
+     * 模拟摇杆/键盘输入。移动向量按 tick 消费，一个 tick 内多个包不会重复加速。
+     * Analog input (joystick/keyboard). The vector is consumed once per tick, so several packets in one tick cannot stack thrust.
+     */
+    public void onPlayerInput(Player player, double motionX, double motionY, boolean up) {
+        if (player.protocol < ProtocolInfo.v1_21_130_28 || !this.isControlling(player)) {
             return;
         }
+        // 包级校验不含 motion，它仍可能是 NaN/Infinity。
+        // The packet-level check omits motion, which can still be NaN/Infinity.
+        if (!Double.isFinite(motionX) || !Double.isFinite(motionY)) {
+            return;
+        }
+        this.bindPaddleController(player);
+        this.paddleButtons = false;
         this.paddleMotionX = motionX;
         this.paddleMotionY = motionY;
-        this.moveVehicle(motionX, motionY);
+        this.paddleUp = up;
+        this.paddleInputTicks = 2;
     }
 
-    public void rotateVehicle() {
-        boolean simulateMove = ((getPassenger() instanceof Player player)
-                && player.protocol >= ProtocolInfo.v1_21_130_28);
-        if (simulateMove) {
-            boolean inputLeft = this.paddleMotionX > 0.35;
-            boolean inputRight = this.paddleMotionX < -0.35;
-            boolean inputDown = this.paddleMotionY < -0.35;
+    /**
+     * 经典触屏布局的左右桨按钮。按钮相互独立，只按一支桨仍会提供约一半的前进推力。
+     * The classic touch layout drives the two paddles independently, so holding one paddle still rows at about half thrust.
+     */
+    public void onPlayerInput(Player player, boolean paddleLeft, boolean paddleRight) {
+        if (player.protocol < ProtocolInfo.v1_21_130_28 || !this.isControlling(player)) {
+            return;
+        }
+        this.bindPaddleController(player);
+        this.paddleButtons = true;
+        this.paddleLeft = paddleLeft;
+        this.paddleRight = paddleRight;
+        this.paddleInputTicks = 2;
+    }
 
-            float delta = inputDown ? 0.1f : 1;
-            if (inputLeft) {
-                this.deltaRotation -= delta;
-            } else if (inputRight) {
-                this.deltaRotation += delta;
-            }
-            this.deltaRotation *= this.getGroundFriction();
-            this.deltaRotation = NukkitMath.clamp(this.deltaRotation, -5, 5);
-            this.yaw += this.deltaRotation;
-            this.setHeadYaw(this.getYaw());
+    private void tickPaddleControl(Player controller, boolean inWater) {
+        this.bindPaddleController(controller);
 
-            this.paddleMotionX = 0;
-            this.paddleMotionY = 0;
+        if (this.paddleInputTicks > 0) {
+            this.paddleInputTicks--;
+        } else {
+            this.clearPaddleInput();
+        }
+
+        BoatFriction friction = this.resolveFriction(inWater);
+        BoatPaddlePhysics.TickResult result = this.paddlePhysics.tick(
+                this.paddleButtons, this.paddleMotionX, this.paddleMotionY, this.paddleUp,
+                this.paddleLeft, this.paddleRight,
+                friction.value, friction.canPaddle,
+                (float) this.motionX, (float) this.motionZ, (float) this.yaw);
+        this.motionX = result.motionX();
+        this.motionZ = result.motionZ();
+        this.yaw += result.yawVelocity();
+        this.setHeadYaw(this.getYaw());
+        this.updatePaddleAnimation(result.firstPaddleSpeed(), result.secondPaddleSpeed());
+    }
+
+    /**
+     * 绑定划桨控制者。换人时立即重置，避免继承上一任的角速度与按键；输入先绑定再缓存，
+     * 新骑手上船后的第一个输入不会被这里清掉。
+     * Binds the paddle controller. A rider change resets immediately so no previous rider's
+     * angular velocity or buttons carry over; binding before input is cached keeps the new
+     * rider's first input from being wiped.
+     */
+    private void bindPaddleController(Player controller) {
+        if (this.paddleController == controller) {
+            return;
+        }
+        this.paddleController = controller;
+        this.paddlePhysics.reset();
+        this.clearPaddleInput();
+    }
+
+    private void clearPaddleInput() {
+        this.paddleInputTicks = 0;
+        this.paddleButtons = false;
+        this.paddleMotionX = 0;
+        this.paddleMotionY = 0;
+        this.paddleUp = false;
+        this.paddleLeft = false;
+        this.paddleRight = false;
+    }
+
+    private void updatePaddleAnimation(float firstSpeed, float secondSpeed) {
+        // 单参 setDataProperty 已广播给所有观察者，无需整份 metadata 重发。
+        // The single-argument setDataProperty already broadcasts, so no full metadata resend.
+        float left = updatePaddleTime(this.paddleTimeLeft, firstSpeed);
+        if (Float.compare(left, this.paddleTimeLeft) != 0) {
+            this.paddleTimeLeft = left;
+            this.setDataProperty(new FloatEntityData(Entity.DATA_PADDLE_TIME_LEFT, left));
+        }
+        float right = updatePaddleTime(this.paddleTimeRight, secondSpeed);
+        if (Float.compare(right, this.paddleTimeRight) != 0) {
+            this.paddleTimeRight = right;
+            this.setDataProperty(new FloatEntityData(Entity.DATA_PADDLE_TIME_RIGHT, right));
         }
     }
 
-    public void moveVehicle(double mx, double my) {
-        boolean simulateMove = ((getPassenger() instanceof Player player)
-                && player.protocol >= ProtocolInfo.v1_21_130_28);
-        if (simulateMove) {
-            boolean inputLeft = mx > 0.35;
-            boolean inputRight = mx < -0.35;
-            boolean inputUp = my > 0.35;
-            boolean inputDown = my < -0.35;
-
-            float animationSpeed = (float) Math.max(0.01,
-                    Math.min(0.08, Math.sqrt(this.motionX * this.motionX + this.motionZ * this.motionZ) * 0.05));
-            if (inputUp) {
-                this.paddleTimeLeft += animationSpeed;
-                this.paddleTimeRight += animationSpeed;
-            } else if (inputDown) {
-                this.paddleTimeLeft -= animationSpeed;
-                this.paddleTimeRight -= animationSpeed;
-            } else {
-                if (!inputLeft) {
-                    this.paddleTimeLeft = 0;
-                }
-                if (!inputRight) {
-                    this.paddleTimeRight = 0;
-                }
-            }
-
-            this.setDataProperty(new FloatEntityData(Entity.DATA_PADDLE_TIME_LEFT, this.paddleTimeLeft));
-            this.setDataProperty(new FloatEntityData(Entity.DATA_PADDLE_TIME_RIGHT, this.paddleTimeRight));
-
-            this.sendData(this.getViewers().values().toArray(Player.EMPTY_ARRAY));
-
-            float acceleration = 0;
-            if (inputRight != inputLeft && !inputUp && !inputDown) {
-                acceleration += 0.005f;
-            }
-            if (inputUp) {
-                acceleration += 0.04f;
-            } else if (inputDown) {
-                acceleration -= 0.005f;
-            }
-            float rad = ((float) yaw - 90) * (NukkitMath.DEG_TO_RAD);
-            this.motionX += NukkitMath.sin(-rad) * acceleration;
-            this.motionZ += NukkitMath.cos(rad) * acceleration;
+    private static float updatePaddleTime(float time, float speed) {
+        if (speed == 0) {
+            return 0;
         }
+        float animationSpeed = Math.max(0.01f, Math.min(0.08f, Math.abs(speed) * 0.05f));
+        return time + Math.signum(speed) * animationSpeed;
+    }
+
+    /**
+     * 基岩版摩擦选择：水中 0.9，空中 1.0（无空气阻力），地面取 actor 所在方块的摩擦。
+     * Bedrock friction: 0.9 in water, 1.0 in air (no air resistance), block friction at the actor on ground.
+     */
+    private BoatFriction resolveFriction(boolean inWater) {
+        if (inWater) {
+            return new BoatFriction(BoatPaddlePhysics.WATER_FRICTION, true);
+        }
+        int x = (int) Math.floor(this.x);
+        // 与客户端一致：取 actor origin（脚底 + baseOffset）所在方块，而非实体脚底。
+        // Match the client: use the actor origin (feet + baseOffset), not the entity feet.
+        int y = (int) Math.floor(this.y + this.getBaseOffset());
+        int z = (int) Math.floor(this.z);
+        Block current = this.liquidBlock(x, y, z);
+        if (current.isWater()) {
+            return new BoatFriction(BoatPaddlePhysics.WATER_FRICTION, true);
+        }
+        Block below = this.level.getBlock(x, y - 1, z, 0);
+        if (current.isAir() || current.getId() == BlockID.SNOW_LAYER) {
+            if (this.onGround) {
+                return new BoatFriction(blockFriction(below), true);
+            }
+            return this.liquidBlock(x, y - 1, z).isWater()
+                    ? new BoatFriction(BoatPaddlePhysics.WATER_FRICTION, true)
+                    : new BoatFriction(BoatPaddlePhysics.AIR_FRICTION, false);
+        }
+        if (!this.onGround) {
+            return new BoatFriction(BoatPaddlePhysics.AIR_FRICTION, false);
+        }
+        Block block = this.level.getBlock(x, y, z, 0);
+        return new BoatFriction(blockFriction(hasVolume(block) ? block : below), true);
+    }
+
+    private Block liquidBlock(int x, int y, int z) {
+        Block extra = this.level.getBlock(x, y, z, 1);
+        return extra.isAir() ? this.level.getBlock(x, y, z, 0) : extra;
+    }
+
+    private static float blockFriction(Block block) {
+        return block.isAir() ? BoatPaddlePhysics.AIR_BLOCK_FRICTION : (float) block.getFrictionFactor();
+    }
+
+    private static boolean hasVolume(Block block) {
+        AxisAlignedBB box = block.getBoundingBox();
+        return box != null
+                && box.getMaxX() > box.getMinX()
+                && box.getMaxY() > box.getMinY()
+                && box.getMaxZ() > box.getMinZ();
+    }
+
+    private record BoatFriction(float value, boolean canPaddle) {
     }
 
     public float getGroundFriction() {
@@ -571,7 +683,6 @@ public class EntityBoat extends EntityVehicle {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 if (this.level.getBlock(x, minY, z).isWater()) {
-                    this.inWater = true;
                     return 0.9f;
                 }
             }
@@ -621,7 +732,9 @@ public class EntityBoat extends EntityVehicle {
         }
 
         if (friction < 0.001f) {
-            return 0f;
+            // 空中无地面摩擦；基岩版船无空气阻力，不能把速度清零。
+            // No ground friction in air: Bedrock boats have no air resistance, so never zero the velocity.
+            return 1f;
         }
         return friction / count;
     }

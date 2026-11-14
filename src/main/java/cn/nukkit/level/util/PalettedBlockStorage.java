@@ -21,6 +21,8 @@ public class PalettedBlockStorage {
     protected IntList palette;
     protected BitArray bitArray;
     private Int2IntMap paletteIndexLookup;
+    private boolean externallyOwned;
+    private volatile boolean shared;
 
     public static PalettedBlockStorage createFromBlockPalette() {
         return createFromBlockPalette(BitArrayVersion.V2, 0);
@@ -67,6 +69,7 @@ public class PalettedBlockStorage {
     }
 
     protected PalettedBlockStorage(BitArray bitArray, IntList palette) {
+        this.externallyOwned = true;
         this.palette = palette;
         this.bitArray = bitArray;
         if (palette.size() > 1) {
@@ -75,9 +78,25 @@ public class PalettedBlockStorage {
     }
 
     private PalettedBlockStorage(PalettedBlockStorage source) {
-        this.bitArray = source.bitArray.copy();
-        this.palette = new IntArrayList(source.palette);
+        boolean share = !source.externallyOwned && source.getClass() == PalettedBlockStorage.class;
+        this.bitArray = share ? source.bitArray : source.bitArray.copy();
+        this.palette = share ? source.palette : new IntArrayList(source.palette);
+        // Creation and writes belong to the owning thread. Executor submission publishes
+        // the clone to its worker; both volatile flags are set before that handoff, and
+        // neither owner mutates the shared backing arrays without first detaching them.
+        if (share) {
+            source.shared = true;
+            this.shared = true;
+        }
         // The independent copy needs the derived reverse index only when written.
+    }
+
+    private void ensureWritable() {
+        if (this.shared) {
+            this.bitArray = this.bitArray.copy();
+            this.palette = new IntArrayList(this.palette);
+            this.shared = false;
+        }
     }
 
     private void createPaletteIndex(int capacity) {
@@ -119,6 +138,7 @@ public class PalettedBlockStorage {
 
     public void setBlock(int index, int runtimeId) {
         try {
+            this.ensureWritable();
             int id = this.idFor(runtimeId);
             this.bitArray.set(index, id);
         } catch (IllegalArgumentException e) {
@@ -134,6 +154,7 @@ public class PalettedBlockStorage {
      */
     public int setBlockReturningIndex(int index, int runtimeId) {
         try {
+            this.ensureWritable();
             int id = this.idFor(runtimeId);
             this.bitArray.set(index, id);
             return id;
@@ -144,6 +165,7 @@ public class PalettedBlockStorage {
 
     /** Points a cell at a palette index returned earlier by {@link #setBlockReturningIndex(int, int)}. */
     public void setPaletteIndex(int index, int paletteIndex) {
+        this.ensureWritable();
         this.bitArray.set(index, paletteIndex);
     }
 
@@ -156,6 +178,7 @@ public class PalettedBlockStorage {
 
         BitArrayVersion version  = BitArrayVersion.get(header >> 1, true);
 
+        this.ensureWritable();
         this.palette.clear();
         if (this.paletteIndexLookup != null) {
             this.paletteIndexLookup.clear();

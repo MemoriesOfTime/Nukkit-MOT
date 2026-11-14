@@ -248,8 +248,40 @@ public class BlockPalette {
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
     }
 
+    /**
+     * 老调色板只有一个骷髅头方块，头型存在方块实体里；为拆分后的头方块补充出站别名。
+     * <p>
+     * Older palettes have a single skull block carrying the head type in its block entity; add outgoing aliases for split heads.
+     * Aliases only fill forward lookups; native states keep their canonical reverse mappings.
+     */
+    private void registerLegacySkullAliases() {
+        int[] heads = {BlockID.WITHER_SKELETON_SKULL, BlockID.ZOMBIE_HEAD,
+                BlockID.PLAYER_HEAD, BlockID.CREEPER_HEAD, BlockID.DRAGON_HEAD,
+                BlockID.PIGLIN_HEAD};
+        for (int meta = 0; meta < 6; meta++) {
+            int skull = BlockID.SKULL_BLOCK << Block.DATA_BITS | meta;
+            int runtimeId = this.legacyToRuntimeId.get(skull);
+            if (runtimeId == -1) {
+                continue;
+            }
+            for (int head : heads) {
+                int fullId = head << Block.DATA_BITS | meta;
+                if (!this.legacyToRuntimeId.containsKey(fullId)) {
+                    this.legacyToRuntimeId.put(fullId, runtimeId);
+                    if (this.legacyToHashId.containsKey(skull)) {
+                        this.legacyToHashId.putIfAbsent(fullId, this.legacyToHashId.get(skull));
+                    }
+                }
+            }
+        }
+        this.legacyToRuntimeIdCache.invalidateAll();
+    }
+
     public synchronized void lock() {
         this.networkMappingReady = false;
+        if (!this.locked) {
+            this.registerLegacySkullAliases();
+        }
         this.locked = true;
         this.trim();
     }

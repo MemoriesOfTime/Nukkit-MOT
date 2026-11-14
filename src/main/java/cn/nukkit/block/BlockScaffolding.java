@@ -15,6 +15,8 @@ import org.jetbrains.annotations.NotNull;
 
 public class BlockScaffolding extends BlockFallable {
 
+    private static final BlockFace[] STABILITY_FACES = BlockFace.values();
+
     private int meta = 0;
 
     public BlockScaffolding() {
@@ -226,7 +228,7 @@ public class BlockScaffolding extends BlockFallable {
         }
 
         int stability = 7;
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : STABILITY_FACES) {
             if (face == BlockFace.UP) {
                 continue;
             }

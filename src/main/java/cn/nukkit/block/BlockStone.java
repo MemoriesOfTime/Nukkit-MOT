@@ -51,19 +51,20 @@ public class BlockStone extends BlockSolidMeta {
         return ItemTool.TIER_WOODEN;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Stone",
+            "Granite",
+            "Polished Granite",
+            "Diorite",
+            "Polished Diorite",
+            "Andesite",
+            "Polished Andesite",
+            "Unknown Stone"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Stone",
-                "Granite",
-                "Polished Granite",
-                "Diorite",
-                "Polished Diorite",
-                "Andesite",
-                "Polished Andesite",
-                "Unknown Stone"
-        };
-        return names[this.getDamage() & 0x07];
+        return NAMES[this.getDamage() & 0x07];
     }
 
     @Override

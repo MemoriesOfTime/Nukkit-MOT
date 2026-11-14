@@ -36,6 +36,7 @@ public class ItemStackRequestCraftingTransaction extends CraftingTransaction {
     }
 
     /**
+     * 实际 damage/NBT 相同的物品才合并，配方模板的通配规则不适用于事件中的实际材料。
      * 同物合并不按 {@code gridSize} 封顶：本快照的输入来自配料描述符（auto-craft 可超过
      * 当前打开网格的容量），遗留的 {@code gridSize*gridSize} 上限会误拒合法的配方书自动合成。
      * <p>
@@ -44,7 +45,7 @@ public class ItemStackRequestCraftingTransaction extends CraftingTransaction {
     @Override
     public void setInput(Item item) {
         for (Item existing : this.inputs) {
-            if (existing.equals(item, item.hasMeta(), item.hasCompoundTag())) {
+            if (existing.equals(item, true, true)) {
                 existing.setCount(existing.getCount() + item.getCount());
                 return;
             }

@@ -37,16 +37,16 @@ public class BlockBricksStone extends BlockSolidMeta {
         return 30;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Stone Bricks",
+            "Mossy Stone Bricks",
+            "Cracked Stone Bricks",
+            "Chiseled Stone Bricks"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Stone Bricks",
-                "Mossy Stone Bricks",
-                "Cracked Stone Bricks",
-                "Chiseled Stone Bricks"
-        };
-
-        return names[this.getDamage() & 0x03];
+        return NAMES[this.getDamage() & 0x03];
     }
 
     @Override

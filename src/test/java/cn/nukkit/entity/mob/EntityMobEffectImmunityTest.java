@@ -74,6 +74,7 @@ class EntityMobEffectImmunityTest {
         Field effects = Entity.class.getDeclaredField("effects");
         effects.setAccessible(true);
         effects.set(target, new Int2ObjectOpenHashMap<Effect>());
+        when(target.isAlive()).thenReturn(true);
         return target;
     }
 }

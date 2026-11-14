@@ -40,6 +40,8 @@ players/*
 resource_packs
 resource_packs/*
 *.md
+!.agents/skills/**/*.md
+/.agents/skills/**/.cache/
 .DS_Store
 .factorypath
 dependency-reduced-pom.xml

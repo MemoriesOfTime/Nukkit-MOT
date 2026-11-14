@@ -28,6 +28,7 @@ import org.apache.logging.log4j.message.FormattedMessage;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -76,6 +77,8 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
     private boolean compressionInitialized;
+    /** 已因缺少压缩前缀断开；置位后不再为每个 batch 记一次失败。 Set once the session closed for a missing prefix, so later batches stay quiet. */
+    private boolean prefixUnavailableClosed;
 
     private final ArrayDeque<Long> malformedBatches = new ArrayDeque<>();
     private long lastMalformedLogNanos;
@@ -106,7 +109,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         this.lastIngressRefillNanos = acceptedAt;
         this.state.getConnection().setSessionCreatedNanos(acceptedAt);
         this.state.getConnection().setChildChannelAcceptedNanos(acceptedAt);
-        this.state.getConnection().setRemoteAddress(String.valueOf(channel.remoteAddress()));
+        this.state.getConnection().setRemoteAddress(String.valueOf(this.clientAddress()));
         this.state.getProtocol().setRaknetProtocol(RAKNET_PROTOCOL);
         this.state.getSecurity().setCompressionIn(this.compressionIn);
         this.state.getSecurity().setCompressionOut(this.compressionOut);
@@ -217,13 +220,13 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                             callback.run();
                         } else {
                             log.warn("Failed to send direct packet {} to {}",
-                                    packet.getClass().getSimpleName(), this.channel.remoteAddress(), result.cause());
+                                    packet.getClass().getSimpleName(), this.clientAddress(), result.cause());
                             this.disconnect("Internal Server Error");
                         }
                     });
                 } catch (Throwable throwable) {
                     log.warn("Failed to prepare direct packet {} for {}",
-                            packet.getClass().getSimpleName(), this.channel.remoteAddress(), throwable);
+                            packet.getClass().getSimpleName(), this.clientAddress(), throwable);
                     this.disconnect("Internal Server Error");
                 }
             });
@@ -276,7 +279,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
-            log.error("[{}] Failed to tick NetherNetPlayerSession", this.channel.remoteAddress(), e);
+            log.error("[{}] Failed to tick NetherNetPlayerSession", this.clientAddress(), e);
         }
     }
 
@@ -311,6 +314,11 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     private void sendPackets(Collection<DataPacket> packets) {
+        if (PacketBatcher.supports(this.compressionOut)) {
+            // Built-in codecs finish reading before returning; sendPacket copies the result into Netty.
+            PacketBatcher.send(packets, batched -> this.sendPackets(batched, true));
+            return;
+        }
         BinaryStream batched = new BinaryStream();
         for (DataPacket packet : packets) {
             if (packet instanceof BatchPacket) {
@@ -331,8 +339,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
     }
 
     private void sendPackets(BinaryStream batched) {
+        this.sendPackets(batched, false);
+    }
+
+    private void sendPackets(BinaryStream batched, boolean borrowed) {
+        CompressionProvider provider = this.compressionOut;
         try {
-            this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
+            int level = Server.getInstance().networkCompressionLevel;
+            this.sendPacket(borrowed ? PacketBatcher.compressBorrowed(provider, batched, level)
+                    : provider.compress(batched, level));
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }
@@ -352,6 +367,9 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
      */
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
+        if (ci && !this.compressionOut.supportsPrefix()) {
+            return this.failUnsupportedPrefix();
+        }
 
         ByteBuf finalPayload = Unpooled.directBuffer((ci ? 1 : 0) + compressedPayload.length);
         if (ci) {
@@ -360,6 +378,25 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
         finalPayload.writeBytes(compressedPayload);
 
         return this.channel.writeAndFlush(finalPayload);
+    }
+
+    /**
+     * 协商出的编码写不出 ≥1.20.60 的前缀：传输层与游戏版本互相矛盾，继续发只会逐批静默丢包，因此断开一次。
+     * <p>The negotiated codec cannot emit the ≥1.20.60 prefix: transport and game version contradict each
+     * other and every further batch would be dropped silently, so the session is closed once instead.
+     */
+    private ChannelFuture failUnsupportedPrefix() {
+        if (!this.prefixUnavailableClosed) {
+            this.prefixUnavailableClosed = true;
+            log.error("Closing session {}: compression {} has no batch prefix but protocol {} requires one (raknetProtocol={})",
+                    this.playerLabel(), this.compressionOut, this.getBedrockProtocol(),
+                    this.state.getProtocol().getRaknetProtocol());
+            this.disconnect("Your client does not support this game version over this connection");
+        }
+        // 批次未写出：必须如实失败，否则 DIRECT_WRITE 监听器会按成功执行回调
+        // The batch was never written: report honest failure, or DIRECT_WRITE listeners run success callbacks
+        return this.channel.newFailedFuture(
+                new CompressionPrefixUnavailableException(this.compressionOut, this.getBedrockProtocol()));
     }
 
     @Override
@@ -491,8 +528,15 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                 && protocol >= ProtocolInfo.v1_20_60;
     }
 
+    private InetSocketAddress clientAddress() {
+        if (this.server != null) {
+            return this.server.playerAddress(this.channel);
+        }
+        return this.channel.remoteAddress() instanceof InetSocketAddress address ? address : null;
+    }
+
     private String playerLabel() {
-        return this.player == null ? String.valueOf(this.channel.remoteAddress()) : this.player.getName();
+        return this.player == null ? String.valueOf(this.clientAddress()) : this.player.getName();
     }
 
     private RakNetPlayerSession.InboundBatchDecodeResult processInboundBatch(byte[] packetBuffer, boolean ci, CompressionProvider receivedCompression) {
@@ -681,8 +725,8 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
             return;
         }
 
-        InetAddress malformedAddress = this.channel.remoteAddress() instanceof java.net.InetSocketAddress address
-                ? address.getAddress() : null;
+        InetSocketAddress remote = this.clientAddress();
+        InetAddress malformedAddress = remote == null ? null : remote.getAddress();
         boolean blockMalformedAddress = RakNetPlayerSession.shouldBlockAddressAfterMalformed(
                 this.state.getLogin().getPhase(), malformedAddress);
         this.disconnect("Sent malformed packet");

@@ -3,16 +3,18 @@ package cn.nukkit.network.protocol.regression.encode;
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.block.Block;
+import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.data.ByteEntityData;
-import cn.nukkit.entity.data.EntityMetadata;
-import cn.nukkit.entity.data.IntEntityData;
-import cn.nukkit.entity.data.NBTEntityData;
-import cn.nukkit.entity.data.StringEntityData;
+import cn.nukkit.entity.data.*;
+import cn.nukkit.entity.item.EntityMinecartChest;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
+import cn.nukkit.network.protocol.types.EntityLink;
+import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.BinaryStream;
 import org.cloudburstmc.nbt.NbtMap;
 import org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition;
 import org.cloudburstmc.protocol.bedrock.data.definitions.SimpleBlockDefinition;
@@ -24,10 +26,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Regression test for minecart display block ({@link Entity#DATA_DISPLAY_ITEM})
@@ -173,5 +172,69 @@ public class MinecartDisplayBlockRegressionTest extends AbstractPacketRegression
         String value = cbPacket.getMetadata().get(org.cloudburstmc.protocol.bedrock.data.entity.EntityDataTypes.COMMAND_BLOCK_LAST_OUTPUT);
         assertTrue(value == null || value.isEmpty(),
                 "Null string entity data should serialize as empty (got: " + value + ")");
+    }
+
+    /**
+     * 1.2.13 之前没有 block runtime id，显示方块必须原样透传 {@code legacyId | (meta << 16)}。
+     * Protocols before 1.2.13 have no block runtime id, so the display block stays packed.
+     */
+    @ParameterizedTest(name = "Legacy minecart display block stays packed v{0}")
+    @MethodSource("legacyDisplayProtocols")
+    void testMinecartDisplayBlockStaysLegacyPacked(int protocolVersion) {
+        GameVersion gameVersion = GameVersion.byProtocol(protocolVersion, false);
+        int legacyDisplay = Block.COMMAND_BLOCK | (3 << 16);
+
+        EntityMetadata metadata = new EntityMetadata();
+        metadata.put(new IntEntityData(Entity.DATA_DISPLAY_ITEM, legacyDisplay));
+
+        BinaryStream encoded = new BinaryStream(Binary.writeMetadata(gameVersion, metadata));
+        assertEquals(1, (int) encoded.getUnsignedVarInt(), "single metadata entry");
+        assertEquals(Entity.DATA_DISPLAY_ITEM, (int) encoded.getUnsignedVarInt(), "wire key for <= 1.2.10");
+        assertEquals(Entity.DATA_TYPE_INT, (int) encoded.getUnsignedVarInt(), "int payload");
+        assertEquals(legacyDisplay, encoded.getVarInt(),
+                "Protocol " + protocolVersion + " must receive legacy id | (meta << 16) unchanged");
+    }
+
+    /**
+     * 线上崩溃路径：1.2.0 - 1.2.10 的 AddEntityPacket 携带矿车显示方块时必须能编码；
+     * 1.1.0 的路径由上面的 writeMetadata 测试覆盖。
+     * Production crash path: AddEntityPacket with a minecart display block must encode on
+     * 1.2.0 - 1.2.10; the 1.1.0 path is covered by the writeMetadata test above.
+     */
+    @ParameterizedTest(name = "AddEntityPacket with minecart display block v{0}")
+    @MethodSource("legacyAddEntityProtocols")
+    void testAddEntityPacketWithMinecartDisplayBlockEncodes(int protocolVersion) {
+        GameVersion gameVersion = GameVersion.byProtocol(protocolVersion, false);
+
+        AddEntityPacket packet = new AddEntityPacket();
+        packet.protocol = protocolVersion;
+        packet.gameVersion = gameVersion;
+        packet.entityUniqueId = 1L;
+        packet.entityRuntimeId = 2L;
+        packet.type = EntityMinecartChest.NETWORK_ID;
+        packet.x = 0f;
+        packet.y = 64f;
+        packet.z = 0f;
+        packet.metadata = new EntityMetadata();
+        packet.metadata.put(new ByteEntityData(Entity.DATA_HAS_DISPLAY, 1));
+        packet.metadata.put(new IntEntityData(Entity.DATA_DISPLAY_ITEM,
+                Block.COMMAND_BLOCK | (3 << 16)));
+        packet.attributes = new Attribute[0];
+        packet.links = new EntityLink[0];
+
+        assertDoesNotThrow(packet::encode);
+    }
+
+    static Stream<Arguments> legacyDisplayProtocols() {
+        return Stream.of(ProtocolInfo.v1_1_0, ProtocolInfo.v1_2_0, ProtocolInfo.v1_2_5_11,
+                        ProtocolInfo.v1_2_5, ProtocolInfo.v1_2_6, ProtocolInfo.v1_2_7,
+                        ProtocolInfo.v1_2_10)
+                .map(Arguments::of);
+    }
+
+    static Stream<Arguments> legacyAddEntityProtocols() {
+        return Stream.of(ProtocolInfo.v1_2_0, ProtocolInfo.v1_2_5_11, ProtocolInfo.v1_2_5,
+                        ProtocolInfo.v1_2_6, ProtocolInfo.v1_2_7, ProtocolInfo.v1_2_10)
+                .map(Arguments::of);
     }
 }

@@ -3,7 +3,6 @@ package cn.nukkit.network.process.processor.v113;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
-import cn.nukkit.Server;
 import cn.nukkit.inventory.AnvilInventory;
 import cn.nukkit.inventory.CraftingRecipe;
 import cn.nukkit.inventory.Inventory;
@@ -19,8 +18,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.UUID;
 
 /**
- * v113 (1.1) 专用的 CraftingEventPacket 处理器。
- * 在v113协议中，合成事件通过CraftingEventPacket处理，而非高版本的InventoryTransactionPacket。
+ * 1.1.x 合成包处理器：通过包内快照校验，在玩家背包结算。
+ * 1.1.x crafting events are validated against the packet snapshot and settled on the player inventory.
  *
  * @author LT_Name
  */
@@ -32,6 +31,7 @@ public class CraftingEventProcessor_v113 extends DataPacketProcessor<CraftingEve
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull CraftingEventPacket pk) {
         Player player = playerHandle.player;
         if (!player.spawned || !player.isAlive()) {
+            logRejection(player, pk, "inactive_player");
             return;
         }
 
@@ -52,7 +52,7 @@ public class CraftingEventProcessor_v113 extends DataPacketProcessor<CraftingEve
                 }
 
                 if (anvilInventory == null) {
-                    Server.getInstance().getLogger().debug("Couldn't find an anvil window for " + player.getName());
+                    logRejection(player, pk, "missing_anvil");
                     player.getInventory().sendContents(player);
                     return;
                 }
@@ -82,6 +82,7 @@ public class CraftingEventProcessor_v113 extends DataPacketProcessor<CraftingEve
 
         // 检查窗口
         if (!playerHandle.getWindowIndex().containsKey(pk.windowId)) {
+            logRejection(player, pk, "unknown_window");
             player.getInventory().sendContents(player);
             ContainerClosePacket containerClosePacket = new ContainerClosePacket();
             containerClosePacket.windowId = (byte) pk.windowId;
@@ -90,18 +91,24 @@ public class CraftingEventProcessor_v113 extends DataPacketProcessor<CraftingEve
         }
 
         if (recipe == null) {
+            logRejection(player, pk, "unknown_recipe");
             player.getInventory().sendContents(player);
             return;
         }
 
-        Item requestedOutput = pk.output != null && pk.output.length > 0 ? pk.output[0] : null;
-        if (!CraftingEvent_v113Adapter.execute(player, recipe, requestedOutput)) {
-            Server.getInstance().getLogger().debug("Invalid crafting event " + pk.id + " from player " + player.getName());
+        if (!CraftingEvent_v113Adapter.execute(player, recipe, pk.input, pk.output)) {
+            String reason = pk.input == null ? "missing_input"
+                    : pk.input.length == 0 ? "empty_input" : "validation_failed";
+            logRejection(player, pk, reason);
+            // 1.1.x 没有服务端合成格，失败时只能重发背包让客户端回滚本地状态。
+            // No server-side crafting grid exists on 1.1.x, so the inventory itself is the resync target.
             player.getInventory().sendContents(player);
-            if (player.getCraftingGrid() != null) {
-                player.getCraftingGrid().sendContents(player);
-            }
         }
+    }
+
+    private static void logRejection(Player player, CraftingEventPacket pk, String reason) {
+        player.getServer().getLogger().debug("Invalid crafting event " + pk.id + " from player " + player.getName()
+                + " reason=" + reason + " protocol=" + player.protocol);
     }
 
     private CraftingRecipe getRecipe(Player player, UUID id) {

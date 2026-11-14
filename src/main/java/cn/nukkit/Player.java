@@ -117,6 +117,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -132,10 +133,8 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
+import java.util.Queue;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -318,8 +317,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public final Map<Long, Boolean> usedChunks = new ConcurrentHashMap<>();
 
     private int chunksSent = 0;
-    private long chunkDeliveryEpoch;
-    private long chunkOrderEpoch;
+    // 异步回调会读取这两代次，写入方恒为主线程 / async callbacks read both epochs; the main thread is the only writer
+    private volatile long chunkDeliveryEpoch;
+    private volatile long chunkOrderEpoch;
     private boolean chunkPublisherUpdatePending;
     private ChunkSubmissionGuard chunkSubmissionGuard;
     private PublisherSubmissionGuard publisherSubmissionGuard;
@@ -330,8 +330,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private record PublisherSubmissionGuard(DataPacket packet, Level sourceLevel, long sourceEpoch,
                                              long orderEpoch, int radius, double x, double y, double z) { }
 
+    private record ChunkRetry(Level sourceLevel, long deliveryEpoch, long orderEpoch, long index) { }
+
     private boolean hasSpawnChunks;
+    /** 主线程独占，保持视野与距离顺序 / Main-thread owned; preserves FOV and distance order. */
     protected final LongLinkedOpenHashSet loadQueue = new LongLinkedOpenHashSet();
+    /** 重试队列上限：超限丢弃，由重排窗口按 usedChunks 重建候选 / Retry queue cap: over-cap entries drop and the reorder window rebuilds candidates from usedChunks. */
+    static final int MAX_PENDING_CHUNK_RETRIES = 256;
+    private final Queue<ChunkRetry> pendingChunkRetries = newPendingRetryQueue();
+
+    @SuppressWarnings("unchecked")
+    static <T> Queue<T> newPendingRetryQueue() {
+        return (Queue<T>) new ArrayBlockingQueue<>(MAX_PENDING_CHUNK_RETRIES);
+    }
+
     protected int nextChunkOrderRun = 1;
     // 客户端缓存协商与事务状态 / Client cache negotiation & transaction state
     private boolean clientCacheSupported = false;
@@ -477,6 +489,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
     private long lastClickAirTime = 0;
+    private CrossbowInput crossbowInput;
     /**
      * Server tick of the last accepted spear jab ({@link InventoryTransactionPacket#USE_ITEM_ACTION_USE_AS_ATTACK}).
      */
@@ -1259,6 +1272,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setUsingItem(boolean value) {
+        if (!value && this.crossbowInput != null) {
+            this.crossbowInput.reset();
+        }
         this.startAction = value ? this.server.getTick() : -1;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, value);
     }
@@ -1304,6 +1320,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void unloadChunks(boolean online) {
         ++this.chunkDeliveryEpoch;
         this.chunkPublisherUpdatePending = false;
+        this.pendingChunkRetries.clear();
         // 切世界后旧事务引用的 blob 全部作废 / old transaction blob refs are void after a world switch
         this.clearBlobCacheState();
         for (long index : this.usedChunks.keySet()) {
@@ -1367,6 +1384,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         long index = Level.chunkHash(x, z);
         Level sourceLevel = this.level;
         long sourceEpoch = this.chunkDeliveryEpoch;
+        long sourceOrderEpoch = this.chunkOrderEpoch;
         boolean tracked = this.usedChunks.containsKey(index);
         boolean submitted = false;
         ChunkSubmissionGuard previousGuard = this.chunkSubmissionGuard;
@@ -1375,10 +1393,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             submitted = this.dataPacket(packet);
         } finally {
             this.chunkSubmissionGuard = previousGuard;
-            if (!submitted && tracked && this.usedChunks.get(index) == Boolean.FALSE
-                    && isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, true)) {
-                this.usedChunks.put(index, Boolean.FALSE);
-                this.loadQueue.add(index);
+            if (!submitted && tracked) {
+                // 插件取消(DataPacketSendEvent)同样走重试，每个重排窗口内每 tick 一次 / A plugin cancel (DataPacketSendEvent) retries too, once per tick until the next reorder
+                this.dispatchChunkRetry(new ChunkRetry(sourceLevel, sourceEpoch, sourceOrderEpoch, index));
             }
         }
         if (!submitted || !isChunkSubmissionContextCurrent(sourceLevel, sourceEpoch, index, tracked)) {
@@ -1422,6 +1439,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                                      long index, boolean tracked) {
         return this.connected && this.level == sourceLevel && this.chunkDeliveryEpoch == sourceEpoch
                 && (!tracked || this.usedChunks.containsKey(index));
+    }
+
+    /** 异步线程仅投递，主线程直接应用 / Async callers only enqueue; the main thread applies directly. */
+    void requestChunkRetry(long index) {
+        this.dispatchChunkRetry(new ChunkRetry(this.level, this.chunkDeliveryEpoch, this.chunkOrderEpoch, index));
+    }
+
+    private void dispatchChunkRetry(ChunkRetry retry) {
+        if (this.server.isPrimaryThread()) {
+            this.applyChunkRetry(retry);
+            return;
+        }
+        this.pendingChunkRetries.offer(retry);
+    }
+
+    private void applyChunkRetry(ChunkRetry retry) {
+        if (this.connected && this.level == retry.sourceLevel()
+                && this.chunkDeliveryEpoch == retry.deliveryEpoch()
+                && this.chunkOrderEpoch == retry.orderEpoch()
+                && this.usedChunks.get(retry.index()) == Boolean.FALSE) {
+            this.loadQueue.add(retry.index());
+        }
+    }
+
+    void drainChunkRetries() {
+        ChunkRetry retry;
+        while ((retry = this.pendingChunkRetries.poll()) != null) {
+            this.applyChunkRetry(retry);
+        }
     }
 
     @Deprecated
@@ -1563,10 +1609,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (asyncLoad) {
                         BaseFullChunk loadedChunk = this.level.getChunkIfLoaded(chunkX, chunkZ);
                         if (loadedChunk == null) {
-                            if (this.level.requestChunkLoadAsync(chunkX, chunkZ)) {
-                                continue;
-                            }
-                            // 受理失败(executor 关闭等)→ 落到下方原同步路径 / rejected → fall through to the sync path below
+                            this.level.requestChunkLoadAsync(chunkX, chunkZ);
+                            // A full disk-reader queue is backpressure, not permission to read
+                            // synchronously. Keep the request in loadQueue and retry next tick.
+                            continue;
                         } else if (!loadedChunk.isPopulated()) {
                             boolean neighboursCached = true;
                             boolean queueRejected = false;
@@ -1576,8 +1622,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         continue;
                                     }
                                     if (this.level.getChunkIfLoaded(chunkX + dx, chunkZ + dz) == null) {
-                                        // 受理失败(队列已满/executor 关)→ 放弃异步预载,落到下方同步 populateChunk 保证推进,避免队列持续满时该区块永久悬挂
-                                        // Rejected (queue full / executor down) → abandon async preload and fall through to sync populateChunk to guarantee progress, so a saturated queue can't leave this chunk hanging forever
+                                        // Population may read all eight neighbours. Defer it
+                                        // when any preload is rejected, just as for the centre.
                                         if (!this.level.requestChunkLoadAsync(chunkX + dx, chunkZ + dz)) {
                                             queueRejected = true;
                                             break;
@@ -1589,7 +1635,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     break;
                                 }
                             }
-                            if (!queueRejected && !neighboursCached) {
+                            if (queueRejected || !neighboursCached) {
                                 continue;
                             }
                         }
@@ -2443,6 +2489,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Resolve transient items under the accepted transition's old mode: recover finite
         // items and discard creative items before a delayed close can use the new mode.
         // Cancelled transitions must leave the inventory available to its current owner.
+        this.resetCrossbowInputState();
         this.resetCraftingGridType();
         this.resolveOpenTradeInputs();
 
@@ -3498,8 +3545,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
 
                     // Wiki: 使用鞘翅滑翔时在垂直高度下降率低于每刻 0.5 格的情况下，摔落高度被重置为 1 格。
-                    // Wiki: 玩家在较小的角度和足够低的速度上着陆不会受到坠落伤害。着陆时临界伤害角度为50°，伤害值等同于玩家从滑行的最高点直接摔落到着陆点受到的伤害。
-                    if (this.isSwimming() || this.isGliding() && Math.abs(this.speed.y) < 0.5 && this.getPitch() <= 40) {
+                    if (this.isSwimming() || this.isGliding() && isSafeElytraLanding(this.speed.y)) {
                         this.resetFallDistance();
                     } else if (this.isGliding()) {
                         this.resetInAirTicks();
@@ -3512,24 +3558,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.foodData.update(tickDiff);
                 }
 
-                //鞘翅检查和耐久计算
-                if (this.isGliding()) {
-                    PlayerInventory playerInventory = this.getInventory();
-                    if (playerInventory != null) {
-                        Item chestplate = playerInventory.getChestplateFast();
-                        if ((chestplate == null || chestplate.getId() != ItemID.ELYTRA)) {
-                            this.setGliding(false);
-                        } else if (!chestplate.isUnbreakable() && ((this.gamemode & 0x01) == 0 && this.age % (20 * (chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY) + 1)) == 0)) {
-                            int newDamage = chestplate.getDamage() + 1;
-                            if (newDamage < chestplate.getMaxDurability()) {
-                                chestplate.setDamage(newDamage);
-                                playerInventory.setChestplate(chestplate);
-                            } else {
-                                this.setGliding(false);
-                            }
-                        }
-                    }
-                }
+                this.updateElytraDurability();
             }
         }
 
@@ -3562,6 +3591,47 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.removeExpiredShapes();
 
         return true;
+    }
+
+    static boolean isSafeElytraLanding(double verticalSpeed) {
+        return verticalSpeed < 0.5;
+    }
+
+    static boolean isUsableElytra(Item item) {
+        return item != null && item.getId() == ItemID.ELYTRA && item.getDamage() < item.getMaxDurability() - 1;
+    }
+
+    void updateElytraDurability() {
+        if (!this.isGliding()) {
+            return;
+        }
+
+        PlayerInventory playerInventory = this.getInventory();
+        if (playerInventory == null) {
+            return;
+        }
+
+        Item chestplate = playerInventory.getChestplateFast();
+        if (!isUsableElytra(chestplate)) {
+            this.setGliding(false);
+            return;
+        }
+
+        if (chestplate.isUnbreakable() || (this.gamemode & 0x01) != 0 || this.age % 20 != 0) {
+            return;
+        }
+
+        int unbreakingLevel = chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY);
+        if (unbreakingLevel > 0 && ThreadLocalRandom.current().nextInt(unbreakingLevel + 1) != 0) {
+            return;
+        }
+
+        int newDamage = chestplate.getDamage() + 1;
+        chestplate.setDamage(newDamage);
+        playerInventory.setChestplate(chestplate);
+        if (newDamage >= chestplate.getMaxDurability() - 1) {
+            this.setGliding(false);
+        }
     }
 
     private void updateBlockingFlag() {
@@ -3621,6 +3691,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return super.entityBaseTick(tickDiff) || hasUpdated;
     }
 
+    boolean tryAcceptClickAir() {
+        long currentClickAirTime = System.currentTimeMillis();
+        if (!this.server.doNotLimitInteractions && currentClickAirTime - this.lastClickAirTime < 100) {
+            return false;
+        }
+        this.lastClickAirTime = currentClickAirTime;
+        return true;
+    }
+
     /**
      * Start hold-to-use from AuthInput START_USING_ITEM / PlayerAction START_USING_ITEM
      * using the <em>server</em> held stack. Java chew/drink is local, so the client
@@ -3628,6 +3707,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * {@code DATA_FLAG_ACTION} after this path succeeds.
      */
     boolean tryStartUsingHeldItem(Item item) {
+        if (item instanceof ItemCrossbow crossbow) {
+            return this.crossbowInput().start(crossbow);
+        }
         if (!UsingItemReceive.shouldStartUsing(
                 this.spawned && this.isAlive(),
                 this.isSpectator() && this.server.useClientSpectator,
@@ -3655,6 +3737,26 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         this.setUsingItem(true);
         return true;
+    }
+
+    private CrossbowInput crossbowInput() {
+        if (this.crossbowInput == null) {
+            this.crossbowInput = new CrossbowInput(this);
+        }
+        return this.crossbowInput;
+    }
+
+    @ApiStatus.Internal
+    public long getCrossbowInputGeneration() {
+        return this.crossbowInput == null ? 0 : this.crossbowInput.generation();
+    }
+
+    @ApiStatus.Internal
+    public void resetCrossbowInputState() {
+        if (this.crossbowInput != null) {
+            if (this.crossbowInput.isCharging()) this.setUsingItem(false);
+            else this.crossbowInput.reset();
+        }
     }
 
     /**
@@ -3744,6 +3846,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void checkNetwork() {
+        this.drainChunkRetries();
+
         if (this.protocol < ProtocolInfo.v1_16_100 && !this.isOnline()) {
             return;
         }
@@ -4377,6 +4481,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.sendAttributes();
             this.inventory.sendCreativeContents();
             this.server.sendFullPlayerListData(this);
+            this.server.sendRecipeList(this);
 
             if (this.isOp() || this.hasPermission("nukkit.textcolor")) {
                 this.setRemoveFormat(false);
@@ -4643,6 +4748,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.handleAuthInputItemStackRequest(authPacket);
 
                 if (!this.isMovementServerAuthoritative()) {
+                    this.handleAuthInputCrossbow(authPacket);
                     return;
                 }
 
@@ -4724,21 +4830,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     ignoreCoordinateMove = true;
                 } else if (this.riding instanceof EntityBoat boat) {
                     if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-                        double moveVecX = authPacket.getMotion().getX();
-                        double moveVecY = authPacket.getMotion().getY();
-                        moveVecX = NukkitMath.clamp(moveVecX, -1, 1);
-                        moveVecY = NukkitMath.clamp(moveVecY, -1, 1);
                         boolean isMobileAndClassicMovement = authPacket.getInputMode() == InputMode.TOUCH && authPacket.getInteractionModel() == AuthInteractionModel.CLASSIC;
                         if (isMobileAndClassicMovement) {
-                            // Press both left and right to move forward and press 1 to turn the boat.
-                            boolean left = authPacket.getInputData().contains(AuthInputAction.PADDLE_LEFT), right = authPacket.getInputData().contains(AuthInputAction.PADDLE_RIGHT);
-                            if (left && right) {
-                                boat.onPlayerInput(this, 0, 1);
-                            } else {
-                                boat.onPlayerInput(this, left? 1: right? -1: 0, 0);
-                            }
+                            boat.onPlayerInput(this,
+                                    authPacket.getInputData().contains(AuthInputAction.PADDLE_LEFT),
+                                    authPacket.getInputData().contains(AuthInputAction.PADDLE_RIGHT));
                         } else {
-                            boat.onPlayerInput(this, moveVecX, moveVecY);
+                            boat.onPlayerInput(this,
+                                    NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1),
+                                    NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1),
+                                    authPacket.getInputData().contains(AuthInputAction.UP));
                         }
                         ignoreCoordinateMove = true;
                     } else {
@@ -4775,7 +4876,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Item authHeldItem = !authStartUsingItem || this.inventory == null
                         ? null : this.inventory.getItemInHand();
                 boolean authHoldToUse = UsingItemReceive.isHoldToUseItem(authHeldItem);
-                if (UsingItemReceive.shouldStartUsingFromAuthInput(
+                // 弩的开始输入留到移动接受后处理。
+                // Defer crossbow starts until movement has been accepted.
+                if (!(authHeldItem instanceof ItemCrossbow) && UsingItemReceive.shouldStartUsingFromAuthInput(
                         this.spawned && this.isAlive(),
                         this.isSpectator() && this.server.useClientSpectator,
                         this.isUsingItem(),
@@ -4847,7 +4950,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (authPacket.getInputData().contains(AuthInputAction.START_GLIDING)) {
                     boolean withoutElytra = false;
                     Item chestplate = this.getInventory().getChestplateFast();
-                    if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
+                    if (!isUsableElytra(chestplate)) {
                         withoutElytra = true;
                     }
                     // A glide request without elytra is refused, never punished: the client asks
@@ -5036,6 +5139,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 double distSqrt = clientPosition.distanceSquared(this);
                 if (this.forceMovement == null && distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
+                    this.handleAuthInputCrossbow(authPacket);
                     break;
                 }
 
@@ -5070,6 +5174,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.newPosition = clientPosition;
                     }
                     this.forceMovement = null;
+                    this.handleAuthInputCrossbow(authPacket);
                 }
 
                 break;
@@ -5167,7 +5272,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput()) break;
                         boolean withoutElytra = false;
                         Item chestplate = this.getInventory().getChestplateFast();
-                        if (chestplate == null || chestplate.getId() != ItemID.ELYTRA || chestplate.getDamage() >= chestplate.getMaxDurability()) {
+                        if (!isUsableElytra(chestplate)) {
                             withoutElytra = true;
                         }
                         // Refused, not punished: see ACTION_START_GLIDING above.
@@ -5682,6 +5787,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private void handleAuthInputCrossbow(PlayerAuthInputPacket authPacket) {
+        if (UsingItemReceive.authInputStartsUsingItem(authPacket)
+                && this.inventory != null && this.inventory.getItemInHandFast() instanceof ItemCrossbow) {
+            this.tryStartUsingHeldItem(this.inventory.getItemInHand());
+        }
+        InventoryTransactionPacket authUse = authPacket.getItemUseTransaction();
+        if (authUse != null && authUse.transactionData instanceof UseItemData use
+                && use.actionType == InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR
+                && this.inventory != null && this.inventory.getItemInHandFast() instanceof ItemCrossbow) {
+            this.crossbowInput().click(use, CrossbowInput.Source.AUTH_INPUT);
+        }
+    }
+
     public void handleInventoryTransactionPacket(InventoryTransactionPacket transactionPacket) {
         if (!this.spawned || !this.isAlive()) {
             log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
@@ -6062,6 +6180,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
+                    if (useItemData.actionType == InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR
+                            && (inventory.getItemInHandFast() instanceof ItemCrossbow
+                            || useItemData.itemInHand instanceof ItemCrossbow)) {
+                        this.crossbowInput().click(useItemData);
+                        break;
+                    }
+
                     boolean heldSlotChanged = inventory.getHeldItemIndex() != useItemData.hotbarSlot;
                     if (heldSlotChanged) {
                         inventory.equipItem(useItemData.hotbarSlot);
@@ -6196,11 +6321,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break;
                         case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR:
-                            long currentClickAirTime = System.currentTimeMillis();
-                            if (!server.doNotLimitInteractions && (currentClickAirTime - lastClickAirTime) < 100) {
+                            if (!this.tryAcceptClickAir()) {
                                 return;
                             }
-                            lastClickAirTime = currentClickAirTime;
 
                             Vector3 directionVector = this.getDirectionVector();
                             if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
@@ -6216,10 +6339,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             item = this.inventory.getItemInHand();
-                            if (item instanceof ItemCrossbow && (this.isSpectator() || !item.onClickAir(this, directionVector))) {
-                                return;
-                            }
-
                             if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
                                 server.getLogger().debug(this.username + ": CLICK_AIR held item mismatch, server="
                                         + item + ", client=" + useItemData.itemInHand);
@@ -6445,6 +6564,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     try {
                         switch (releaseItemData.actionType) {
                             case InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE:
+                                if (this.inventory.getItemInHandFast() instanceof ItemCrossbow) {
+                                    this.crossbowInput().release(releaseItemData);
+                                    return;
+                                }
                                 if (this.isUsingItem()) {
                                     item = this.inventory.getItemInHand();
                                     int ticksUsed = this.server.getTick() - this.startAction;
@@ -7392,6 +7515,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             pendingLoginVerification = null;
         }
         if (this.connected && !this.closed) {
+            this.resetCrossbowInputState();
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
                 pk.reason = failReason != null ? failReason : DisconnectFailReason.DISCONNECTED;
@@ -7740,6 +7864,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.server.getPluginManager().callEvent(ev);
 
         if (!ev.isCancelled()) {
+            this.resetCrossbowInputState();
             if (this.fishing != null) {
                 this.stopFishing(false);
             }
@@ -8411,6 +8536,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
+            this.resetCrossbowInputState();
             this.cancelPendingPortalTransfer();
             this.removeAllWindows();
             this.formOpen = false;
@@ -8781,6 +8907,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void sendAllInventories() {
         for (Inventory inv : this.windows.keySet()) {
+            if (this.protocol < ProtocolInfo.v1_2_0 && !(inv instanceof PlayerInventory)) {
+                continue;
+            }
             inv.sendContents(this);
 
             if (inv instanceof PlayerInventory) {
@@ -9083,6 +9212,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     protected void preSwitchLevel() {
+        this.resetCrossbowInputState();
         // Remove old chunks
         this.unloadChunks(true);
     }
@@ -9385,25 +9515,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.getLevel().addSound(new ExperienceOrbSound(this));
                 pickedXPOrb = server.getTick();
 
-                // Four armor slots, hand and offhand shield; keep discovery order.
+                // Four armor slots, main hand and offhand; only damaged repairable items are candidates.
                 int[] itemsWithMending = null;
                 int mendingCount = 0;
                 for (int i = 0; i < 4; i++) {
                     Item item = inventory.getArmorItem(i);
-                    if (item.getDamage() != 0 && item.hasEnchantment(Enchantment.ID_MENDING)) {
+                    if (isMendingCandidate(item)) {
                         if (itemsWithMending == null) itemsWithMending = new int[6];
                         itemsWithMending[mendingCount++] = inventory.getSize() + i;
                     }
                 }
 
                 Item hand = inventory.getItemInHandFast();
-                if (hand.getDamage() != 0 && hand.hasEnchantment(Enchantment.ID_MENDING)) {
+                if (isMendingCandidate(hand)) {
                     if (itemsWithMending == null) itemsWithMending = new int[6];
                     itemsWithMending[mendingCount++] = inventory.getHeldItemIndex();
                 }
 
                 Item offhand = this.getOffhandInventory().getItem(0);
-                if (offhand.getId() == Item.SHIELD && offhand.getDamage() != 0 && offhand.hasEnchantment(Enchantment.ID_MENDING)) {
+                if (isMendingCandidate(offhand)) {
                     if (itemsWithMending == null) itemsWithMending = new int[6];
                     itemsWithMending[mendingCount++] = -1;
                 }
@@ -9413,29 +9543,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     boolean isOffhand = itemToRepair == -1;
 
                     Item toRepair = isOffhand ? offhand : this.inventory.getItem(itemToRepair);
-                    if (toRepair instanceof ItemDurable) {
-                        if (toRepair.getDamage() > 0) {
-                            int dmg = toRepair.getDamage() - (exp << 1); // repair 2 points per xp
-                            if (dmg < 0) {
-                                dmg = 0;
-                            }
-                            toRepair.setDamage(dmg);
-                            if (isOffhand) {
-                                this.getOffhandInventory().setItem(0, toRepair);
-                            } else {
-                                this.inventory.setItem(itemToRepair, toRepair);
-                            }
-                            return true;
+                    if (isMendingCandidate(toRepair)) {
+                        int damage = toRepair.getDamage();
+                        // Vanilla: 1 XP repairs 2 durability; XP left after the repair goes to the player
+                        int repaired = (int) Math.min(damage, (long) exp << 1);
+                        toRepair.setDamage(damage - repaired);
+                        boolean applied = isOffhand
+                                ? this.getOffhandInventory().setItem(0, toRepair)
+                                : this.inventory.setItem(itemToRepair, toRepair);
+                        if (applied) {
+                            exp -= repaired >> 1;
                         }
                     }
                 }
 
-                this.addExperience(exp);
+                if (exp > 0) {
+                    this.addExperience(exp);
+                }
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static boolean isMendingCandidate(Item item) {
+        return item instanceof ItemDurable
+                && item.getDamage() > 0
+                && !item.isUnbreakable()
+                && item.hasEnchantment(Enchantment.ID_MENDING);
     }
 
     @Override

@@ -6,7 +6,8 @@ leveldb_jni = "0.0.12"
 block_state_updater = "1.21.110-20250915.183018-1"
 netty_epoll = "4.2.16.Final"
 caffeine = "3.2.3"
-guava = "33.1.0-jre"
+guava = "33.7.2-jre"
+checker_qual = "3.42.0"
 gson = "2.13.2"
 fastutil = "8.5.15"
 snakeyaml = "2.5"
@@ -31,11 +32,12 @@ bytebuddy = "1.18.8"
 objenesis = "3.4"
 nukkitx_natives = "1.0.3"
 raknet = "1.1.0.CR4-20261026.103812-1"
-cloudburst_nethernet = "2.0.0.CR6-20261023.132252-11"
-cloudburst_netty_common = "2.0.0.CR6-20261023.132252-11"
-libdatachannel = "0.24.6.0-20261023.142230-9"
+cloudburst_nethernet = "2.0.0.CR6-20261105.090937-25"
+cloudburst_netty_common = "2.0.0.CR6-20261105.090937-25"
+libdatachannel = "0.24.6.0-20261105.085043-11"
 expiringmap = "0.5.11"
 slf4j_api = "2.0.18"
+jspecify = "1.0.1"
 cloudburst_common = "3.0.0.Beta14-20261006.183140-3"
 cloudburst_bedrock_codec = "3.0.0.Beta14-20261006.183140-3"
 jackson_dataformat_toml = "2.20.1"
@@ -52,6 +54,7 @@ libdatachannel-arch-detect = { module = "dev.opencollab:libdatachannel-java-arch
 netty-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "netty_epoll" }
 netty-codec-haproxy = { module = "io.netty:netty-codec-haproxy", version.ref = "netty_epoll" }
 netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty_epoll" }
+netty-handler = { module = "io.netty:netty-handler", version.ref = "netty_epoll" }
 nukkitx-natives = { module = "com.nukkitx:natives", version.ref = "nukkitx_natives" }
 cloudburst-common = { module = "org.cloudburstmc.protocol:common", version.ref = "cloudburst_common" }
 cloudburst-bedrock-codec = { module = "org.cloudburstmc.protocol:bedrock-codec", version.ref = "cloudburst_bedrock_codec" }
@@ -59,6 +62,7 @@ cloudburst-math = { module = "org.cloudburstmc.math:immutable", version.ref = "c
 netease-protocol-extension = { module = "dev.mot.protocol:netease-protocol-extension", version.ref = "netease_protocol_extension" }
 fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
+checker-qual = { module = "org.checkerframework:checker-qual", version.ref = "checker_qual" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 

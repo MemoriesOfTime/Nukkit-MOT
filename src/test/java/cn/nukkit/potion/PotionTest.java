@@ -444,6 +444,7 @@ class PotionTest {
             field(target, "server", server);
             field(target, "effects", effects);
             when(target.getServer()).thenReturn(server);
+            when(target.isAlive()).thenReturn(true);
             when(target.canBeAffected(anyInt())).thenReturn(affected);
             doAnswer(call -> { events.add(call.getArgument(0)); return null; })
                     .when(manager).callEvent(any(Event.class));

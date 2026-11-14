@@ -1,8 +1,10 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BannerPattern;
 import cn.nukkit.utils.DyeColor;
 
@@ -77,5 +79,10 @@ public class ItemBanner extends Item {
 
     public boolean hasPattern() {
         return (this.hasCompoundTag() ? this.getNamedTag() : new CompoundTag()).contains("Patterns");
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_2_0;
     }
 }
