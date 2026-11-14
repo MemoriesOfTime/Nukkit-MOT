@@ -10,7 +10,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -332,7 +334,7 @@ public final class NetworkMapping {
             return null;
         }
 
-        for (Item item : inventory.getContents().values()) {
+        for (Item item : bundleLookupContents(inventory).values()) {
             if (!(item instanceof ItemBundle bundle)) {
                 continue;
             }
@@ -399,7 +401,7 @@ public final class NetworkMapping {
             return null;
         }
 
-        for (var entry : inventory.getContents().entrySet()) {
+        for (var entry : bundleLookupContents(inventory).entrySet()) {
             Item item = entry.getValue();
             if (!(item instanceof ItemBundle bundle)) {
                 continue;
@@ -434,5 +436,15 @@ public final class NetworkMapping {
         }
 
         return null;
+    }
+
+    /** Double-chest contents are clones; retain actual carriers and the logical window slot numbers. */
+    private static Map<Integer, Item> bundleLookupContents(Inventory inventory) {
+        if (!(inventory instanceof DoubleChestInventory)) return inventory.getContents();
+        Map<Integer, Item> contents = new LinkedHashMap<>();
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            contents.put(slot, inventory.getUnclonedItem(slot));
+        }
+        return contents;
     }
 }

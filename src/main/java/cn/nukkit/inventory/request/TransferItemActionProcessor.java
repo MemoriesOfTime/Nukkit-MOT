@@ -154,14 +154,12 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         Item originalDestItem = destItem.clone();
         Item originalSourceItem = sourceItem.clone();
 
-        if (!dstInv.setItem(dstSlot, newDest, sendDest)) {
+        if (!NativeItemStackRequestOwnership.write(context, dstInv, dstSlot, newDest, sendDest)) {
             playBundleSound(player, dstInv, Sound.BUNDLE_INSERT_FAIL);
             return context.error();
         }
 
-        boolean srcOk = fullTransfer
-                ? srcInv.clear(srcSlot, sendSource)
-                : srcInv.setItem(srcSlot, newSrc, sendSource);
+        boolean srcOk = NativeItemStackRequestOwnership.write(context, srcInv, srcSlot, newSrc, sendSource);
         if (!srcOk) {
             dstInv.setItemForce(dstSlot, originalDestItem);
             return context.error();
@@ -235,14 +233,12 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         }
 
         Item originalDestItem = destItem.clone();
-        if (!dstInv.setItem(dstSlot, newDest, sendDest)) {
+        if (!NativeItemStackRequestOwnership.write(context, dstInv, dstSlot, newDest, sendDest)) {
             playBundleSound(player, dstInv, Sound.BUNDLE_INSERT_FAIL);
             return context.error();
         }
 
-        boolean srcOk = fullTransfer
-                ? srcInv.clear(srcSlot, sendSource)
-                : srcInv.setItem(srcSlot, newSrc, sendSource);
+        boolean srcOk = NativeItemStackRequestOwnership.write(context, srcInv, srcSlot, newSrc, sendSource);
         if (!srcOk) {
             dstInv.setItemForce(dstSlot, originalDestItem);
             return context.error();
