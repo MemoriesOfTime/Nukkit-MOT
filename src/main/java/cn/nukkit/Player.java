@@ -4481,6 +4481,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.sendAttributes();
             this.inventory.sendCreativeContents();
             this.server.sendFullPlayerListData(this);
+            this.server.sendRecipeList(this);
 
             if (this.isOp() || this.hasPermission("nukkit.textcolor")) {
                 this.setRemoveFormat(false);
@@ -8911,6 +8912,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void sendAllInventories() {
         for (Inventory inv : this.windows.keySet()) {
+            if (this.protocol < ProtocolInfo.v1_2_0 && !(inv instanceof PlayerInventory)) {
+                continue;
+            }
             inv.sendContents(this);
 
             if (inv instanceof PlayerInventory) {

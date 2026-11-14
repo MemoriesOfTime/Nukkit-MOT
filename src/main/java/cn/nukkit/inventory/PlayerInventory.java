@@ -755,12 +755,17 @@ public class PlayerInventory extends BaseInventory {
 
         if (p.protocol < 407) {
             if (p.protocol < ProtocolInfo.v1_2_0) {
+                // 1.1.x 仅创造模式下发创造列表，其余模式保留客户端内置列表。
+                // Only creative 1.1.x clients get the list; other modes keep the built-in one.
+                if (!p.isCreative()) {
+                    return;
+                }
                 ContainerSetContentPacket_v113 pk = new ContainerSetContentPacket_v113();
                 pk.windowid = ContainerSetContentPacket_v113.SPECIAL_CREATIVE;
                 pk.eid = p.getId();
-                if (!p.isSpectator()) {
-                    pk.slots = Item.getCreativeItems(p.getGameVersion()).toArray(Item.EMPTY_ARRAY);
-                }
+                // 1.1.x 解析不了的物品已由 getCreativeItems 按 isSupportedOn 过滤。
+                // Items a 1.1.x client cannot parse are already filtered by isSupportedOn.
+                pk.slots = Item.getCreativeItems(p.getGameVersion()).toArray(Item.EMPTY_ARRAY);
                 p.dataPacket(pk);
             } else {
                 InventoryContentPacket pk = new InventoryContentPacket();

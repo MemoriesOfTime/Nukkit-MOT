@@ -1,5 +1,8 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 public class ItemShield extends ItemTool {
 
     public ItemShield() {
@@ -36,5 +39,10 @@ public class ItemShield extends ItemTool {
     @Override
     public boolean isShield() {
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(GameVersion protocolId) {
+        return protocolId.getProtocol() >= ProtocolInfo.v1_10_0;
     }
 }

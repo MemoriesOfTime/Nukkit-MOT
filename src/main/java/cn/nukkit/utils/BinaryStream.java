@@ -1475,7 +1475,7 @@ public class BinaryStream {
     }
 
     private void putSlotV113(Item item) {
-        if (item == null || item.getId() == Item.AIR) {
+        if (item == null || item.getId() == Item.AIR || !item.isSupportedOn(GameVersion.V1_1_0)) {
             this.putVarInt(0);
             return;
         }
