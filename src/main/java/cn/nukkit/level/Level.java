@@ -71,7 +71,6 @@ import cn.nukkit.plugin.Plugin;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
-import cn.nukkit.utils.collection.nb.LongObjectEntry;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
@@ -329,8 +328,29 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Map<Long, Deque<DataPacket>> chunkPackets = new ConcurrentHashMap<>();
 
-    @NonComputationAtomic
-    private final Long2ObjectNonBlockingMap<Long> unloadQueue = new Long2ObjectNonBlockingMap<>();
+    /**
+     * 未使用区块的到期卸载队列：最旧优先，重新入队移到队尾，见 {@link ChunkUnloadQueue}。
+     * <p>Chunks waiting out their unload grace period, oldest first; see {@link ChunkUnloadQueue}.
+     */
+    private final ChunkUnloadQueue unloadQueue = new ChunkUnloadQueue();
+
+    // drain 的 Level 侧判断，缓存以避免每次卸载分配回调 / Level-side decisions for drain, cached to avoid per-pass callbacks.
+    private final ChunkUnloadQueue.Target unloadTarget = new ChunkUnloadQueue.Target() {
+        @Override
+        public boolean isChunkInUse(long hash) {
+            return Level.this.isChunkInUse(hash);
+        }
+
+        @Override
+        public boolean isChunkSaveBacklogged() {
+            return Level.this.isChunkSaveBacklogged();
+        }
+
+        @Override
+        public boolean unloadChunk(long hash) {
+            return Level.this.unloadChunk(Level.getHashX(hash), Level.getHashZ(hash), true);
+        }
+    };
 
     private int time;
 
@@ -562,8 +582,6 @@ public class Level implements ChunkManager, Metadatable {
         return context != null && context.level == this && context.protocol == protocol
                 && context.x == x && context.z == z && context.sequence == sequence ? context.owner : null;
     }
-
-    private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
 
     private final boolean antiXray;
 
@@ -5349,12 +5367,12 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (this.isChunkInUse(index)) {
-            this.unloadQueue.remove(index);
+            this.cancelUnloadChunkRequest(index);
             for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
                 loader.onChunkLoaded(chunk);
             }
         } else {
-            this.unloadQueue.put(index, (Long) System.currentTimeMillis());
+            this.unloadQueue.request(index);
         }
         return chunk;
     }
@@ -5471,9 +5489,9 @@ public class Level implements ChunkManager, Metadatable {
         this.finishChunkLoad(pending.hash, pending.x, pending.z, chunk);
     }
 
-    private void queueUnloadChunk(int x, int z) {
-        long index = Level.chunkHash(x, z);
-        this.unloadQueue.put(index, (Long) System.currentTimeMillis());
+    /** Whether the chunk is waiting to be unloaded. */
+    public boolean isUnloadChunkRequested(long hash) {
+        return this.unloadQueue.contains(hash);
     }
 
     public boolean unloadChunkRequest(int x, int z) {
@@ -5485,7 +5503,7 @@ public class Level implements ChunkManager, Metadatable {
             return false;
         }
 
-        this.queueUnloadChunk(x, z);
+        this.unloadQueue.request(Level.chunkHash(x, z));
 
         return true;
     }
@@ -5495,7 +5513,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void cancelUnloadChunkRequest(long hash) {
-        this.unloadQueue.remove(hash);
+        this.unloadQueue.cancel(hash);
     }
 
     public boolean unloadChunk(int x, int z) {
@@ -5819,7 +5837,7 @@ public class Level implements ChunkManager, Metadatable {
 
         LevelProvider levelProvider = this.requireProvider();
         for (long index : levelProvider.getLoadedChunkHashes()) {
-            if (!this.unloadQueue.containsKey(index)) {
+            if (!this.isUnloadChunkRequested(index)) {
                 int X = getHashX(index);
                 int Z = getHashZ(index);
                 if (!this.isSpawnChunk(X, Z)) {
@@ -5834,7 +5852,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public void doGarbageCollection(long allocatedTime) {
         long start = System.currentTimeMillis();
-        if (unloadChunks(start, allocatedTime, false)) {
+        if (unloadChunks(allocatedTime, false)) {
             allocatedTime -= (System.currentTimeMillis() - start);
             provider.doGarbageCollection(allocatedTime);
         }
@@ -5844,10 +5862,15 @@ public class Level implements ChunkManager, Metadatable {
         this.unloadChunks(false);
     }
 
+    /** 强制卸载忽略宽限期、写积压与单次计数，清空调用时的队列快照；命令 /gc 依赖此行为 / A forced pass ignores grace, backlog and the count cap and walks the snapshot taken when it starts. */
     public void unloadChunks(boolean force) {
         this.unloadChunks(50, force);
     }
 
+    /**
+     * @param maxUnload 非 force 时单次最多卸载数 / per-pass cap unless forced
+     * @param force     忽略宽限期、写积压与计数 / ignore grace, backlog and the cap
+     */
     public void unloadChunks(int maxUnload, boolean force) {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return;
@@ -5856,54 +5879,15 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        if (!this.unloadQueue.isEmpty()) {
-            long now = System.currentTimeMillis();
-
-            int unloaded = 0;
-            LongList toRemove = null;
-            for (var entry : unloadQueue.fastEntrySet()) {
-                long index = entry.getLongKey();
-
-                if (isChunkInUse(index)) {
-                    continue;
-                }
-
-                if (!force) {
-                    long time = entry.getValue();
-                    if (unloaded > maxUnload) {
-                        break;
-                    } else if (time > (now - 20000)) {
-                        continue;
-                    }
-                    unloaded++;
-                }
-
-                if (toRemove == null) toRemove = new LongArrayList();
-                toRemove.add(index);
-            }
-
-            if (toRemove != null) {
-                int size = toRemove.size();
-                for (int i = 0; i < size; i++) {
-                    long index = toRemove.getLong(i);
-                    int X = getHashX(index);
-                    int Z = getHashZ(index);
-
-                    if (this.unloadChunk(X, Z, true)) {
-                        this.unloadQueue.remove(index);
-                    }
-                }
-            }
-        }
+        this.unloadQueue.drain(this.unloadTarget, force, maxUnload, Long.MAX_VALUE);
     }
 
     /**
-     * @param now           current time
-     * @param allocatedTime allocated time
-     * @param force         force
-     * @return true if there is allocated time remaining
+     * @param allocatedTime 本次卸载可用的毫秒数 / milliseconds this pass may use
+     * @param force         忽略宽限期、写积压与计数 / ignore grace, backlog and the count cap
+     * @return true 表示还有剩余预算给 provider GC / true when budget remains for the provider GC
      */
-    private boolean unloadChunks(long now, long allocatedTime, boolean force) {
+    private boolean unloadChunks(long allocatedTime, boolean force) {
         if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
             return false;
         }
@@ -5913,60 +5897,8 @@ public class Level implements ChunkManager, Metadatable {
             return true;
         }
 
-        if (!this.unloadQueue.isEmpty()) {
-            boolean result = true;
-            int maxIterations = this.unloadQueue.size();
-
-            if (lastUsingUnloadingIter == null) {
-                lastUsingUnloadingIter = this.unloadQueue.fastEntrySet().iterator();
-            }
-
-            var iter = lastUsingUnloadingIter;
-
-            LongList toUnload = null;
-
-            for (int i = 0; i < maxIterations; i++) {
-                if (!iter.hasNext()) {
-                    iter = this.unloadQueue.fastEntrySet().iterator();
-                }
-                var entry = iter.next();
-
-                long index = entry.getLongKey();
-
-                if (isChunkInUse(index)) {
-                    continue;
-                }
-
-                if (!force) {
-                    long time = entry.getValue();
-                    if (time > (now - 20000)) {
-                        continue;
-                    }
-                }
-
-                if (toUnload == null) {
-                    toUnload = new LongArrayList();
-                }
-                toUnload.add(index);
-            }
-
-            if (toUnload != null) {
-                for (long index : toUnload) {
-                    int X = getHashX(index);
-                    int Z = getHashZ(index);
-                    if (this.unloadChunk(X, Z, true)) {
-                        this.unloadQueue.remove(index);
-                        if (System.currentTimeMillis() - now >= allocatedTime) {
-                            result = false;
-                            break;
-                        }
-                    }
-                }
-            }
-            return result;
-        } else {
-            return true;
-        }
+        return this.unloadQueue.drain(this.unloadTarget, force, Integer.MAX_VALUE,
+                this.unloadQueue.now() + allocatedTime);
     }
 
     @Override
