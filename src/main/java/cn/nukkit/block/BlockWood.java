@@ -83,7 +83,12 @@ public class BlockWood extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(this, this.getDamage() & 0x03);
+        int meta = this.getDamage();
+        if (this.getClass() == BlockWood.class && meta >= 12 && meta <= 15) {
+            int species = meta & 0x03;
+            return new ItemBlock(Block.get(WOOD_BARK, species), species);
+        }
+        return new ItemBlock(this, meta & 0x03);
     }
 
     @Override
