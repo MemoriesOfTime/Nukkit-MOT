@@ -270,8 +270,11 @@ buildTools.compileClasspath += sourceSets.main.get().output + sourceSets.main.ge
 val dependencyDownloadRepos = listOf(
     "https://repo1.maven.org/maven2/",
     "https://repo.opencollab.dev/maven-releases/",
+    "https://repo.opencollab.dev/maven-snapshots/",
     "https://repo.okaeri.cloud/releases",
     "https://maven.daporkchop.net/",
+    "https://repo.lanink.cn/repository/maven-releases/",
+    "https://repo.lanink.cn/repository/maven-snapshots/",
     "https://repo.lanink.cn/repository/maven-public/"
 )
 
