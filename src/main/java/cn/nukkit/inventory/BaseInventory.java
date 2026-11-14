@@ -216,6 +216,8 @@ public abstract class BaseInventory implements Inventory {
             item = ev.getNewItem();
         }
 
+        if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
+
         if (holder instanceof BlockEntity) {
             ((BlockEntity) holder).setDirty();
         }
@@ -522,11 +524,14 @@ public abstract class BaseInventory implements Inventory {
                     if (item.getCount() < maxStackSize) {
                         int amount = Math.min(maxStackSize - item.getCount(), slot.getCount());
                         if (amount > 0) {
-                            slot.setCount(slot.getCount() - amount);
-                            item.setCount(item.getCount() + amount);
-                            this.setItem(i, item);
-                            if (slot.getCount() <= 0) {
-                                iterator.remove();
+                            Item candidate = item.clone();
+                            candidate.setCount(item.getCount() + amount);
+                            if (this.setItemExactBulk(i, candidate)) {
+                                slot.setCount(slot.getCount() - amount);
+                                item = this.getItem(i);
+                                if (slot.getCount() <= 0) {
+                                    iterator.remove();
+                                }
                             }
                         }
                     }
@@ -542,12 +547,14 @@ public abstract class BaseInventory implements Inventory {
                 if (!itemSlots.isEmpty()) {
                     Item slot = itemSlots.get(0);
                     int amount = Math.min(Math.min(slot.getMaxStackSize(), this.getMaxStackSize()), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
+                    if (amount <= 0) continue;
                     Item item = slot.clone();
                     item.setCount(amount);
-                    this.setItem(slotIndex, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
+                    if (this.setItemExactBulk(slotIndex, item)) {
+                        slot.setCount(slot.getCount() - amount);
+                        if (slot.getCount() <= 0) {
+                            itemSlots.remove(slot);
+                        }
                     }
                 }
             }
@@ -574,11 +581,14 @@ public abstract class BaseInventory implements Inventory {
             for (Item slot : new ArrayList<>(itemSlots)) {
                 if (slot.equals(item, item.hasMeta(), item.getCompoundTag() != null)) {
                     int amount = Math.min(item.getCount(), slot.getCount());
-                    slot.setCount(slot.getCount() - amount);
-                    item.setCount(item.getCount() - amount);
-                    this.setItem(i, item);
-                    if (slot.getCount() <= 0) {
-                        itemSlots.remove(slot);
+                    Item candidate = item.clone();
+                    candidate.setCount(item.getCount() - amount);
+                    if (this.setItemExactBulk(i, candidate)) {
+                        slot.setCount(slot.getCount() - amount);
+                        item = this.getItem(i);
+                        if (slot.getCount() <= 0) {
+                            itemSlots.remove(slot);
+                        }
                     }
                 }
             }
@@ -589,6 +599,23 @@ public abstract class BaseInventory implements Inventory {
         }
 
         return itemSlots.toArray(Item.EMPTY_ARRAY);
+    }
+
+    private boolean setItemExactBulk(int slot, Item target) {
+        try (InventoryMutationGuard.WriteScope write = InventoryMutationGuard.tryExactBulkWrite(this, slot, target)) {
+            if (write == null) return false;
+            try {
+                if (this.setItem(slot, target.clone())
+                        && InventoryMutationGuard.matchesTarget(this.getItem(slot), target)) {
+                    return true;
+                }
+            } catch (RuntimeException | Error failure) {
+                write.restorePreviousSlot();
+                throw failure;
+            }
+            write.restorePreviousSlot();
+            return false;
+        }
     }
 
     @Override
@@ -606,6 +633,8 @@ public abstract class BaseInventory implements Inventory {
                 }
                 item = ev.getNewItem();
             }
+
+            if (!InventoryMutationGuard.acceptsWrite(this, index, item)) return false;
 
             if (holder instanceof BlockEntity) {
                 ((BlockEntity) holder).setDirty();
