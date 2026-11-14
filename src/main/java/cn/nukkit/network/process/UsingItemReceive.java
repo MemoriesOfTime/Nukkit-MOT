@@ -33,6 +33,30 @@ public final class UsingItemReceive {
     }
 
     /**
+     * 客户端把整栈预测成空气（消耗 1 个）时，CLICK_AIR 的持有物比对不能拒绝，否则真使用会被吞掉；仅限即时使用物品。
+     * <p>
+     * A client that predicted a full stack consumption reports air on CLICK_AIR; accept that for
+     * instant-use items, whose hold-to-use counterparts report through other signals.
+     */
+    public static boolean isPredictedFullConsumption(Item serverItem, Item clientItem) {
+        return serverItem != null && clientItem != null && clientItem.isNull()
+                && serverItem.getCount() == 1 && !serverItem.canRelease();
+    }
+
+    /**
+     * CLICK_AIR 的持有物比对：客户端整栈预测消耗成空气时放行，其余要求与服务端手持物一致。
+     * <p>
+     * CLICK_AIR held-item check: accept a client-predicted full consumption, otherwise the client
+     * stack must match the server's.
+     */
+    public static boolean shouldUseClickAirItem(Item serverItem, Item clientItem) {
+        if (serverItem == null || clientItem == null) {
+            return false;
+        }
+        return serverItem.equalsFast(clientItem) || isPredictedFullConsumption(serverItem, clientItem);
+    }
+
+    /**
      * A second CLICK_AIR while already using is treated as {@code onUse(ticksUsed)} and
      * always {@code setUsingItem(false)}. Keep that as the duration-ready finish, but
      * ignore an immediate duplicate start so Java USE_ITEM + USE_ITEM_ON cannot abort

@@ -1,11 +1,8 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
-import cn.nukkit.block.Block;
 import cn.nukkit.item.trim.ItemTrimMaterialType;
 import cn.nukkit.item.trim.ItemTrimPatternType;
-import cn.nukkit.level.Level;
-import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -52,16 +49,6 @@ abstract public class ItemArmor extends Item implements ItemDurable {
     @Override
     public boolean isArmor() {
         return true;
-    }
-
-    @Override
-    public boolean canBeActivated() {
-        return true;
-    }
-
-    @Override
-    public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
-        return this.equipArmor(player);
     }
 
     @Override

@@ -122,6 +122,27 @@ class UsingItemReceiveTest {
         assertFalse(UsingItemReceive.shouldKeepUsingOnClickBlock(true, true, true, true));
     }
 
+    @Test
+    void predictedFullConsumptionOnlyForSingleInstantUseItem() {
+        assertTrue(UsingItemReceive.isPredictedFullConsumption(Item.get(ItemID.SNOWBALL), Item.get(Item.AIR)));
+        assertFalse(UsingItemReceive.isPredictedFullConsumption(Item.get(ItemID.SNOWBALL, 0, 2), Item.get(Item.AIR)));
+        assertFalse(UsingItemReceive.isPredictedFullConsumption(Item.get(ItemID.SNOWBALL), Item.get(ItemID.SNOWBALL)));
+        assertFalse(UsingItemReceive.isPredictedFullConsumption(Item.get(ItemID.APPLE), Item.get(Item.AIR)));
+        assertFalse(UsingItemReceive.isPredictedFullConsumption(null, Item.get(Item.AIR)));
+        assertFalse(UsingItemReceive.isPredictedFullConsumption(Item.get(ItemID.SNOWBALL), null));
+    }
+
+    @Test
+    void clickAirAcceptsMatchingOrPredictedFullConsumption() {
+        Item snowball = Item.get(ItemID.SNOWBALL);
+        assertTrue(UsingItemReceive.shouldUseClickAirItem(snowball, Item.get(ItemID.SNOWBALL, 0, 2)));
+        assertTrue(UsingItemReceive.shouldUseClickAirItem(snowball, Item.get(Item.AIR)));
+        assertFalse(UsingItemReceive.shouldUseClickAirItem(Item.get(ItemID.SNOWBALL, 0, 2), Item.get(Item.AIR)));
+        assertFalse(UsingItemReceive.shouldUseClickAirItem(snowball, Item.get(ItemID.EGG)));
+        assertFalse(UsingItemReceive.shouldUseClickAirItem(snowball, null));
+        assertFalse(UsingItemReceive.shouldUseClickAirItem(null, snowball));
+    }
+
 
     @Test
     void netease860AuthInputStartUsingItemDecodesAndWouldSetUsingItem() {

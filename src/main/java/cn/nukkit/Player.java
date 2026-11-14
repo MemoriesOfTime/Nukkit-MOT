@@ -6227,12 +6227,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     Item serverItem = inventory.getItemInHand();
                                     Item clientItem = useItemData.itemInHand;
 
-                                    boolean canProceed = serverItem.equals(clientItem);
-                                    if (!canProceed && clientItem.isNull()
-                                            && serverItem.getCount() == 1
-                                            && serverItem.canBeActivated()) {
-                                        canProceed = true;
-                                    }
+                                    // 客户端预测整栈消耗时可能上报空气；方块自身能否激活（如末影之眼）与物品能否激活无关。
+                                    // A predicted full consumption may report air here; the block's own activation
+                                    // (e.g. the ender eye) does not depend on the item being activatable.
+                                    boolean canProceed = serverItem.equals(clientItem)
+                                            || UsingItemReceive.isPredictedFullConsumption(serverItem, clientItem);
 
                                     if (canProceed) {
                                         Item i = serverItem;
@@ -6339,7 +6338,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
 
                             item = this.inventory.getItemInHand();
-                            if (useItemData.itemInHand == null || !item.equalsFast(useItemData.itemInHand)) {
+                            boolean predictedFullConsumption = UsingItemReceive.isPredictedFullConsumption(
+                                    item, useItemData.itemInHand);
+                            if (!UsingItemReceive.shouldUseClickAirItem(item, useItemData.itemInHand)) {
                                 server.getLogger().debug(this.username + ": CLICK_AIR held item mismatch, server="
                                         + item + ", client=" + useItemData.itemInHand);
                                 this.needSendHeldItem = true;
@@ -6383,6 +6384,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 if (!item.onUse(this, ticksUsed)) {
                                     this.inventory.sendContents(this);
                                 }
+                            } else if (predictedFullConsumption) {
+                                this.needSendHeldItem = true;
                             }
                             break;
                         case InventoryTransactionPacket.USE_ITEM_ACTION_USE_AS_ATTACK:
