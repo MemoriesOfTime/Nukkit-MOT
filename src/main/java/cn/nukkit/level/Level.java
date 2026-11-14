@@ -835,6 +835,7 @@ public class Level implements ChunkManager, Metadatable {
             this.provider = null;
             this.blockMetadata = null;
             this.server.getLevels().remove(this.levelId);
+            EnumLevel.onLevelClosed(this);
             synchronized (this.generators) {
                 this.generators.clear();
             }
