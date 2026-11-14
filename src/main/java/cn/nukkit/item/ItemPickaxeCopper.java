@@ -34,6 +34,6 @@ public class ItemPickaxeCopper extends StringItemToolBase {
 
     @Override
     public int getAttackDamage() {
-        return 5;
+        return 4;
     }
 }
