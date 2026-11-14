@@ -957,8 +957,32 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v2168
      */
     public static final int SOUND_STRAW_BED_BREAK_LEAVE = 613;
+    /**
+     * @since v2259 1.26.70
+     */
+    public static final int SOUND_CONVERT_TO_FROSTBITE = 614;
+    /**
+     * @since v2259 1.26.70
+     */
+    public static final int SOUND_CONVERT_TO_ZOMBIE = 615;
+    /**
+     * @since v2259 1.26.70
+     */
+    public static final int SOUND_CRACK = 616;
+    /**
+     * @since v2259 1.26.70
+     */
+    public static final int SOUND_ICE_BALL_THROW = 617;
+    /**
+     * @since v2259 1.26.70
+     */
+    public static final int SOUND_RECORD_FLURRY = 618;
+    /**
+     * @since v2259 1.26.70
+     */
+    public static final int SOUND_IMITATE_FROSTBITE = 619;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(614);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(620);
 
     public int sound;
     public float x;
@@ -1613,6 +1637,12 @@ public class LevelSoundEventPacket extends DataPacket {
             case SOUND_MOUNT -> "mount";
             case SOUND_DISMOUNT -> "dismount";
             case SOUND_STRAW_BED_BREAK_LEAVE -> "straw_bed.break_leave";
+            case SOUND_CONVERT_TO_FROSTBITE -> "convert_to_frostbite";
+            case SOUND_CONVERT_TO_ZOMBIE -> "convert_to_zombie";
+            case SOUND_CRACK -> "crack";
+            case SOUND_ICE_BALL_THROW -> "ice_ball.throw";
+            case SOUND_RECORD_FLURRY -> "record.flurry";
+            case SOUND_IMITATE_FROSTBITE -> "imitate.frostbite";
             default -> SOUND_UNDEFINED_NAME;
         };
     }

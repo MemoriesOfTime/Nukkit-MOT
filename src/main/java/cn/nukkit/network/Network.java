@@ -887,6 +887,14 @@ public class Network {
             .registerPacket(ProtocolInfo.SERVERBOUND_CURSOR_ITEM_DRAG_PACKET, ServerboundCursorItemDragPacket.class)
             .registerPacket(ProtocolInfo.CLIENTBOUND_PLAY_AUDIO_CONTENT_PACKET, ClientboundPlayAudioContentPacket.class)
             .registerPacket(ProtocolInfo.SERVERBOUND_REGISTER_AUDIO_CONTENT_PACKET, ServerboundRegisterAudioContentPacket.class)
+            // v2259 packets (1.26.70)
+            .registerPacket(ProtocolInfo.CHAT_PACKET, ChatPacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_REQUEST_ONLINE_MUSIC_PLAYBACK_PACKET, ServerboundRequestOnlineMusicPlaybackPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_ONLINE_MUSIC_PLAYBACK_RESPONSE_PACKET, ClientboundOnlineMusicPlaybackResponsePacket.class)
+            .registerPacket(ProtocolInfo.PLAYER_TOGGLE_ARMOR_VISIBILITY_REQUEST_PACKET, PlayerToggleArmorVisibilityRequestPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_MUSIC_PLAYBACK_FAILURE_PACKET, ClientboundMusicPlaybackFailurePacket.class)
+            .registerPacket(ProtocolInfo.VIRTUAL_CONTAINER_OPEN_PACKET, VirtualContainerOpenPacket.class)
+            .registerPacket(ProtocolInfo.VIRTUAL_CONTAINER_CLOSE_PACKET, VirtualContainerClosePacket.class)
             .build();
 
         this.packetPoolCurrentNetEase = this.packetPoolCurrent.toBuilder()

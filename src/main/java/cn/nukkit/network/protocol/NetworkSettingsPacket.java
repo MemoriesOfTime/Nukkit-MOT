@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.PacketCompressionAlgorithm;
+import cn.nukkit.network.protocol.types.SctpRecoveryProfile;
 import lombok.ToString;
 
 @ToString
@@ -11,6 +12,10 @@ public class NetworkSettingsPacket extends DataPacket {
     public boolean clientThrottleEnabled;
     public byte clientThrottleThreshold;
     public float clientThrottleScalar;
+    /**
+     * @since v2259 1.26.70
+     */
+    public SctpRecoveryProfile sctpRecoveryProfile = SctpRecoveryProfile.DEFAULT;
 
     @Override
     public byte pid() {
@@ -26,6 +31,9 @@ public class NetworkSettingsPacket extends DataPacket {
             this.putBoolean(this.clientThrottleEnabled);
             this.putByte(this.clientThrottleThreshold);
             this.putLFloat(this.clientThrottleScalar);
+            if (protocol >= ProtocolInfo.v1_26_70) {
+                this.putByte((byte) this.sctpRecoveryProfile.getId());
+            }
         }
     }
 

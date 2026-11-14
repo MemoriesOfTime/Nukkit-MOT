@@ -23,7 +23,8 @@ public class EmoteListPacket extends DataPacket {
     public void decode() {
         this.runtimeId = this.getEntityRuntimeId();
         int size = (int) this.getUnsignedVarInt();
-        if (size > 1000) {
+        int max = this.protocol >= ProtocolInfo.v1_26_70 ? 6 : 1000;
+        if (size > max) {
             throw new RuntimeException("Too big EmoteListPacket: " + size);
         }
         for (int i = 0; i < size; i++) {

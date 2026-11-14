@@ -49,8 +49,13 @@ class GameVersionTest {
     }
 
     @Test
-    void lastVersionIsV1_26_60() {
-        assertEquals(GameVersion.V1_26_60, GameVersion.getLastVersion());
+    void byProtocolResolvesV1_26_70() {
+        assertEquals(GameVersion.V1_26_70, GameVersion.byProtocol(ProtocolInfo.v1_26_70, false));
+    }
+
+    @Test
+    void lastVersionIsV1_26_70() {
+        assertEquals(GameVersion.V1_26_70, GameVersion.getLastVersion());
     }
 
     @Test
@@ -67,13 +72,14 @@ class GameVersionTest {
         assertTrue(ProtocolInfo.SUPPORTED_PROTOCOLS.contains(ProtocolInfo.v1_26_50_27));
         assertTrue(ProtocolInfo.SUPPORTED_PROTOCOLS.contains(ProtocolInfo.v1_26_50));
         assertTrue(ProtocolInfo.SUPPORTED_PROTOCOLS.contains(ProtocolInfo.v1_26_60));
+        assertTrue(ProtocolInfo.SUPPORTED_PROTOCOLS.contains(ProtocolInfo.v1_26_70));
     }
 
     @Test
-    void currentProtocolIsV1_26_60() {
-        // Utils.dynamic 允许测试属性覆盖；默认应解析到 1.26.60（2225）的版本字符串
-        // Utils.dynamic allows a test-property override; default must resolve to the 1.26.60 (2225) string
-        assertEquals("1.26.60", cn.nukkit.utils.Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL));
+    void currentProtocolIsV1_26_70() {
+        // Utils.dynamic 允许测试属性覆盖；默认应解析到 1.26.70（2259）的版本字符串
+        // Utils.dynamic allows a test-property override; default must resolve to the 1.26.70 (2259) string
+        assertEquals("1.26.70", cn.nukkit.utils.Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL));
         assertEquals("1.26.50.27", cn.nukkit.utils.Utils.getVersionByProtocol(ProtocolInfo.v1_26_50_27));
     }
 }

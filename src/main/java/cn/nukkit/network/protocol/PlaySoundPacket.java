@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.types.SoundAttachOptions;
 import lombok.ToString;
 
 @ToString
@@ -29,6 +30,22 @@ public class PlaySoundPacket extends DataPacket {
      * @since v2192 v1_26_50_27
      */
     public Float playbackPositionSeconds;
+    /**
+     * 可选播放起点延迟（秒）。
+     * <p>
+     * Optional playback timeline start delay in seconds.
+     *
+     * @since v2259 1.26.70
+     */
+    public Float startDelaySeconds;
+    /**
+     * 可选挂载目标，取代裸 Entity To Attach To 字段。
+     * <p>
+     * Optional attach target, replacing the bare Entity To Attach To field.
+     *
+     * @since v2259 1.26.70
+     */
+    public SoundAttachOptions attachOptions;
 
     @Override
     public byte pid() {
@@ -52,6 +69,10 @@ public class PlaySoundPacket extends DataPacket {
             this.putBoolean(this.bypassListenerRangeCheck);
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);
             this.putOptionalNull(this.playbackPositionSeconds, this::putLFloat);
+            if (protocol >= ProtocolInfo.v1_26_70) {
+                this.putOptionalNull(this.startDelaySeconds, this::putLFloat);
+                this.putOptionalNull(this.attachOptions, SoundAttachOptions::put);
+            }
         } else if (protocol >= ProtocolInfo.v1_26_40) {
             this.putVarInt((int) this.loopCount);
             this.putOptionalNull(this.serverSoundHandle, this::putLLong);

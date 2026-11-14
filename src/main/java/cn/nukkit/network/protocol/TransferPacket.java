@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.GatheringsConfigurationJoinInfo;
+import cn.nukkit.network.protocol.types.TransferPlayerUIOptions;
 import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
@@ -21,6 +22,14 @@ public class TransferPacket extends DataPacket {
      * Gatherings configuration added in v2168 (1.26.40); the server may leave it unset (null).
      */
     public GatheringsConfigurationJoinInfo gatheringsConfiguration;
+    /**
+     * v2259 (1.26.70) 新增的转服界面选项，可整体缺省。
+     * <p>
+     * Server transfer UI options added in v2259 (1.26.70); the whole block may be absent.
+     *
+     * @since v2259 1.26.70
+     */
+    public TransferPlayerUIOptions serverTransferSettings;
 
     @Override
     public void decode() {
@@ -31,6 +40,9 @@ public class TransferPacket extends DataPacket {
         }
         if (this.protocol >= ProtocolInfo.v1_26_40) {
             this.gatheringsConfiguration = this.getOptional(null, bs -> this.readGatheringsConfiguration());
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_70) {
+            this.serverTransferSettings = this.getOptional(null, TransferPlayerUIOptions::get);
         }
     }
 
@@ -44,6 +56,9 @@ public class TransferPacket extends DataPacket {
         }
         if (this.protocol >= ProtocolInfo.v1_26_40) {
             this.putOptionalNull(this.gatheringsConfiguration, this::writeGatheringsConfiguration);
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_70) {
+            this.putOptionalNull(this.serverTransferSettings, TransferPlayerUIOptions::put);
         }
     }
 

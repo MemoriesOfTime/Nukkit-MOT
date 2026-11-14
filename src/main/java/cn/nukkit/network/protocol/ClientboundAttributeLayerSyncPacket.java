@@ -332,6 +332,11 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
             this.putUnsignedVarInt(2);
             writeColor255(at.value);
             this.putString(COLOR_OPERATIONS.get(at.operation.ordinal()));
+        } else if (data instanceof StringAttributeData && this.protocol >= ProtocolInfo.v1_26_70) {
+            StringAttributeData at = (StringAttributeData) data;
+            this.putUnsignedVarInt(3);
+            this.putString(at.value);
+            this.putString(at.operation.name());
         } else {
             throw new IllegalArgumentException("Unknown AttributeData: " + data);
         }
@@ -354,6 +359,12 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
                 ColorAttributeData.Color255RGBA color = readColor255();
                 String cOp = this.getString();
                 return new ColorAttributeData(color, ColorAttributeData.Operation.values()[COLOR_OPERATIONS.indexOf(cOp)]);
+            case 3:
+                if (this.protocol >= ProtocolInfo.v1_26_70) {
+                    String sValue = this.getString(128);
+                    String sOp = this.getString(32);
+                    return new StringAttributeData(sValue, StringAttributeData.Operation.valueOf(sOp));
+                }
         }
         throw new IllegalArgumentException("Unknown AttributeData type: " + type);
     }

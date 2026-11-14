@@ -159,7 +159,7 @@ public class PlayerAuthInputPacket extends DataPacket {
             }
         }
 
-        this.inputMode = InputMode.fromOrdinal((int) this.getUnsignedVarInt());
+        this.inputMode = InputMode.fromOrdinal((int) this.getUnsignedVarInt(), this.protocol);
         this.playMode = ClientPlayMode.fromOrdinal((int) this.getUnsignedVarInt());
         if (this.protocol >= ProtocolInfo.v1_19_0_29) {
             // v2168: 改为有符号 VarInt（zigzag）/ v2168 uses signed (zigzag) VarInt

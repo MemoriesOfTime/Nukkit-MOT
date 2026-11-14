@@ -69,9 +69,11 @@ public enum PlayerActionType {
      */
     START_USING_ITEM,
     /**
-     * @since v2168 (1.26.40)
+     * v2168 起原 InternalUpdate，v2259 起语义为交换主手/副手物品（线值不变）。
+     * <p>
+     * InternalUpdate since v2168; swaps main-hand and off-hand items since v2259 (wire value unchanged).
      */
-    INTERNAL_UPDATE
+    SWAP_OFFHAND
     ;
 
     private static final PlayerActionType[] VALUES = values();

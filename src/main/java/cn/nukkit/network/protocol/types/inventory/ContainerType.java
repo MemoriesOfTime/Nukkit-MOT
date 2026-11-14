@@ -50,7 +50,21 @@ public enum ContainerType {
     /**
      * @since v630
      */
-    CRAFTER(36);
+    CRAFTER(36),
+    /**
+     * v2225 预留值，v2259 命名为唱片压制容器（线值不变）。
+     * <p>
+     * Reserved in v2225, named for the disc press in v2259 (wire value unchanged).
+     */
+    DISC_PRESS(38),
+    /**
+     * 仅存在于内存、不绑定方块或实体的虚拟容器。
+     * <p>
+     * In-memory virtual container that is not tied to a block or an entity.
+     *
+     * @since v2259 1.26.70
+     */
+    VIRTUAL_CONTAINER(39);
 
     public static final ContainerType[] VALUES;
 

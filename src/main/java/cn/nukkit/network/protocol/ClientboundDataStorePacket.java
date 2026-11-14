@@ -65,9 +65,13 @@ public class ClientboundDataStorePacket extends DataPacket {
     }
 
     private void writeDataStoreUpdate(DataStoreUpdate update) {
-        this.putString(update.getDataStoreName());
-        this.putString(update.getProperty());
-        this.putString(update.getPath());
+        if (this.protocol >= ProtocolInfo.v1_26_70) {
+            this.putString(update.resolveVariableName());
+        } else {
+            this.putString(update.getDataStoreName());
+            this.putString(update.getProperty());
+            this.putString(update.getPath());
+        }
         Object value = update.getData();
         DataStorePropertyType type = update.getPropertyType();
 
@@ -115,14 +119,18 @@ public class ClientboundDataStorePacket extends DataPacket {
                 throw new IllegalStateException("Invalid data store update control: " + control);
         }
         this.putLInt(update.getPropertyUpdateCount());
-        if (this.protocol >= ProtocolInfo.v1_26_0) {
+        if (this.protocol >= ProtocolInfo.v1_26_0 && this.protocol < ProtocolInfo.v1_26_70) {
             this.putLInt(update.getPathUpdateCount());
         }
     }
 
     private void writeDataStoreChange(DataStoreChange change) {
-        this.putString(change.getDataStoreName());
-        this.putString(change.getProperty());
+        if (this.protocol >= ProtocolInfo.v1_26_70) {
+            this.putString(change.resolveVariableName());
+        } else {
+            this.putString(change.getDataStoreName());
+            this.putString(change.getProperty());
+        }
         this.putLInt(change.getUpdateCount());
         writeChangeValue(change.getNewValue());
     }
@@ -161,6 +169,8 @@ public class ClientboundDataStorePacket extends DataPacket {
     }
 
     private void writeDataStoreRemoval(DataStoreRemoval removal) {
-        this.putString(removal.getDataStoreName());
+        this.putString(this.protocol >= ProtocolInfo.v1_26_70
+                ? removal.resolveVariableName()
+                : removal.getDataStoreName());
     }
 }

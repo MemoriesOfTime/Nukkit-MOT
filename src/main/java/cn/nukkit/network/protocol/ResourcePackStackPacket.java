@@ -27,6 +27,14 @@ public class ResourcePackStackPacket extends DataPacket {
      * @since v671
      */
     public boolean hasEditorPacks;
+    /**
+     * v2259+ 位标志：0x1 Core、0x2 Annotation；{@link #hasEditorPacks} 为 true 时默认按 Core 下发。
+     * <p>
+     * v2259+ bit flags: 0x1 Core, 0x2 Annotation; defaults to Core when {@link #hasEditorPacks} is set.
+     *
+     * @since v2259 1.26.70
+     */
+    public int editorPackTypes = -1;
 
     public String gameVersion = "*";
 
@@ -72,7 +80,14 @@ public class ResourcePackStackPacket extends DataPacket {
                 }
                 this.putBoolean(!this.experiments.isEmpty()); // Were experiments previously toggled
                 if (this.protocol >= ProtocolInfo.v1_20_80) {
-                    this.putBoolean(this.hasEditorPacks);
+                    if (this.protocol >= ProtocolInfo.v1_26_70) {
+                        int packTypes = this.editorPackTypes >= 0
+                                ? this.editorPackTypes
+                                : (this.hasEditorPacks ? 0x1 : 0);
+                        this.putByte((byte) packTypes);
+                    } else {
+                        this.putBoolean(this.hasEditorPacks);
+                    }
                 }
             }
         }

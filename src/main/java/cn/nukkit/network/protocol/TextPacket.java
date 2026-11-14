@@ -54,6 +54,14 @@ public class TextPacket extends DataPacket {
      * @since v685
      */
     public String filteredMessage = "";
+    /**
+     * v2259+ 仅用于 translate/popup/jukeboxPopup：true 表示排队的弹出消息。
+     * <p>
+     * v2259+ for translate/popup/jukeboxPopup only: true queues the popup behind the current one.
+     *
+     * @since v2259 1.26.70
+     */
+    public boolean queue;
 
     @OnlyNetEase
     public String unknownNE = "";
@@ -84,6 +92,9 @@ public class TextPacket extends DataPacket {
                     this.parameters = new String[paramCount];
                     for (int i = 0; i < this.parameters.length; i++) {
                         this.parameters[i] = this.getString(MAX_MESSAGE_CHARS);
+                    }
+                    if (this.protocol >= ProtocolInfo.v1_26_70) {
+                        this.queue = this.getBoolean();
                     }
                     break;
                 default:
@@ -243,6 +254,9 @@ public class TextPacket extends DataPacket {
                     this.putUnsignedVarInt(this.parameters.length);
                     for (String parameter : this.parameters) {
                         this.putString(parameter);
+                    }
+                    if (this.protocol >= ProtocolInfo.v1_26_70) {
+                        this.putBoolean(this.queue);
                     }
                     break;
             }

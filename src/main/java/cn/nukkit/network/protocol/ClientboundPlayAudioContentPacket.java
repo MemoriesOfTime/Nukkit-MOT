@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.types.SoundAttachOptions;
 import lombok.ToString;
 
 /**
@@ -23,6 +24,14 @@ public class ClientboundPlayAudioContentPacket extends DataPacket {
     public boolean bypassListenerRangeCheck;
     public Long serverSoundHandle;
     public Float playbackPositionSeconds;
+    /**
+     * @since v2259 1.26.70
+     */
+    public Float startDelaySeconds;
+    /**
+     * @since v2259 1.26.70
+     */
+    public SoundAttachOptions attachOptions;
 
     @Override
     @Deprecated
@@ -54,5 +63,9 @@ public class ClientboundPlayAudioContentPacket extends DataPacket {
         this.putBoolean(this.bypassListenerRangeCheck);
         this.putOptionalNull(this.serverSoundHandle, this::putLLong);
         this.putOptionalNull(this.playbackPositionSeconds, this::putLFloat);
+        if (this.protocol >= ProtocolInfo.v1_26_70) {
+            this.putOptionalNull(this.startDelaySeconds, this::putLFloat);
+            this.putOptionalNull(this.attachOptions, SoundAttachOptions::put);
+        }
     }
 }

@@ -26,6 +26,10 @@ public class CommandBlockUpdatePacket extends DataPacket {
     public boolean shouldTrackOutput;
     public int tickDelay;
     public boolean executingOnFirstTick;
+    /**
+     * @since v2259 1.26.70
+     */
+    public boolean lastOutputIsRawMessage;
 
     @Override
     public byte pid() {
@@ -56,6 +60,9 @@ public class CommandBlockUpdatePacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_12_0) {
             this.tickDelay = this.getLInt();
             this.executingOnFirstTick = this.getBoolean();
+            if (this.protocol >= ProtocolInfo.v1_26_70) {
+                this.lastOutputIsRawMessage = this.getBoolean();
+            }
         }
     }
 
@@ -81,6 +88,9 @@ public class CommandBlockUpdatePacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_12_0) {
             this.putLInt(this.tickDelay);
             this.putBoolean(this.executingOnFirstTick);
+            if (this.protocol >= ProtocolInfo.v1_26_70) {
+                this.putBoolean(this.lastOutputIsRawMessage);
+            }
         }
     }
 }

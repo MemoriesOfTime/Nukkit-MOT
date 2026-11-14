@@ -132,7 +132,7 @@ public class V2225PacketRegressionTest extends AbstractPacketRegressionTest {
         BinaryStream tail = new BinaryStream(present);
         tail.setOffset(present.length - 26 - 6 + 1);
         assertTrue(tail.getBoolean(), "present byte must be true when data is set");
-        PassengerOfBlockArguments read = PassengerOfBlockArguments.get(tail);
+        PassengerOfBlockArguments read = PassengerOfBlockArguments.get(tail, V2225);
         assertEquals(new BlockVector3(10, 64, -20), read.blockPos);
         assertEquals(0.5f, read.offset.x, 0.0001f);
         assertEquals(90f, read.rotation, 0.0001f);

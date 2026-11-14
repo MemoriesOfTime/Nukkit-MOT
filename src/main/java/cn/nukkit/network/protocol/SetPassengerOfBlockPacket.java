@@ -29,7 +29,7 @@ public class SetPassengerOfBlockPacket extends DataPacket {
     public void decode() {
         this.passengerUniqueId = this.getVarLong();
         if (this.getBoolean()) {
-            this.passengerOfBlockArguments = PassengerOfBlockArguments.get(this);
+            this.passengerOfBlockArguments = PassengerOfBlockArguments.get(this, this.protocol);
         }
     }
 
@@ -37,6 +37,7 @@ public class SetPassengerOfBlockPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putVarLong(this.passengerUniqueId);
-        this.putOptionalNull(this.passengerOfBlockArguments, PassengerOfBlockArguments::put);
+        this.putOptionalNull(this.passengerOfBlockArguments,
+                (stream, args) -> PassengerOfBlockArguments.put(stream, args, this.protocol));
     }
 }

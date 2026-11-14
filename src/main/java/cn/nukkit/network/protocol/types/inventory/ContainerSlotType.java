@@ -89,21 +89,27 @@ public enum ContainerSlotType {
      */
     RECIPE_FURNACE_ITEMS_CONTAINER(66),
     /**
-     * @since v2225
+     * v2225 预留槽位，v2259 命名为唱片压制各槽位（线值不变）。
+     * <p>
+     * Reserved in v2225, named for the disc press in v2259 (wire value unchanged).
      */
-    RESERVED_CONTAINER_A(67),
+    DISC_PRESS_BLOCK_CONTAINER(67),
     /**
-     * @since v2225
+     * @since v2259 1.26.70
      */
-    RESERVED_CONTAINER_B(68),
+    DISC_PRESS_DYE_CONTAINER(68),
     /**
-     * @since v2225
+     * @since v2259 1.26.70
      */
-    RESERVED_CONTAINER_C(69),
+    DISC_PRESS_DISC_CONTAINER(69),
     /**
-     * @since v2225
+     * @since v2259 1.26.70
      */
-    RESERVED_CONTAINER_D(70);
+    DISC_PRESS_RESULT_PREVIEW_CONTAINER(70),
+    /**
+     * @since v2259 1.26.70
+     */
+    VIRTUAL_CONTAINER(71);
 
     private final int id;
     private static final Int2ObjectArrayMap<ContainerSlotType> VALUES = new Int2ObjectArrayMap<>();
@@ -129,11 +135,17 @@ public enum ContainerSlotType {
             return this.id + 1;
         }
         int protocol = gameVersion.getProtocol();
+        if (protocol >= ProtocolInfo.v1_26_70) {
+            return this.id;
+        }
         if (protocol >= ProtocolInfo.v1_26_60) {
+            if (this.id >= VIRTUAL_CONTAINER.id) {
+                throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
+            }
             return this.id;
         }
         if (protocol >= ProtocolInfo.v1_26_10) {
-            if (this.id >= RESERVED_CONTAINER_A.id) {
+            if (this.id >= DISC_PRESS_BLOCK_CONTAINER.id) {
                 throw new IllegalArgumentException("Container slot type " + this + " is not supported on protocol " + protocol);
             }
             return this.id;
@@ -183,11 +195,14 @@ public enum ContainerSlotType {
             return fromId(id > RECIPE_ITEMS.id ? id - 1 : id);
         }
         int protocol = gameVersion.getProtocol();
-        if (protocol >= ProtocolInfo.v1_26_60) {
+        if (protocol >= ProtocolInfo.v1_26_70) {
             return fromId(id);
         }
+        if (protocol >= ProtocolInfo.v1_26_60) {
+            return id >= VIRTUAL_CONTAINER.id ? null : fromId(id);
+        }
         if (protocol >= ProtocolInfo.v1_26_10) {
-            return id >= RESERVED_CONTAINER_A.id ? null : fromId(id);
+            return id >= DISC_PRESS_BLOCK_CONTAINER.id ? null : fromId(id);
         }
         if (protocol >= ProtocolInfo.v1_21_20) {
             return id >= RECIPE_FOOD_CONTAINER.id ? null : fromId(id);

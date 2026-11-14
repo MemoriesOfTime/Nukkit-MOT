@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.network.protocol.types.CommandOriginData;
 import cn.nukkit.network.protocol.types.CommandOutputMessage;
 import cn.nukkit.network.protocol.types.CommandOutputType;
+import cn.nukkit.utils.BinaryStream;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 
@@ -65,6 +66,9 @@ public class CommandOutputPacket extends DataPacket {
             this.putUnsignedVarInt(msg.getParameters().length);
             for (var param : msg.getParameters()) {
                 this.putString(param);
+            }
+            if (this.protocol >= ProtocolInfo.v1_26_70) {
+                this.putOptionalNull(msg.getRawMessage(), BinaryStream::putString);
             }
         }
         if (this.protocol >= ProtocolInfo.v1_21_130_28) {

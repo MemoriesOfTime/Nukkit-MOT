@@ -12,6 +12,7 @@ public class ServerboundDataStorePacket extends DataPacket {
     public static final int NETWORK_ID = ProtocolInfo.SERVERBOUND_DATA_STORE_PACKET;
 
     private static final int MAX_KEY_CHARS = 1000;
+    private static final int MAX_VARIABLE_NAME_CHARS = 2000;
     private static final int MAX_STRING_VALUE_CHARS = 5000;
 
     private DataStoreUpdate update;
@@ -25,9 +26,23 @@ public class ServerboundDataStorePacket extends DataPacket {
     @Override
     public void decode() {
         DataStoreUpdate update = new DataStoreUpdate();
-        update.setDataStoreName(requireKey(this.getString(MAX_KEY_CHARS), "Data Store Name"));
-        update.setProperty(requireKey(this.getString(MAX_KEY_CHARS), "Property"));
-        update.setPath(this.getString(MAX_KEY_CHARS));
+        if (this.protocol >= ProtocolInfo.v1_26_70) {
+            String variableName = requireKey(this.getString(MAX_VARIABLE_NAME_CHARS), "Variable Name");
+            update.setVariableName(variableName);
+            // 还原旧字段供 DDUI 解析：store[:property][/path]
+            // Restore the legacy fields for DDUI resolution: store[:property][/path]
+            int colon = variableName.indexOf(':');
+            String store = colon < 0 ? variableName : variableName.substring(0, colon);
+            String remainder = colon < 0 ? "" : variableName.substring(colon + 1);
+            int slash = remainder.indexOf('/');
+            update.setDataStoreName(store);
+            update.setProperty(slash < 0 ? remainder : remainder.substring(0, slash));
+            update.setPath(slash < 0 ? "" : remainder.substring(slash + 1));
+        } else {
+            update.setDataStoreName(requireKey(this.getString(MAX_KEY_CHARS), "Data Store Name"));
+            update.setProperty(requireKey(this.getString(MAX_KEY_CHARS), "Property"));
+            update.setPath(this.getString(MAX_KEY_CHARS));
+        }
         int control = (int) this.getUnsignedVarInt();
         switch (control) {
             case 0:
@@ -51,7 +66,11 @@ public class ServerboundDataStorePacket extends DataPacket {
                 throw new IllegalStateException("Invalid data store update control: " + control);
         }
         update.setPropertyUpdateCount(this.getLInt());
-        if (this.protocol >= ProtocolInfo.v1_26_0) {
+        if (this.protocol >= ProtocolInfo.v1_26_70) {
+            // v2259 只保留一个变量级计数
+            // v2259 keeps a single variable-level update count
+            update.setPathUpdateCount(update.getPropertyUpdateCount());
+        } else if (this.protocol >= ProtocolInfo.v1_26_0) {
             update.setPathUpdateCount(this.getLInt());
         } else {
             update.setPathUpdateCount(0);

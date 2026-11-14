@@ -343,7 +343,10 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
     @Test
     void testLevelSoundEventV1001EncodesCompleteCloudburstSoundNameSet() {
         java.util.List<String> nukkitNames = new java.util.ArrayList<>();
-        for (int sound = LevelSoundEventPacket.SOUND_ITEM_USE_ON; sound < LevelSoundEventPacket.SOUND_UNDEFINED; sound++) {
+        // v1_26_30 的 Cloudburst codec 不包含 1.26.70 起新增的声音（614+），只比对到该边界之前
+        // CB's v1_26_30 codec predates the 1.26.70 sounds (614+); compare only below that boundary
+        int lastSoundKnownAtV1001 = LevelSoundEventPacket.SOUND_CONVERT_TO_FROSTBITE;
+        for (int sound = LevelSoundEventPacket.SOUND_ITEM_USE_ON; sound < lastSoundKnownAtV1001; sound++) {
             String name = encodeLevelSoundEventName(ProtocolInfo.v1_26_30, sound);
             if (!"undefined".equals(name)) {
                 nukkitNames.add(name);

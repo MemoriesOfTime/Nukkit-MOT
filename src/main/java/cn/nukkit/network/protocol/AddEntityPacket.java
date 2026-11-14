@@ -279,7 +279,8 @@ public class AddEntityPacket extends DataPacket {
             putEntityLink(protocol, link);
         }
         if (protocol >= ProtocolInfo.v1_26_60) {
-            this.putOptionalNull(this.passengerOfBlockArguments, PassengerOfBlockArguments::put);
+            this.putOptionalNull(this.passengerOfBlockArguments,
+                    (stream, args) -> PassengerOfBlockArguments.put(stream, args, this.protocol));
         }
     }
 
