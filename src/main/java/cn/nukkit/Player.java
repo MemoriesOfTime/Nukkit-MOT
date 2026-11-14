@@ -4830,21 +4830,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     ignoreCoordinateMove = true;
                 } else if (this.riding instanceof EntityBoat boat) {
                     if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-                        double moveVecX = authPacket.getMotion().getX();
-                        double moveVecY = authPacket.getMotion().getY();
-                        moveVecX = NukkitMath.clamp(moveVecX, -1, 1);
-                        moveVecY = NukkitMath.clamp(moveVecY, -1, 1);
                         boolean isMobileAndClassicMovement = authPacket.getInputMode() == InputMode.TOUCH && authPacket.getInteractionModel() == AuthInteractionModel.CLASSIC;
                         if (isMobileAndClassicMovement) {
-                            // Press both left and right to move forward and press 1 to turn the boat.
-                            boolean left = authPacket.getInputData().contains(AuthInputAction.PADDLE_LEFT), right = authPacket.getInputData().contains(AuthInputAction.PADDLE_RIGHT);
-                            if (left && right) {
-                                boat.onPlayerInput(this, 0, 1);
-                            } else {
-                                boat.onPlayerInput(this, left? 1: right? -1: 0, 0);
-                            }
+                            boat.onPlayerInput(this,
+                                    authPacket.getInputData().contains(AuthInputAction.PADDLE_LEFT),
+                                    authPacket.getInputData().contains(AuthInputAction.PADDLE_RIGHT));
                         } else {
-                            boat.onPlayerInput(this, moveVecX, moveVecY);
+                            boat.onPlayerInput(this,
+                                    NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1),
+                                    NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1),
+                                    authPacket.getInputData().contains(AuthInputAction.UP));
                         }
                         ignoreCoordinateMove = true;
                     } else {
