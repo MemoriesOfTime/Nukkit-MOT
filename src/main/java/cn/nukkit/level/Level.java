@@ -1580,7 +1580,12 @@ public class Level implements ChunkManager, Metadatable {
                     this.updateEntities.remove(id);
                     continue;
                 }
-                if (!this.updateEntity(entity, currentTick)) this.updateEntities.remove(id);
+                if (!this.updateEntity(entity, currentTick)) {
+                    // Entity.equals compares class/id: never retire an equal replacement from a callback.
+                    if (this.updateEntities.get(id) == entity) {
+                        this.updateEntities.remove(id, entity);
+                    }
+                }
             }
         } finally {
             if (keys != null && keys.length <= MAX_RETAINED_ENTITY_TICK_KEYS) this.entityTickKeys = keys;
@@ -1898,9 +1903,7 @@ public class Level implements ChunkManager, Metadatable {
                     iter.remove();
                 }
 
-                for (Entity entity : chunk.getEntities().values()) {
-                    entity.scheduleUpdate();
-                }
+                this.scheduleChunkEntities(chunk);
 
                 if (doRandomTick && randomTickSpeed > 0) {
                     if (this.useSections) {
@@ -3568,8 +3571,16 @@ public class Level implements ChunkManager, Metadatable {
         return this.entities.get(entityId);
     }
 
+    void scheduleChunkEntities(FullChunk chunk) {
+        for (Entity entity : chunk.getEntitySnapshot()) {
+            if (!entity.closed && entity.level == this && entity.chunk == chunk) {
+                entity.scheduleUpdate();
+            }
+        }
+    }
+
     public Entity[] getEntities() {
-        return entities.values().toArray(new Entity[0]);
+        return entities.valuesSnapshot().toArray(new Entity[0]);
     }
 
     /**
@@ -3634,7 +3645,7 @@ public class Level implements ChunkManager, Metadatable {
             try {
                 for (int x = minX; x <= maxX; ++x) {
                     for (int z = minZ; z <= maxZ; ++z) {
-                        for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
+                        for (Entity ent : this.getChunkEntitySnapshot(x, z, loadChunks)) {
                             if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
                                 if (index < ENTITY_BUFFER.length) {
                                     ENTITY_BUFFER[index] = ent;
@@ -3806,6 +3817,11 @@ public class Level implements ChunkManager, Metadatable {
     public Map<Long, Entity> getChunkEntities(int X, int Z, boolean loadChunks) {
         FullChunk chunk = loadChunks ? this.getChunk(X, Z) : this.getChunkIfLoaded(X, Z);
         return chunk != null ? chunk.getEntities() : Collections.emptyMap();
+    }
+
+    /** Reuses cached membership without exposing a mutable array or loading extra chunks. */
+    public List<Entity> getChunkEntitySnapshot(int x, int z, boolean loadChunks) {
+        return BaseFullChunk.getEntitySnapshot(this.getChunkEntities(x, z, loadChunks));
     }
 
     public Map<Long, BlockEntity> getChunkBlockEntities(int X, int Z) {

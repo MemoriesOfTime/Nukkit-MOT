@@ -1020,7 +1020,7 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
 
             for (int x = minX; x <= maxX; ++x) {
                 for (int z = minZ; z <= maxZ; ++z) {
-                    for (Entity e : level.getChunkEntities(x, z, false).values()) {
+                    for (Entity e : level.getChunkEntitySnapshot(x, z, false)) {
                         if ((entity == null || (e != entity && entity.canCollideWith(e))) && e.getBoundingBox().intersectsWith(boundingBox)) {
                             nearby.add(e);
                         }
