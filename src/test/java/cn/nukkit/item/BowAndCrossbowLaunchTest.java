@@ -25,15 +25,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * Regression: a fully drawn bow launched its arrow at 3.36 blocks per tick and never made it
@@ -119,8 +114,9 @@ class BowAndCrossbowLaunchTest {
     void crossbowLaunchesACriticalArrowAtVanillaSpeed() {
         ItemCrossbow crossbow = new ItemCrossbow();
         crossbow.createNamedTag(Item.get(Item.ARROW), 1);
-
-        assertTrue(crossbow.launchArrow(shooter()));
+        Player player = shooter();
+        player.getInventory().setItemInHand(crossbow);
+        assertTrue(crossbow.launchArrow(player));
 
         EntityShootBowEvent shot = onlyShot();
         EntityArrow arrow = (EntityArrow) shot.getProjectile();
@@ -133,8 +129,9 @@ class BowAndCrossbowLaunchTest {
     void multishotLaunchesThreeCriticalArrowsAtVanillaSpeed() {
         ItemCrossbow crossbow = new ItemCrossbow();
         crossbow.createNamedTag(Item.get(Item.ARROW), 3);
-
-        assertTrue(crossbow.launchArrow(shooter()));
+        Player player = shooter();
+        player.getInventory().setItemInHand(crossbow);
+        assertTrue(crossbow.launchArrow(player));
 
         assertEquals(3, shots.size());
         for (EntityShootBowEvent shot : shots) {
@@ -168,14 +165,17 @@ class BowAndCrossbowLaunchTest {
         lenient().when(provider.getLevel()).thenReturn(level);
 
         Player player = mock(Player.class);
+        player.spawned = true;
         player.chunk = chunk;
         player.yaw = 90;
         player.pitch = 0;
         lenient().when(player.getEyePosition()).thenReturn(new Vector3(0.5, 65.62, 0.5));
         lenient().when(player.getLevel()).thenReturn(level);
-        // Creative: the bow and the crossbow take a free arrow and leave the inventory alone.
         lenient().when(player.isCreative()).thenReturn(true);
-        lenient().when(player.getInventory()).thenReturn(mock(PlayerInventory.class));
+        lenient().when(player.isAlive()).thenReturn(true);
+        lenient().when(player.isConnected()).thenReturn(true);
+        lenient().when(player.getServer()).thenReturn(MockServer.get());
+        lenient().when(player.getInventory()).thenReturn(new PlayerInventory(player));
         lenient().when(player.getOffhandInventory()).thenReturn(mock(PlayerOffhandInventory.class));
         return player;
     }

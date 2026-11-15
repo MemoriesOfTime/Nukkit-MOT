@@ -124,7 +124,7 @@ public class RepairItemRecipe extends MultiRecipe {
         int j = maxDurability - d1;
         int k = maxDurability - d2;
         int l = j + k + maxDurability * 5 / 100;
-        int i1 = maxDurability + 1 - l;
+        int i1 = maxDurability - l;
         if (i1 < 0) {
             i1 = 0;
         }

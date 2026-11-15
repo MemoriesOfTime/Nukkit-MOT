@@ -23,7 +23,7 @@ import cn.nukkit.level.vibration.VibrationType;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Hash;
-import it.unimi.dsi.fastutil.longs.LongArraySet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.util.*;
@@ -246,7 +246,7 @@ public class Explosion {
      */
     public boolean explodeB() {
         if (!hasSafeExplosionNumbers(1.3d, 1d, STEP_LEN * 0.75d)) return false;
-        LongArraySet updateBlocks = new LongArraySet();
+        LongOpenHashSet updateBlocks = null;
         Vector3 sourceVec = this.source.floor();
         double yield = (1d / this.size) * 100d;
 
@@ -362,11 +362,14 @@ public class Explosion {
                 for (BlockFace side : BlockFace.values()) {
                     Vector3 sideBlock = pos.getSide(side);
                     long index = Hash.hashBlock(sideBlock.getFloorX(), sideBlock.getFloorY(), sideBlock.getFloorZ());
-                    if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
+                    if (!this.affectedBlocks.contains(sideBlock) && (updateBlocks == null || !updateBlocks.contains(index))) {
                         this.processBlockUpdate(sideBlock);
                         Block layer1 = this.level.getBlock(sideBlock, 1);
                         if (!layer1.isAir()) {
                             this.processBlockUpdate(layer1);
+                        }
+                        if (updateBlocks == null) {
+                            updateBlocks = new LongOpenHashSet();
                         }
                         updateBlocks.add(index);
                     }

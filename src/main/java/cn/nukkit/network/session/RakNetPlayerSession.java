@@ -99,6 +99,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
     private boolean compressionInitialized;
+    /** 已因缺少压缩前缀断开；置位后不再为每个 batch 记一次失败。 Set once the session closed for a missing prefix, so later batches stay quiet. */
+    private boolean prefixUnavailableClosed;
 
     private SecretKey encryptionKey;
     private Cipher encryptionCipher;
@@ -490,6 +492,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
+        if (ci && !this.compressionOut.supportsPrefix()) {
+            return this.failUnsupportedPrefix();
+        }
 
         ByteBuf finalPayload = Unpooled.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
@@ -520,6 +525,26 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
 
         return this.channel.writeAndFlush(finalPayload);
+    }
+
+    /**
+     * 协商出的编码写不出 ≥1.20.60 的前缀：客户端 RakNet 版本与游戏版本互相矛盾，继续发只会逐批静默丢包。
+     * <p>The negotiated codec cannot emit the ≥1.20.60 prefix: the client's RakNet version and game version
+     * contradict each other, and every further batch would be dropped silently.
+     */
+    private ChannelFuture failUnsupportedPrefix() {
+        if (!this.prefixUnavailableClosed) {
+            this.prefixUnavailableClosed = true;
+            log.error("Closing session {}: compression {} has no batch prefix but protocol {} requires one (raknetProtocol={})",
+                    this.playerLabel(), this.compressionOut, this.getBedrockProtocol(),
+                    this.state.getProtocol().getRaknetProtocol());
+            this.disconnect("Your client does not support this game version over this connection");
+        }
+        // 批次未写出：必须如实失败，否则 DIRECT_WRITE 监听器会按成功执行回调（如在断连后启用加密并改写登录相位）
+        // The batch was never written: report honest failure, or DIRECT_WRITE listeners run success
+        // callbacks (e.g. enabling encryption after the disconnect and rewriting the login phase)
+        return this.channel.newFailedFuture(
+                new CompressionPrefixUnavailableException(this.compressionOut, this.getBedrockProtocol()));
     }
 
     @Override
