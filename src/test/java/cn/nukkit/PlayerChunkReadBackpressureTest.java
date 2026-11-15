@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Location;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.plugin.PluginManager;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -8,8 +9,8 @@ import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class PlayerChunkReadBackpressureTest {
@@ -98,5 +99,54 @@ class PlayerChunkReadBackpressureTest {
         verify(level).populateChunk(3, 5);
         verify(level).requestChunk(3, 5, player);
         assertTrue(player.loadQueue.isEmpty());
+    }
+
+    @Test
+    void spawnedPlayerKeepsSendingColumnsBehindAnUnpopulatableOne() {
+        when(level.isAsyncChunkLoadEnabled()).thenReturn(false);
+        long readyHash = Level.chunkHash(4, 5);
+        player.loadQueue.add(readyHash);
+        when(level.populateChunk(3, 5)).thenReturn(false);
+        when(level.populateChunk(4, 5)).thenReturn(true);
+        player.spawned = true;
+        player.teleportPosition = null;
+
+        player.sendNextChunk();
+
+        verify(level, never()).requestChunk(eq(3), eq(5), same(player));
+        verify(level).requestChunk(eq(4), eq(5), same(player));
+        assertTrue(player.loadQueue.contains(hash), "the blocked column stays queued for a retry");
+        assertFalse(player.loadQueue.contains(readyHash));
+    }
+
+    @Test
+    void unspawnedPlayerKeepsCenterOutOrder() {
+        when(level.isAsyncChunkLoadEnabled()).thenReturn(false);
+        long readyHash = Level.chunkHash(4, 5);
+        player.loadQueue.add(readyHash);
+        when(level.populateChunk(3, 5)).thenReturn(false);
+        player.spawned = false;
+
+        player.sendNextChunk();
+
+        verify(level, never()).requestChunk(anyInt(), anyInt(), any());
+        assertTrue(player.loadQueue.contains(hash));
+        assertTrue(player.loadQueue.contains(readyHash));
+    }
+
+    @Test
+    void teleportingPlayerKeepsCenterOutOrder() {
+        when(level.isAsyncChunkLoadEnabled()).thenReturn(false);
+        long readyHash = Level.chunkHash(4, 5);
+        player.loadQueue.add(readyHash);
+        when(level.populateChunk(3, 5)).thenReturn(false);
+        player.spawned = true;
+        player.teleportPosition = new Location(0, 0, 0);
+
+        player.sendNextChunk();
+
+        verify(level, never()).requestChunk(anyInt(), anyInt(), any());
+        assertTrue(player.loadQueue.contains(hash));
+        assertTrue(player.loadQueue.contains(readyHash));
     }
 }

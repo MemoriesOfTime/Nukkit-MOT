@@ -1,14 +1,12 @@
 package cn.nukkit;
 
 import cn.nukkit.block.BlockID;
-import cn.nukkit.level.*;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.process.processor.common.ClientCacheBlobStatusProcessor;
 import cn.nukkit.network.process.processor.common.SubChunkRequestProcessor;
-import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.SubChunkRequestResult;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.XXHash64;
@@ -478,9 +476,69 @@ class SubChunkReloadAndReentryTest {
         }
         workers.get(0).run();
         SubChunkRequestProcessor.tickRequests(handle);
-        assertEquals(0, successfulEntries(f), "old context must not reach accepted transport");
+        assertEquals(0, successfulEntries(f), "old context must not acknowledge the replacement ledger");
         assertFalse(flow.isColumnDataReady(HASH, 10, 200));
         assertEquals(change.equals("epoch") ? 1 : 0, flow.inFlightOffsetCount());
+    }
+
+    @Test
+    void replacedShellAnswersStaleSubChunksWithFailureInsteadOfDroppingThem() throws Exception {
+        Fixture f = new Fixture(directory, false);
+        f.reload(true, false, 8);
+        doReturn(10).when(f.server).getTick();
+        f.sendShell(); f.sent.clear();
+        List<Runnable> workers = captureSerialization(f);
+        PlayerHandle handle = new PlayerHandle(f.player);
+        PlayerSubChunkRequestState flow = (PlayerSubChunkRequestState) field(f.player, "subChunkRequestState");
+        SubChunkRequestProcessor.INSTANCE.handle(handle, f.request());
+        flow.onColumnSent(HASH, 10, true); // a replacement shell owns a new receipt
+        workers.get(0).run();
+        SubChunkRequestProcessor.tickRequests(handle);
+
+        List<SubChunkPacket.SubChunkData> entries = f.sent.stream()
+                .filter(SubChunkPacket.class::isInstance)
+                .map(SubChunkPacket.class::cast)
+                .flatMap(packet -> packet.subChunks.stream())
+                .toList();
+        assertFalse(entries.isEmpty(), "a replaced shell must still answer, or the client stays deduped forever");
+        assertTrue(entries.stream().allMatch(entry -> entry.result == SubChunkRequestResult.CHUNK_NOT_FOUND),
+                "stale snapshots must not be delivered as success data");
+        assertTrue(entries.stream().allMatch(entry -> entry.data == null), "a nack carries no stale section bytes");
+        assertFalse(flow.isColumnDataReady(HASH, 10, 200), "the replacement ledger must stay unacknowledged");
+        assertEquals(0, flow.inFlightOffsetCount());
+    }
+
+    @Test
+    void staleFailureAnswersRespectTheSharedTickByteBudget() throws Exception {
+        Fixture f = new Fixture(directory, false);
+        f.reload(true, false, 256);
+        doReturn(10).when(f.server).getTick();
+        f.sendShell();
+        f.sent.clear();
+        PlayerHandle handle = new PlayerHandle(f.player);
+        PlayerSubChunkRequestState flow = (PlayerSubChunkRequestState) field(f.player, "subChunkRequestState");
+        flow.accountResponseBytes(10, flow.remainingResponseBytes(10) - 16);
+        List<Runnable> workers = captureSerialization(f);
+        SubChunkRequestPacket request = f.request();
+        request.positionOffsets = new ArrayList<>();
+        for (int y = 0; y < 256; y++) {
+            request.positionOffsets.add(new BlockVector3(0, y, 0));
+        }
+        SubChunkRequestProcessor.INSTANCE.handle(handle, request);
+        flow.onColumnSent(HASH, 10, true); // a replacement shell owns a new receipt
+        assertEquals(1, workers.size(), "the whole request is submitted as one batch");
+        workers.get(0).run();
+        SubChunkRequestProcessor.tickRequests(handle);
+
+        assertEquals(16, flow.remainingResponseBytes(10),
+                "stale failure entries must stay within the shared per-tick byte budget");
+        assertTrue(flow.hasCompletions(), "budget-blocked stale answers stay queued for the next tick");
+
+        doReturn(11).when(f.server).getTick();
+        SubChunkRequestProcessor.tickRequests(handle);
+
+        assertEquals(256, failedEntries(f), "the retained stale answers are delivered next tick");
+        assertEquals(0, flow.inFlightOffsetCount());
     }
 
     @Test
@@ -621,6 +679,12 @@ class SubChunkReloadAndReentryTest {
         return f.sent.stream().filter(SubChunkPacket.class::isInstance).map(SubChunkPacket.class::cast)
                 .flatMap(packet -> packet.subChunks.stream())
                 .filter(entry -> entry.result == SubChunkRequestResult.SUCCESS).count();
+    }
+
+    private static long failedEntries(Fixture f) {
+        return f.sent.stream().filter(SubChunkPacket.class::isInstance).map(SubChunkPacket.class::cast)
+                .flatMap(packet -> packet.subChunks.stream())
+                .filter(entry -> entry.result == SubChunkRequestResult.CHUNK_NOT_FOUND).count();
     }
 
     private static final class Fixture {

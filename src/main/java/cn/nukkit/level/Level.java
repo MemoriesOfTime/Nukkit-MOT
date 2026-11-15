@@ -417,7 +417,12 @@ public class Level implements ChunkManager, Metadatable {
     private final AtomicInteger rideableEntityCount = new AtomicInteger();
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
-    private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
+    private final Long2LongOpenHashMap chunkPopulationLock = new Long2LongOpenHashMap();
+    private final Long2ObjectOpenHashMap<ChunkLightRetry> chunkLightRetries = new Long2ObjectOpenHashMap<>();
+
+    private static final class ChunkLightRetry {
+        private boolean busy;
+    }
     private final Long2ObjectOpenHashMap<Boolean> chunkGenerationQueue = new Long2ObjectOpenHashMap<>();
     private final int chunkGenerationQueueSize;
     private final int chunkPopulationQueueSize;
@@ -4070,6 +4075,11 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public final void generateChunkCallback(final int x, final int z, BaseFullChunk chunk, final boolean isPopulated) {
+        this.generateChunkCallback(x, z, chunk, isPopulated, false);
+    }
+
+    private void generateChunkCallback(final int x, final int z, BaseFullChunk chunk,
+                                       final boolean isPopulated, boolean lightRecoveryCompleted) {
         this.providerLock.readLock().lock();
         try {
             LevelProvider levelProvider = this.getProvider();
@@ -4083,14 +4093,14 @@ public class Level implements ChunkManager, Metadatable {
             // block updates, so connection/corner bits were never computed; flag the chunk for
             // the mount/send paths to recompute them from neighbours
             chunk.setNeedsLegacyConnectionFix(true);
-            if (this.chunkPopulationQueue.containsKey(index)) {
+            if (lightRecoveryCompleted || (this.chunkPopulationQueue.containsKey(index)
+                    && !this.chunkLightRetries.containsKey(index))) {
                 FullChunk oldChunk = this.getChunk(x, z, false);
-                for (int xx = -1; xx <= 1; ++xx) {
-                    for (int zz = -1; zz <= 1; ++zz) {
-                        this.chunkPopulationLock.remove(Level.chunkHash(x + xx, z + zz));
-                    }
-                }
+                this.releaseChunkPopulationLocks(x, z);
                 this.chunkPopulationQueue.remove(index);
+                if (lightRecoveryCompleted) {
+                    this.chunkLightRetries.remove(index);
+                }
                 chunk.setProvider(levelProvider);
                 this.setChunk(x, z, chunk, false);
                 chunk = this.getChunk(x, z, false);
@@ -4107,7 +4117,6 @@ public class Level implements ChunkManager, Metadatable {
                 }
             } else if (this.chunkGenerationQueue.containsKey(index) || this.chunkPopulationLock.containsKey(index)) {
                 this.chunkGenerationQueue.remove(index);
-                this.chunkPopulationLock.remove(index);
                 chunk.setProvider(levelProvider);
                 this.setChunk(x, z, chunk, false);
             } else {
@@ -5363,7 +5372,11 @@ public class Level implements ChunkManager, Metadatable {
         this.retryLegacyConnectionFixForNeighbours(x, z);
 
         if (!chunk.isLightPopulated() && chunk.isPopulated() && this.server.lightUpdates) {
-            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk));
+            if (this.chunkLightRetries.containsKey(index)) {
+                this.resumePendingLightRetry(index, x, z);
+            } else if (!this.chunkPopulationQueue.containsKey(index)) {
+                this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk));
+            }
         }
 
         if (this.isChunkInUse(index)) {
@@ -5729,6 +5742,13 @@ public class Level implements ChunkManager, Metadatable {
         if (this.chunkPopulationQueue.containsKey(index)) {
             return false;
         }
+        if (this.chunkLightRetries.containsKey(index)) {
+            if (this.getChunkIfLoaded(x, z) == null) {
+                this.getChunk(x, z, true);
+            }
+            this.resumePendingLightRetry(index, x, z);
+            return false;
+        }
 
         BaseFullChunk loadedChunk = this.getChunkIfLoaded(x, z);
         if (loadedChunk != null && loadedChunk.isPopulated()) {
@@ -5757,17 +5777,142 @@ public class Level implements ChunkManager, Metadatable {
                     this.chunkPopulationQueue.put(index, Boolean.TRUE);
                     for (int xx = -1; xx <= 1; ++xx) {
                         for (int zz = -1; zz <= 1; ++zz) {
-                            this.chunkPopulationLock.put(Level.chunkHash(x + xx, z + zz), Boolean.TRUE);
+                            this.chunkPopulationLock.put(Level.chunkHash(x + xx, z + zz), index);
                         }
                     }
 
-                    this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PopulationTask(this, chunk));
+                    try {
+                        this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PopulationTask(this, chunk));
+                    } catch (RuntimeException | Error failure) {
+                        this.abandonChunkPopulation(x, z);
+                        Server server = this.server;
+                        if (server != null) {
+                            server.getLogger().error("Failed to schedule population for chunk " + x + ", " + z, failure);
+                        }
+                    }
                 }
             }
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * 释放该列 population 队列项与 3×3 锁。
+     * <p>
+     * Releases the column's population queue entry and 3x3 locks.
+     */
+    public void abandonChunkPopulation(int x, int z) {
+        long index = Level.chunkHash(x, z);
+        if (this.chunkPopulationQueue.remove(index) == null) {
+            return;
+        }
+        this.releaseChunkPopulationLocks(x, z);
+    }
+
+    /**
+     * 将该列转入独立的光照恢复任务。
+     * <p>
+     * Transfers the column to an independent light-recovery task.
+     */
+    public void scheduleChunkLightRetry(int x, int z, BaseFullChunk chunk) {
+        long index = Level.chunkHash(x, z);
+        boolean pending = this.chunkPopulationQueue.containsKey(index);
+        ChunkLightRetry retry = this.chunkLightRetries.get(index);
+        if (retry != null && retry.busy) {
+            return;
+        }
+        if (retry == null && pending) {
+            retry = new ChunkLightRetry();
+            this.chunkLightRetries.put(index, retry);
+        }
+        if (retry != null) {
+            this.chunkPopulationQueue.remove(index);
+            retry.busy = true;
+        }
+        Server server = this.server;
+        if (server == null) {
+            this.pauseChunkLightRetry(x, z);
+            return;
+        }
+        try {
+            server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk, retry));
+        } catch (RuntimeException | Error failure) {
+            this.pauseChunkLightRetry(x, z);
+            server.getLogger().error("Failed to schedule light retry for chunk " + x + ", " + z, failure);
+        }
+    }
+
+    public void pauseChunkLightRetry(int x, int z) {
+        long index = Level.chunkHash(x, z);
+        ChunkLightRetry retry = this.chunkLightRetries.get(index);
+        if (retry == null) {
+            return;
+        }
+        retry.busy = false;
+        this.releaseChunkPopulationLocks(x, z);
+    }
+
+    public boolean isChunkLightRetryCurrent(int x, int z, Object receipt) {
+        return receipt != null && this.chunkLightRetries.get(Level.chunkHash(x, z)) == receipt;
+    }
+
+    public void pauseChunkLightRetry(int x, int z, Object receipt) {
+        if (this.isChunkLightRetryCurrent(x, z, receipt)) {
+            this.pauseChunkLightRetry(x, z);
+        }
+    }
+
+    /** 完成光照恢复并放行该列。<p>Finishes light recovery and admits the column. */
+    public boolean completeChunkLightRetry(int x, int z, BaseFullChunk chunk, Object receipt) {
+        if (this.isChunkLightRetryCurrent(x, z, receipt) && chunk.isLightPopulated()) {
+            long index = Level.chunkHash(x, z);
+            if (this.chunkPopulationLock.containsKey(index) && this.chunkPopulationLock.get(index) != index) {
+                return false;
+            }
+            this.generateChunkCallback(x, z, chunk, false, true);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 仅释放仍属于该列的 3×3 population 锁。
+     * <p>
+     * Releases only 3x3 population locks still owned by the column.
+     */
+    public void releaseChunkPopulationLocks(int x, int z) {
+        long owner = Level.chunkHash(x, z);
+        for (int xx = -1; xx <= 1; ++xx) {
+            for (int zz = -1; zz <= 1; ++zz) {
+                long index = Level.chunkHash(x + xx, z + zz);
+                if (this.chunkPopulationLock.containsKey(index) && this.chunkPopulationLock.get(index) == owner) {
+                    this.chunkPopulationLock.remove(index);
+                }
+            }
+        }
+    }
+
+    private void resumePendingLightRetry(long index, int x, int z) {
+        ChunkLightRetry retry = this.chunkLightRetries.get(index);
+        if (retry == null || retry.busy) {
+            return;
+        }
+        BaseFullChunk chunk = this.getChunkIfLoaded(x, z);
+        if (chunk == null) {
+            return;
+        }
+        if (chunk.isLightPopulated()) {
+            this.completeChunkLightRetry(x, z, chunk, retry);
+            return;
+        }
+        if (!chunk.isPopulated()) {
+            this.chunkLightRetries.remove(index);
+            this.releaseChunkPopulationLocks(x, z);
+            return;
+        }
+        this.scheduleChunkLightRetry(x, z, chunk);
     }
 
     public void generateChunk(int x, int z) {

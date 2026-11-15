@@ -1,11 +1,11 @@
 package cn.nukkit.level;
 
 import cn.nukkit.math.BlockVector3;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import cn.nukkit.network.protocol.SubChunkPacket;
 import cn.nukkit.network.protocol.SubChunkRequestPacket;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayDeque;
@@ -35,8 +35,8 @@ import java.util.function.ToLongFunction;
  */
 public class PlayerSubChunkRequestState {
 
-    // 队列上限：包数与 offset 总数，超限丢弃新请求（客户端会重新请求）
-    // Queue caps: packets and total offsets; new requests are dropped over the caps (the client re-requests)
+    // 队列上限：包数与 offset 总数，超限的新请求转入拒绝队列
+    // Queue caps: packets and total offsets; new requests over the caps move to the rejected queue
     private static final int MAX_DEFERRED_REQUESTS = 256;
     private static final int MAX_DEFERRED_OFFSETS = 65536;
     // 每 tick 每玩家响应序列化字节上限，超出部分留待下 tick / per-player per-tick response
@@ -56,6 +56,9 @@ public class PlayerSubChunkRequestState {
     private final ArrayDeque<SubChunkRequestPacket> deferredRequests = new ArrayDeque<>();
     // 队列保留的 offset 总数（空列表请求按 1 计）/ offsets retained in the queue (an empty list counts as 1)
     private int deferredOffsets;
+    // Over-cap requests awaiting a failure answer; same caps as the deferred queue
+    private final ArrayDeque<SubChunkRequestPacket> rejectedRequests = new ArrayDeque<>();
+    private int rejectedOffsets;
     // miss 补发积压（BlobStatus 回报超出本 tick 字节预算的部分），按批排队、队头排空
     // / Miss-response backlog (the part of a BlobStatus report over this tick's byte
     // budget), queued per batch and drained from the head
@@ -188,9 +191,9 @@ public class PlayerSubChunkRequestState {
     }
 
     /**
-     * 入队一个新请求；包数或 offset 总数超上限时拒绝（客户端会重新请求）。
+     * 入队一个新请求；包数或 offset 总数超上限时拒绝。
      * <p>
-     * Enqueues a new request; rejected over the packet or offset cap (the client re-requests).
+     * Enqueues a new request; rejected over the packet or offset cap.
      */
     public boolean tryDefer(SubChunkRequestPacket pk) {
         int count = requestOffsetCount(pk);
@@ -271,6 +274,39 @@ public class PlayerSubChunkRequestState {
             this.deferredRequests.remove(best);
         }
         return best;
+    }
+
+    /**
+     * 登记一个待以失败条目应答的超限请求。
+     * <p>
+     * Registers an over-cap request to be answered with failure entries.
+     */
+    public boolean tryReject(SubChunkRequestPacket pk) {
+        int count = requestOffsetCount(pk);
+        if (this.rejectedRequests.size() >= MAX_DEFERRED_REQUESTS
+                || this.rejectedOffsets + count > MAX_DEFERRED_OFFSETS) {
+            return false;
+        }
+        this.rejectedRequests.add(pk);
+        this.rejectedOffsets += count;
+        return true;
+    }
+
+    public SubChunkRequestPacket pollRejected() {
+        SubChunkRequestPacket pk = this.rejectedRequests.poll();
+        if (pk != null) {
+            this.rejectedOffsets -= requestOffsetCount(pk);
+        }
+        return pk;
+    }
+
+    public void pushRejectedFront(SubChunkRequestPacket residual) {
+        this.rejectedRequests.addFirst(residual);
+        this.rejectedOffsets += requestOffsetCount(residual);
+    }
+
+    public boolean hasRejected() {
+        return !this.rejectedRequests.isEmpty();
     }
 
     public boolean hasDeferred() {
@@ -369,6 +405,8 @@ public class PlayerSubChunkRequestState {
     public void clear() {
         this.deferredRequests.clear();
         this.deferredOffsets = 0;
+        this.rejectedRequests.clear();
+        this.rejectedOffsets = 0;
         this.deferredMissBatches.clear();
         this.deferredMissHashes = 0;
         this.completions.clear();

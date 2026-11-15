@@ -1642,6 +1642,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
 
                     if (!this.level.populateChunk(chunkX, chunkZ)) {
+                        if (this.spawned && this.teleportPosition == null) {
+                            continue;
+                        }
                         // 保中心向外顺序,避免外圈幽灵区块(等价 Allay enqueueFirst+break)
                         // Preserve center-out order, avoiding ghost chunks (cf. Allay enqueueFirst+break)
                         break;
