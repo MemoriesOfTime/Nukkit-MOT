@@ -198,6 +198,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public static final float DEFAULT_SPEED = 0.1f;
     public static final float MAXIMUM_SPEED = 0.5f;
+    private static final double MOVEMENT_COLLISION_TOLERANCE = 0.1;
+    private static final double LOW_PROFILE_HEIGHT = 0.6;
+    private static final double STANDING_HEIGHT = 1.8;
+    private static final double MOVEMENT_DESYNC_LIMIT_SQUARED = 9;
+    private static final double MOVEMENT_DESYNC_STUCK_SQUARED = 0.25;
+    private static final int MOVEMENT_DESYNC_TICKS = 20;
     public static final float DEFAULT_FLY_SPEED = 0.05f;
     public static final float DEFAULT_VERTICAL_FLY_SPEED = 1.0f;
 
@@ -399,6 +405,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected Color locatorBarColor;
 
     protected boolean checkMovement = true;
+    private int movementBlockedSinceTick = -1;
 
     private PermissibleBase perm;
     /**
@@ -2938,6 +2945,107 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    /** Two pose-independent bands tolerate client/server stance disagreement and foot contact. */
+    private boolean isMovementBlocked(double dx, double dy, double dz) {
+        if (this.isSpectator() || this.noClip || this.riding != null
+                || !this.server.getServerConfig().playerSettings().movementCollisionCheck()) {
+            return false;
+        }
+
+        AxisAlignedBB box = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
+        double scale = Math.min(1, this.getScale());
+        double tolerance = this.movementCollisionTolerance(box);
+        AxisAlignedBB probe = box.shrink(tolerance, 0, tolerance);
+        double fromFeet = this.boundingBox.getMinY();
+        double feet = box.getMinY();
+        double coreTop = (LOW_PROFILE_HEIGHT - MOVEMENT_COLLISION_TOLERANCE) * scale;
+        probe.setMinY(feet + MOVEMENT_COLLISION_TOLERANCE * scale);
+        probe.setMaxY(feet + coreTop);
+        double step = this.getStepHeight() * scale;
+        if (this.collidesWithSolid(probe, null)) {
+            probe.setMinY(feet + step);
+            probe.setMaxY(feet + STANDING_HEIGHT * scale - step);
+            if (this.collidesWithSolid(probe, null)) {
+                return true;
+            }
+        }
+
+        // Merged long steps do not describe a single vertical path. Allow either ordering of
+        // short horizontal/vertical motion, including jumping onto blocks and leaving overhangs.
+        if (dy == 0 || dx * dx + dz * dz > 1 || this.isGliding() || this.riptideTicks > 0
+                || (this.adventureSettings != null && this.adventureSettings.get(Type.FLYING))) {
+            return false;
+        }
+        AxisAlignedBB occupied = null;
+        if (dy < 0) {
+            probe.setMinY(feet + step);
+            probe.setMaxY(fromFeet + step);
+        } else {
+            probe.setMinY(fromFeet + coreTop);
+            probe.setMaxY(feet + coreTop);
+            // A piston may insert a block into the old core before lifting the player out.
+            occupied = this.boundingBox.shrink(tolerance, 0, tolerance);
+            occupied.setMinY(fromFeet + MOVEMENT_COLLISION_TOLERANCE * scale);
+            occupied.setMaxY(fromFeet + coreTop);
+        }
+        if (!this.collidesWithSolid(probe, occupied)) {
+            return false;
+        }
+        return (dx == 0 && dz == 0)
+                || this.collidesWithSolid(probe.getOffsetBoundingBox(-dx, 0, -dz), occupied);
+    }
+
+    private double movementCollisionTolerance(AxisAlignedBB box) {
+        float coordinate = (float) Math.max(Math.max(Math.abs(box.getMinX()), Math.abs(box.getMaxX())),
+                Math.max(Math.abs(box.getMinZ()), Math.abs(box.getMaxZ())));
+        // Never invert the horizontal probe for a small player at far float coordinates.
+        double maxTolerance = Math.min(0.25, Math.min(box.getMaxX() - box.getMinX(),
+                box.getMaxZ() - box.getMinZ()) * 0.45);
+        return Math.min(maxTolerance, Math.max(MOVEMENT_COLLISION_TOLERANCE * Math.min(1, this.getScale()),
+                2 * Math.ulp(coordinate)));
+    }
+
+    private boolean collidesWithSolid(AxisAlignedBB probe, AxisAlignedBB occupied) {
+        if (!this.level.hasCollision(this, probe, false)) {
+            return false;
+        }
+        return !CollisionHelper.getCollisionBlocks(this.level, probe, this, true, false, block -> {
+            int id = block.getId();
+            return !block.canPassThrough() && id != BlockID.SCAFFOLDING && id != BlockID.POWDER_SNOW
+                    && (occupied == null || !block.collidesWithBB(occupied));
+        }).isEmpty();
+    }
+
+    private void groundBlockedMovement() {
+        double tolerance = this.movementCollisionTolerance(this.boundingBox);
+        AxisAlignedBB feet = this.boundingBox.shrink(tolerance, 0, tolerance);
+        double feetY = feet.getMinY();
+        feet.setMaxY(feetY + this.getStepHeight() * Math.min(1, this.getScale()));
+        feet.setMinY(feetY - 0.75);
+        // Keep the exposed-top rule: body contact with a stacked wall cannot ground a player.
+        this.onGround = CollisionHelper.hasExposedBlockSupport(this.level, this, feet);
+        this.isCollided = this.onGround;
+        this.updateFallState(this.onGround);
+    }
+
+    private Location liftOntoSupport(Location pos) {
+        AxisAlignedBB feet = this.boundingBox.clone();
+        feet.setMaxY(feet.getMinY() + this.getStepHeight() * Math.min(1, this.getScale()));
+        double top = feet.getMinY();
+        for (AxisAlignedBB shape : CollisionHelper.getCollisionCubes(this.level, this, feet)) {
+            if (shape.getMaxY() <= feet.getMaxY()) {
+                top = Math.max(top, shape.getMaxY());
+            }
+        }
+        double lift = top - feet.getMinY();
+        // 重同步必须接受门禁允许的姿态，不能用完整站立盒再次拒绝低顶棚。
+        // Resync must accept every pose admitted by the movement gate, including under low ceilings.
+        if (lift <= 0 || this.isMovementBlocked(0, lift, 0)) {
+            return pos;
+        }
+        return new Location(pos.x, pos.y + lift, pos.z, pos.yaw, pos.pitch, pos.headYaw, pos.level);
+    }
+
     protected void handleMovement(Vector3 clientPos, int tickDiff) {
         if (!this.isAlive() || !this.spawned || this.teleportPosition != null || this.isSleeping()) {
             return;
@@ -2952,41 +3060,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         double distanceSquared = clientPos.distanceSquared(this);
         if (distanceSquared == 0) {
-            if (this.lastYaw != this.yaw || this.lastPitch != this.pitch) {
-                if (!this.firstMove) {
-                    Location from = new Location(this.x, this.y, this.z, this.lastYaw, this.lastPitch, this.level);
-                    Location to = this.getLocation();
-
-                    PlayerMoveEvent moveEvent = new PlayerMoveEvent(this, from, to);
-                    this.server.getPluginManager().callEvent(moveEvent);
-
-                    if (moveEvent.isCancelled()) {
-                        this.teleport(from, null);
-                        return;
-                    }
-
-                    this.lastYaw = to.yaw;
-                    this.lastPitch = to.pitch;
-
-                    if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
-                        this.teleport(moveEvent.getTo(), null);
-                    } else {
-                        this.needSendRotation = true;
-                    }
-                } else {
-                    // Seed the rollback position when the first input only changes rotation.
-                    this.lastX = this.x;
-                    this.lastY = this.y;
-                    this.lastZ = this.z;
-                    this.lastYaw = this.yaw;
-                    this.lastPitch = this.pitch;
-                    this.needSendRotation = true;
-                    this.firstMove = false;
-                }
-            }
-
-            if (this.speed == null) speed = new Vector3(0, 0, 0);
-            else this.speed.setComponents(0, 0, 0);
+            this.movementBlockedSinceTick = -1;
+            this.handleStationaryInput();
             return;
         }
 
@@ -3025,8 +3100,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double dz = clientPos.z - this.z;
 
         // fastMove collision resolution + speed check on server correction amount (EC pattern)
+        boolean blocked = false;
         if (!revert) {
-            this.fastMove(dx, dy, dz);
+            blocked = this.isMovementBlocked(dx, dy, dz);
+            if (!blocked) {
+                this.movementBlockedSinceTick = -1;
+                this.fastMove(dx, dy, dz);
+            }
 
             // Calculate server correction amount (how much fastMove deviated from client position)
             double diffX = this.x - clientPos.x;
@@ -3049,13 +3129,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
-                // Accept client position (revert flag handles correction at end)
-                this.x = clientPos.x;
-                this.y = clientPos.y;
-                this.z = clientPos.z;
-                this.boundingBox.setBounds(this.x - 0.3, this.y, this.z - 0.3, this.x + 0.3, this.y + this.getHeight(), this.z + 0.3);
-
-                this.checkChunks();
+                if (!blocked) {
+                    // Accept client position (revert flag handles correction at end).
+                    this.x = clientPos.x;
+                    this.y = clientPos.y;
+                    this.z = clientPos.z;
+                    this.recalculateBoundingBox(false);
+                    this.checkChunks();
+                } else if (!revert) {
+                    int tick = this.server.getTick();
+                    if (this.movementBlockedSinceTick < 0) {
+                        this.movementBlockedSinceTick = tick;
+                    }
+                    boolean stuck = distanceSquared > MOVEMENT_DESYNC_STUCK_SQUARED
+                            && tick - this.movementBlockedSinceTick >= MOVEMENT_DESYNC_TICKS;
+                    if (distanceSquared > MOVEMENT_DESYNC_LIMIT_SQUARED || stuck) {
+                        PlayerInvalidMoveEvent ev = new PlayerInvalidMoveEvent(this, true);
+                        this.getServer().getPluginManager().callEvent(ev);
+                        revert = !ev.isCancelled() && ev.isRevert();
+                        this.movementBlockedSinceTick = -1;
+                        if (revert) {
+                            server.getLogger().debug(username + ": blocked position diverged, distanceSquared=" + distanceSquared);
+                        }
+                    }
+                    if (!revert) {
+                        this.groundBlockedMovement();
+                        this.handleStationaryInput();
+                        return;
+                    }
+                }
             }
 
             // Ground check
@@ -3153,10 +3255,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // Unified revert handling (EC pattern: MODE_NORMAL for softer correction)
         if (revert) {
+            this.movementBlockedSinceTick = -1;
+            if (blocked) {
+                // This input never changed the authoritative position; lastXYZ may be unseeded.
+                from = this.liftOntoSupport(new Location(this.x, this.y, this.z, from.yaw, from.pitch, this.level));
+                this.firstMove = false;
+            }
             this.x = from.x;
             this.y = from.y;
             this.z = from.z;
-            this.boundingBox.setBounds(this.x - 0.3, this.y, this.z - 0.3, this.x + 0.3, this.y + this.getHeight(), this.z + 0.3);
+            this.recalculateBoundingBox(false);
 
             this.lastX = from.x;
             this.lastY = from.y;
@@ -3273,8 +3381,42 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private void handleStationaryInput() {
+        if (this.lastYaw != this.yaw || this.lastPitch != this.pitch) {
+            if (!this.firstMove) {
+                Location from = new Location(this.x, this.y, this.z, this.lastYaw, this.lastPitch, this.level);
+                Location to = this.getLocation();
+                PlayerMoveEvent moveEvent = new PlayerMoveEvent(this, from, to);
+                this.server.getPluginManager().callEvent(moveEvent);
+                if (moveEvent.isCancelled()) {
+                    this.teleport(from, null);
+                    return;
+                }
+                this.lastYaw = to.yaw;
+                this.lastPitch = to.pitch;
+                if (!to.equals(moveEvent.getTo())) {
+                    this.teleport(moveEvent.getTo(), null);
+                } else {
+                    this.needSendRotation = true;
+                }
+            } else {
+                // Seed the rollback position when the first input only changes rotation.
+                this.lastX = this.x;
+                this.lastY = this.y;
+                this.lastZ = this.z;
+                this.lastYaw = this.yaw;
+                this.lastPitch = this.pitch;
+                this.needSendRotation = true;
+                this.firstMove = false;
+            }
+        }
+        if (this.speed == null) this.speed = new Vector3(0, 0, 0);
+        else this.speed.setComponents(0, 0, 0);
+    }
+
     protected void resetClientMovement() {
         this.newPosition = null;
+        this.movementBlockedSinceTick = -1;
     }
 
     protected void setLastLocation(Location location) {
