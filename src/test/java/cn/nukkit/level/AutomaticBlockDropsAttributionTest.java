@@ -1,23 +1,28 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.Server;
-import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockDoublePlant;
-import cn.nukkit.block.BlockID;
-import cn.nukkit.block.BlockPointedDripstone;
+import cn.nukkit.block.*;
 import cn.nukkit.block.properties.enums.DripstoneThickness;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.event.Event;
 import cn.nukkit.event.block.AutomaticBlockDropsEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.level.vibration.VibrationManager;
+import cn.nukkit.lang.BaseLang;
+import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.Hash;
+import cn.nukkit.utils.MainLogger;
+import cn.nukkit.utils.serverconfig.ServerConfig;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
@@ -280,15 +285,22 @@ class AutomaticBlockDropsAttributionTest {
     }
 
     /**
-     * 真实 useBreakOn 夹具：内存方块表 + 可派发事件的假插件总线 + 拦截 EntityItem 构造。
+     * 真实破坏路径夹具：真实构造的 Level（簿记/服务器/振动管理器都是真实实例）+ 内存方块表 +
+     * 可派发事件的假插件总线 + 拦截 EntityItem 构造。
      * <p>
-     * Real-useBreakOn fixture: in-memory cell map, a fake plugin bus that dispatches events,
-     * and EntityItem construction interception.
+     * Real break-path fixture: a really constructed Level (real bookkeeping, server and vibration
+     * manager) plus an in-memory block world, a fake plugin bus that dispatches events, and
+     * EntityItem construction interception.
      */
     private static final class Fixture {
 
-        final Level level = Mockito.mock(Level.class);
-        final AutomaticBlockBreakTrace trace = new AutomaticBlockBreakTrace();
+        final Server server = Mockito.mock(Server.class);
+        final Level level;
+        final BaseFullChunk chunk = Mockito.mock(BaseFullChunk.class);
+        // setBlock 会向 requireProvider().getMaximumLayer() 询问层上限；构造器内部创建的 provider 不可达
+        // setBlock asks requireProvider().getMaximumLayer(); the provider built inside the constructor
+        // is unreachable, so this double answers that world-config question
+        final LevelProvider provider = Mockito.mock(LevelProvider.class);
         final GameRules gameRules = GameRules.getDefault();
         final Map<Long, Block> cells = new HashMap<>();
         final List<AutomaticBlockDropsEvent> events = new ArrayList<>();
@@ -312,16 +324,40 @@ class AutomaticBlockDropsAttributionTest {
                     })
                     .when(pluginManager)
                     .callEvent(Mockito.any(Event.class));
-            Server server = Mockito.mock(Server.class);
             Mockito.when(server.getPluginManager()).thenReturn(pluginManager);
+            Mockito.when(server.getLogger()).thenReturn(Mockito.mock(MainLogger.class));
+            Mockito.when(server.getLanguage()).thenReturn(Mockito.mock(BaseLang.class));
+            Mockito.when(server.getServerConfig()).thenReturn(new ServerConfig());
 
-            setField("server", server);
-            setField("automaticBlockBreakTrace", trace);
-            setField("gameRules", gameRules);
-            setField("vibrationManager", Mockito.mock(VibrationManager.class));
+            this.level = constructedLevel(server);
+            Mockito.when(level.getDimensionData()).thenReturn(DimensionEnum.OVERWORLD.getDimensionData());
+            Mockito.when(level.getMinBlockY()).thenReturn(0);
+            Mockito.when(level.getMaxBlockY()).thenReturn(255);
+            level.gameRules = gameRules;
+            Mockito.when(level.getServer()).thenReturn(server);
 
             realMethods();
             stubs();
+        }
+
+        /**
+         * 真实构造的世界对象：字段初始化与构造器都执行，破坏链簿记、服务器、振动管理器都是真实实例；
+         * 构造完成后未 stub 的调用仍按 mock 默认值返回，夹具只伪造世界数据访问。
+         * <p>
+         * A really constructed world: field initializers and the constructor run, so the break-chain
+         * bookkeeping, server and vibration manager are real; afterwards un-stubbed calls fall back
+         * to mock defaults, so the fixture only fakes world-data access.
+         */
+        private static Level constructedLevel(Server server) {
+            AtomicBoolean constructing = new AtomicBoolean(true);
+            Level level = Mockito.mock(Level.class, Mockito.withSettings()
+                    .useConstructor(server, "automatic-block-drops", "automatic-block-drops",
+                            TestLevelProvider.class)
+                    .defaultAnswer(invocation -> constructing.get()
+                            ? invocation.callRealMethod()
+                            : Mockito.RETURNS_DEFAULTS.answer(invocation)));
+            constructing.set(false);
+            return level;
         }
 
         void put(Block block, int x, int y, int z) {
@@ -346,18 +382,6 @@ class AutomaticBlockDropsAttributionTest {
             return air;
         }
 
-        private void setCell(Vector3 pos, Block next) {
-            int x = pos.getFloorX();
-            int y = pos.getFloorY();
-            int z = pos.getFloorZ();
-            Block previous = cells.get(Hash.hashBlock(x, y, z));
-            put(next, x, y, z);
-            // 真实 setBlock 会补全 previous 坐标后调 trace.record；此处手动补齐
-            if (previous != null) {
-                trace.record(previous, next);
-            }
-        }
-
         private void realMethods() {
             Mockito.doCallRealMethod().when(level).useBreakOn(Mockito.any());
             Mockito.doCallRealMethod().when(level).useBreakOn(Mockito.any(), Mockito.any());
@@ -371,10 +395,30 @@ class AutomaticBlockDropsAttributionTest {
             Mockito.doCallRealMethod().when(level).dropItem(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean(), Mockito.anyInt());
 
             Mockito.doCallRealMethod().when(level).dropItemFromAutomaticBlock(Mockito.any(), Mockito.any());
+
+            // 真实 setBlock：破坏链簿记只在这里发生，不能再用测试替身绕开
+            // Real setBlock: break-chain bookkeeping only happens here, so the fixture must not fake it
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.any());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.any(BlockLayer.class), Mockito.any());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.anyInt(), Mockito.any());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.any(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.anyInt(), Mockito.any(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.any(BlockLayer.class), Mockito.any(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.any(), Mockito.anyBoolean(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.any(BlockLayer.class), Mockito.any(), Mockito.anyBoolean(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.any(), Mockito.anyInt(), Mockito.any(), Mockito.anyBoolean(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(), Mockito.any(), Mockito.anyBoolean(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(), Mockito.any(BlockLayer.class), Mockito.any(), Mockito.anyBoolean(), Mockito.anyBoolean());
+            Mockito.doCallRealMethod().when(level).setBlock(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(), Mockito.any(), Mockito.anyBoolean(), Mockito.anyBoolean());
         }
 
         private void stubs() {
             Mockito.when(level.getBlock(Mockito.any(Vector3.class)))
+                    .thenAnswer(invocation -> {
+                        Vector3 pos = invocation.getArgument(0);
+                        return cellAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
+                    });
+            Mockito.when(level.getBlock(Mockito.any(Vector3.class), Mockito.anyInt()))
                     .thenAnswer(invocation -> {
                         Vector3 pos = invocation.getArgument(0);
                         return cellAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
@@ -386,46 +430,169 @@ class AutomaticBlockDropsAttributionTest {
                     .thenAnswer(invocation -> cellAt(
                             invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2)));
 
-            // 雪层 onUpdate 走 getBlockIdAt / getGameRules() 公共入口；mock 的 getter 不读字段，需显式接线
-            // Snow's onUpdate uses the public getBlockIdAt / getGameRules() entries; a mock getter
-            // does not read the field, so wire both explicitly
+            // 雪层 onUpdate 走 getBlockIdAt / getGameRules() 公共入口
+            // Snow's onUpdate uses the public getBlockIdAt / getGameRules() entries
             Mockito.when(level.getBlockIdAt(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt()))
                     .thenAnswer(invocation -> cellAt(
                             invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2)).getId());
             Mockito.when(level.getGameRules()).thenReturn(gameRules);
 
-            Mockito.when(level.setBlock(Mockito.any(Vector3.class), Mockito.any(Block.class)))
-                    .thenAnswer(invocation -> {
-                        setCell(invocation.getArgument(0), invocation.getArgument(1));
-                        return true;
-                    });
-            Mockito.when(level.setBlock(Mockito.any(Vector3.class), Mockito.any(Block.class), Mockito.anyBoolean(), Mockito.anyBoolean()))
-                    .thenAnswer(invocation -> {
-                        setCell(invocation.getArgument(0), invocation.getArgument(1));
-                        if (setBlockTriggered.compareAndSet(false, true) && onFirstSetBlock != null) {
-                            onFirstSetBlock.run();
-                        }
-                        return true;
-                    });
-
+            // 真实 setBlock 的边界与区块入口；世界数据仍由内存方块表提供
+            // Bounds and chunk entry points the real setBlock needs; world data stays in the cell map
+            Mockito.when(level.isYInRange(Mockito.anyInt())).thenReturn(true);
+            Mockito.when(level.requireProvider()).thenReturn(provider);
+            Mockito.when(provider.getMaximumLayer()).thenReturn(1);
             Mockito.when(level.getChunk(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyBoolean()))
                     .thenAnswer(invocation -> {
                         if (spawnTriggered.compareAndSet(false, true) && onFirstSpawn != null) {
                             onFirstSpawn.run();
                         }
-                        return null;
+                        return chunk;
                     });
             Mockito.when(level.getChunkPlayers(Mockito.anyInt(), Mockito.anyInt())).thenReturn(new HashMap<>());
+            Mockito.when(level.getChunkLoaders(Mockito.anyInt(), Mockito.anyInt())).thenReturn(new ChunkLoader[0]);
+            Mockito.when(level.getNearbyEntities(Mockito.any())).thenReturn(new Entity[0]);
+
+            Mockito.when(chunk.getAndSetBlock(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt(),
+                            Mockito.anyInt(), Mockito.any(Block.class)))
+                    .thenAnswer(invocation -> {
+                        int x = invocation.getArgument(0);
+                        int y = invocation.getArgument(1);
+                        int z = invocation.getArgument(2);
+                        Block next = invocation.getArgument(4);
+                        Block previous = cellAt(x, y, z);
+                        put(next, x, y, z);
+                        if (setBlockTriggered.compareAndSet(false, true) && onFirstSetBlock != null) {
+                            onFirstSetBlock.run();
+                        }
+                        return previous;
+                    });
+        }
+    }
+
+    /**
+     * 只提供构造 Level 时读取的时间/天气/规则元数据，存储操作一律不支持：方块世界由夹具的内存表负责。
+     * <p>
+     * Supplies only the time/weather/rule metadata the Level constructor reads; every storage
+     * operation is unsupported because the fixture keeps the block world in memory.
+     */
+    public static final class TestLevelProvider implements LevelProvider {
+
+        private final Level level;
+
+        public TestLevelProvider(Level level, String path) {
+            this.level = level;
         }
 
-        private void setField(String name, Object value) {
-            try {
-                var field = Level.class.getDeclaredField(name);
-                field.setAccessible(true);
-                field.set(level, value);
-            } catch (ReflectiveOperationException e) {
-                throw new AssertionError(e);
-            }
+        public static boolean usesChunkSection() {
+            return false;
         }
+
+        @Override
+        public Level getLevel() {
+            return level;
+        }
+
+        @Override
+        public String getPath() {
+            return "automatic-block-drops";
+        }
+
+        @Override
+        public String getName() {
+            return "automatic-block-drops";
+        }
+
+        @Override
+        public String getGenerator() {
+            return "flat";
+        }
+
+        @Override
+        public Map<String, Object> getGeneratorOptions() {
+            return Map.of();
+        }
+
+        @Override
+        public void updateLevelName(String name) {
+        }
+
+        @Override
+        public long getTime() {
+            return 0;
+        }
+
+        @Override
+        public boolean isRaining() {
+            return false;
+        }
+
+        @Override
+        public int getRainTime() {
+            return 1;
+        }
+
+        @Override
+        public boolean isThundering() {
+            return false;
+        }
+
+        @Override
+        public int getThunderTime() {
+            return 1;
+        }
+
+        @Override
+        public long getCurrentTick() {
+            return 0;
+        }
+
+        @Override
+        public long getSeed() {
+            return 0;
+        }
+
+        @Override
+        public GameRules getGamerules() {
+            return GameRules.getDefault();
+        }
+
+        @Override
+        public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override public BaseFullChunk getLoadedChunk(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public BaseFullChunk getLoadedChunk(long hash) { throw new UnsupportedOperationException(); }
+        @Override public BaseFullChunk getChunk(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public BaseFullChunk getChunk(int chunkX, int chunkZ, boolean create) { throw new UnsupportedOperationException(); }
+        @Override public BaseFullChunk getEmptyChunk(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public void saveChunks() { throw new UnsupportedOperationException(); }
+        @Override public void saveChunk(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public void saveChunk(int chunkX, int chunkZ, FullChunk chunk) { throw new UnsupportedOperationException(); }
+        @Override public void unloadChunks() { throw new UnsupportedOperationException(); }
+        @Override public boolean loadChunk(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public boolean loadChunk(int chunkX, int chunkZ, boolean create) { throw new UnsupportedOperationException(); }
+        @Override public boolean unloadChunk(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public boolean unloadChunk(int chunkX, int chunkZ, boolean safe) { throw new UnsupportedOperationException(); }
+        @Override public boolean isChunkGenerated(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public boolean isChunkPopulated(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public boolean isChunkLoaded(int chunkX, int chunkZ) { throw new UnsupportedOperationException(); }
+        @Override public boolean isChunkLoaded(long hash) { throw new UnsupportedOperationException(); }
+        @Override public void setChunk(int chunkX, int chunkZ, FullChunk chunk) { throw new UnsupportedOperationException(); }
+        @Override public void setRaining(boolean raining) { throw new UnsupportedOperationException(); }
+        @Override public void setRainTime(int rainTime) { throw new UnsupportedOperationException(); }
+        @Override public void setThundering(boolean thundering) { throw new UnsupportedOperationException(); }
+        @Override public void setThunderTime(int thunderTime) { throw new UnsupportedOperationException(); }
+        @Override public void setCurrentTick(long currentTick) { throw new UnsupportedOperationException(); }
+        @Override public void setTime(long value) { throw new UnsupportedOperationException(); }
+        @Override public void setSeed(long value) { throw new UnsupportedOperationException(); }
+        @Override public Vector3 getSpawn() { throw new UnsupportedOperationException(); }
+        @Override public void setSpawn(Vector3 pos) { throw new UnsupportedOperationException(); }
+        @Override public Map<Long, ? extends FullChunk> getLoadedChunks() { throw new UnsupportedOperationException(); }
+        @Override public void doGarbageCollection() { throw new UnsupportedOperationException(); }
+        @Override public void close() { throw new UnsupportedOperationException(); }
+        @Override public void saveLevelData() { throw new UnsupportedOperationException(); }
+        @Override public void setGameRules(GameRules rules) { throw new UnsupportedOperationException(); }
     }
 }
