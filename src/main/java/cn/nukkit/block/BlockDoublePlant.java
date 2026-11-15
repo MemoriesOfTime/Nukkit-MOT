@@ -100,9 +100,22 @@ public class BlockDoublePlant extends BlockFlowable {
         if ((this.getDamage() & TOP_HALF_BITMASK) == TOP_HALF_BITMASK) { // Top half
             Block down = down();
             if (down instanceof BlockDoublePlant) {
+                // 内层破坏已同步移除两格；此处再清空会吞掉插件在内层事件期间放入的新方块
+                // The nested break already removed both halves; clearing here again would
+                // wipe a block plugins placed during the inner event
                 this.getLevel().useBreakOn(down);
+            } else {
+                this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
             }
         } else {
+            // 两格须在本次破坏内同步移除，否则上半格脱离破坏链，破坏追踪与收尾事件都看不到它
+            // Both halves must go in this same break, or the top leaves the break chain
+            // and stays invisible to break tracing and the completion event (mirrors BlockDoor)
+            Block up = this.up();
+            if (up instanceof BlockDoublePlant
+                    && (up.getDamage() & TOP_HALF_BITMASK) == TOP_HALF_BITMASK) {
+                this.getLevel().setBlock(up, Block.get(BlockID.AIR), true, true);
+            }
             this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
         }
 

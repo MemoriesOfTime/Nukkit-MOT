@@ -25,6 +25,7 @@ import org.mockito.Mockito;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -185,6 +186,81 @@ class AutomaticBlockDropsAttributionTest {
                 BlockID.AIR,
                 fixture.cells.get(snowCell).getId(),
                 "the snow layer must still be removed");
+    }
+
+    @Test
+    void doublePlantBothHalvesAreTracedInTheBreakCompletionEvent() {
+        long bottomCell = Hash.hashBlock(5, 64, 0);
+        long topCell = Hash.hashBlock(5, 65, 0);
+
+        // outermost 收尾事件上报本链全部变更格，插件据此清理来源标记；上半格拖到下一 tick
+        // 移除会让标记残留并误伤后续掉落
+        // The outermost completion event reports all cells changed by the chain; a top half
+        // deferred to a later tick leaves a stale marker that can hit future drops on that cell
+        Set<Long> reportedCells = new HashSet<>();
+
+        Fixture fixture = new Fixture(event -> {
+            if (event.isOutermostBreak()) {
+                for (Block changed : event.getChangedBlocks()) {
+                    reportedCells.add(Hash.hashBlock(
+                            changed.getFloorX(), changed.getFloorY(), changed.getFloorZ()));
+                }
+            }
+        });
+        fixture.put(doublePlant(0), 5, 64, 0);
+        fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(EntityItem.class)) {
+            fixture.level.useBreakOn(new Vector3(5, 64, 0), BlockFace.UP, null, null, false);
+        }
+
+        assertEquals(BlockID.AIR, fixture.cells.get(bottomCell).getId());
+        assertEquals(
+                BlockID.AIR,
+                fixture.cells.get(topCell).getId(),
+                "the top half must be removed by the same break, not a later normal update");
+        assertTrue(reportedCells.contains(bottomCell));
+        assertTrue(
+                reportedCells.contains(topCell),
+                "the completion event must report the top cell so source markers can be cleaned");
+    }
+
+    @Test
+    void topHalfBreakKeepsPluginBlockPlacedDuringTheInnerEvent() {
+        long bottomCell = Hash.hashBlock(5, 64, 0);
+        long topCell = Hash.hashBlock(5, 65, 0);
+        int sunflowerItem = doublePlant(0).toItem().getId();
+
+        // 内层下半格掉落事件是插件重入点；插件在原上半格放入的新方块必须在整条破坏结束后存活
+        // The inner bottom-half drop event is a plugin reentry point; a block placed into
+        // the former top cell there must survive the whole break
+        AtomicBoolean injected = new AtomicBoolean();
+        AtomicReference<Fixture> holder = new AtomicReference<>();
+        Fixture fixture = new Fixture(event -> {
+            if (!event.isOutermostBreak() && injected.compareAndSet(false, true)) {
+                holder.get().level.setBlock(new Vector3(5, 65, 0), Block.get(BlockID.STONE));
+            }
+        });
+        holder.set(fixture);
+        fixture.put(doublePlant(0), 5, 64, 0);
+        fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class,
+                (mock, context) -> fixture.spawned.add(
+                        NBTIO.getItemHelper(((CompoundTag) context.arguments().get(1)).getCompound("Item"))))) {
+            fixture.level.useBreakOn(new Vector3(5, 65, 0), BlockFace.UP, null, null, false);
+        }
+
+        assertTrue(injected.get(), "the plugin placement must have been injected mid-chain");
+        assertEquals(BlockID.AIR, fixture.cells.get(bottomCell).getId());
+        assertEquals(
+                BlockID.STONE,
+                fixture.cells.get(topCell).getId(),
+                "a block placed during the inner event must survive the outer break");
+        assertTrue(
+                fixture.spawned.stream().anyMatch(item -> item.getId() == sunflowerItem),
+                "the bottom half's own drop still spawns");
     }
 
     private static BlockPointedDripstone dripstone(DripstoneThickness thickness, boolean hanging) {
