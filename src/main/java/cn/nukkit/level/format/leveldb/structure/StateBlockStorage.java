@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.StampedLock;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 
@@ -64,6 +65,14 @@ public class StateBlockStorage {
     private BitArray bitArray;
     private volatile boolean shared;
     // Snapshot acknowledgements must also notice public storage mutations that bypass section setters.
+
+    /**
+     * 单元与调色板的发布锁:写独占,读乐观,仅观测到并发写时退化为共享读。
+     * <p>
+     * Publication lock for cells and palette: exclusive writes, optimistic reads that fall
+     * back to the shared lock only when a writer was observed.
+     */
+    private final StampedLock cellsLock = new StampedLock();
 
     /**
      * Bumped by every change of the stored states. Whoever read cells together with a version knows
@@ -137,6 +146,15 @@ public class StateBlockStorage {
     }
 
     public synchronized void readFromStorage(ByteBuf buffer, ChunkBuilder chunkBuilder) {
+        long stamp = this.cellsLock.writeLock();
+        try {
+            this.readFromStorageLocked(buffer, chunkBuilder);
+        } finally {
+            this.cellsLock.unlockWrite(stamp);
+        }
+    }
+
+    private void readFromStorageLocked(ByteBuf buffer, ChunkBuilder chunkBuilder) {
         this.version++;
         short header = buffer.readUnsignedByte();
 
@@ -226,7 +244,32 @@ public class StateBlockStorage {
     }
 
     public BlockStateSnapshot getBlockState(int index) {
-        return this.palette.get(this.bitArray.get(index));
+        // 乐观读:无竞争时零锁开销,只有读到 grow/compress/readFromStorage 重塑的中间态才加锁重读。
+        // Optimistic read: no locking when uncontended; a mid-rebuild state from grow/compress/
+        // readFromStorage re-reads under the lock.
+        long stamp = this.cellsLock.tryOptimisticRead();
+        try {
+            List<BlockStateSnapshot> palette = this.palette;
+            int paletteIndex = this.bitArray.get(index);
+            if (paletteIndex >= 0 && paletteIndex < palette.size()) {
+                BlockStateSnapshot snapshot = palette.get(paletteIndex);
+                if (snapshot != null && this.cellsLock.validate(stamp)) {
+                    return snapshot;
+                }
+            }
+        } catch (IndexOutOfBoundsException ignored) {
+            // A rebuild shrank the palette under this read; the locked path reports any real error.
+        }
+        return this.getBlockStateLocked(index);
+    }
+
+    private BlockStateSnapshot getBlockStateLocked(int index) {
+        long stamp = this.cellsLock.readLock();
+        try {
+            return this.palette.get(this.bitArray.get(index));
+        } finally {
+            this.cellsLock.unlockRead(stamp);
+        }
     }
 
     public BlockStateSnapshot getBlockState(int x, int y, int z) {
@@ -234,8 +277,34 @@ public class StateBlockStorage {
     }
 
     public int get(int index) {
-        BlockStateSnapshot snapshot = this.palette.get(this.bitArray.get(index));
-        return snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
+        long stamp = this.cellsLock.tryOptimisticRead();
+        try {
+            List<BlockStateSnapshot> palette = this.palette;
+            int paletteIndex = this.bitArray.get(index);
+            if (paletteIndex >= 0 && paletteIndex < palette.size()) {
+                BlockStateSnapshot snapshot = palette.get(paletteIndex);
+                if (snapshot != null) {
+                    int legacyId = snapshot.getLegacyId();
+                    int legacyData = snapshot.getLegacyData();
+                    if (this.cellsLock.validate(stamp)) {
+                        return legacyId << Block.DATA_BITS | legacyData;
+                    }
+                }
+            }
+        } catch (IndexOutOfBoundsException ignored) {
+            // A rebuild shrank the palette under this read; the locked path reports any real error.
+        }
+        return this.getLocked(index);
+    }
+
+    private int getLocked(int index) {
+        long stamp = this.cellsLock.readLock();
+        try {
+            BlockStateSnapshot snapshot = this.palette.get(this.bitArray.get(index));
+            return snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
+        } finally {
+            this.cellsLock.unlockRead(stamp);
+        }
     }
 
     public int get(int x, int y, int z) {
@@ -247,6 +316,7 @@ public class StateBlockStorage {
     }
 
     public synchronized void set(int index, BlockStateSnapshot value) {
+        long stamp = this.cellsLock.writeLock();
         try {
             this.ensureWritable();
             int paletteIndex = this.getOrAdd(value);
@@ -259,6 +329,7 @@ public class StateBlockStorage {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
         } finally {
             this.version++;
+            this.cellsLock.unlockWrite(stamp);
         }
     }
 
@@ -503,6 +574,12 @@ public class StateBlockStorage {
     }
 
     /**
+     * 调用方须已持有 cellsLock 写锁:公共 {@link #compress()} 会重入不可重入的写锁而死锁,
+     * 容量耗尽只能走 {@link #compressLocked()}。
+     * <p>
+     * Callers must already hold the cellsLock write lock: the public {@link #compress()} would
+     * re-enter the non-reentrant write lock and deadlock, so exhaustion goes to {@link #compressLocked()}.
+     *
      * @return palette index
      */
     private int getOrAdd(BlockStateSnapshot snapshot) {
@@ -511,18 +588,25 @@ public class StateBlockStorage {
             return index;
         }
 
-        index = this.palette.size();
-        BitArrayVersion version = this.bitArray.getVersion();
-        if (index > version.getMaxEntryValue()) {
+        boolean compressed = false;
+        while (true) {
+            index = this.palette.size();
+            BitArrayVersion version = this.bitArray.getVersion();
+            if (index <= version.getMaxEntryValue()) {
+                this.palette.add(snapshot);
+                return index;
+            }
             BitArrayVersion next = version.next();
             if (next != null) {
                 this.grow(next);
-            } else if (!this.compress()) {
+            } else if (compressed || !this.compressLocked()) {
                 throw new IndexOutOfBoundsException("too many elements");
+            } else {
+                // 压缩重建了调色板与位阵,压缩前算出的插入点与位宽已失效,交给循环头重算。
+                // Compression rebuilt palette and cells, so the loop head recomputes both.
+                compressed = true;
             }
         }
-        this.palette.add(snapshot);
-        return index;
     }
 
     public boolean isEmpty() {
@@ -577,6 +661,15 @@ public class StateBlockStorage {
      * @return dirty
      */
     public synchronized boolean compress() {
+        long stamp = this.cellsLock.writeLock();
+        try {
+            return this.compressLocked();
+        } finally {
+            this.cellsLock.unlockWrite(stamp);
+        }
+    }
+
+    private boolean compressLocked() {
         if (this.palette.isEmpty()) {
             return false;
         }

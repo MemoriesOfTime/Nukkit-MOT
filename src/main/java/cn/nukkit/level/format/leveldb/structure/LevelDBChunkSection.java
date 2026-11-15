@@ -40,7 +40,9 @@ public class LevelDBChunkSection implements ChunkSection {
     private volatile WeakReference<LevelDBChunk> parent;
 
     protected final int y;
-    protected StateBlockStorage[] storages;
+    // 读路径无锁访问:层数组整体替换后以一次 volatile 写发布(见 createLayerUnsafe)。
+    // Lock-free reads: the array is replaced as a whole and published by one volatile store (see createLayerUnsafe).
+    protected volatile StateBlockStorage[] storages;
 
     // Positive-only memo. Storage replacement or mutation must recheck the palette.
     private volatile StateBlockStorage randomTickStorage;
@@ -165,17 +167,8 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockId(int x, int y, int z, int layer) {
-        try {
-            this.readLock.lock();
-
-            if (!this.hasLayerUnsafe(layer)) {
-                return BlockID.AIR;
-            }
-
-            return (this.storages[layer].getBlockState(x, y, z)).getLegacyId();
-        } finally {
-            this.readLock.unlock();
-        }
+        StateBlockStorage storage = this.storageForLayer(layer);
+        return storage == null ? BlockID.AIR : storage.getBlockState(x, y, z).getLegacyId();
     }
 
     @Override
@@ -226,17 +219,8 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockData(int x, int y, int z, int layer) {
-        try {
-            this.readLock.lock();
-
-            if (!this.hasLayerUnsafe(layer)) {
-                return 0;
-            }
-
-            return (this.storages[layer].getBlockState(x, y, z)).getLegacyData();
-        } finally {
-            this.readLock.unlock();
-        }
+        StateBlockStorage storage = this.storageForLayer(layer);
+        return storage == null ? 0 : storage.getBlockState(x, y, z).getLegacyData();
     }
 
     @Override
@@ -278,17 +262,8 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getFullBlock(int x, int y, int z, int layer) {
-        try {
-            this.readLock.lock();
-
-            if (!this.hasLayerUnsafe(layer)) {
-                return BlockID.AIR;
-            }
-
-            return this.storages[layer].get(x, y, z);
-        } finally {
-            this.readLock.unlock();
-        }
+        StateBlockStorage storage = this.storageForLayer(layer);
+        return storage == null ? BlockID.AIR : storage.get(x, y, z);
     }
 
     /**
@@ -325,32 +300,24 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int[] getBlockState(int x, int y, int z, int layer) {
-        try {
-            this.readLock.lock();
-
-            if (!this.hasLayerUnsafe(layer)) {
-                return new int[] { BlockID.AIR, 0 };
-            }
-
-            BlockStateSnapshot blockState = this.storages[layer].getBlockState(x, y, z);
-            return new int[] { blockState.getLegacyId(), blockState.getLegacyData() };
-        } finally {
-            this.readLock.unlock();
+        StateBlockStorage storage = this.storageForLayer(layer);
+        if (storage == null) {
+            return new int[] { BlockID.AIR, 0 };
         }
+
+        BlockStateSnapshot blockState = storage.getBlockState(x, y, z);
+        return new int[] { blockState.getLegacyId(), blockState.getLegacyData() };
     }
 
     /** One palette lookup, retaining all 32 bits of both legacy fields without a temporary array. */
     public long getBlockStatePair(int x, int y, int z, int layer) {
-        try {
-            this.readLock.lock();
-            if (!this.hasLayerUnsafe(layer)) {
-                return 0L;
-            }
-            BlockStateSnapshot state = this.storages[layer].getBlockState(x, y, z);
-            return ((long) state.getLegacyId() << 32) | (state.getLegacyData() & 0xffffffffL);
-        } finally {
-            this.readLock.unlock();
+        StateBlockStorage storage = this.storageForLayer(layer);
+        if (storage == null) {
+            return 0L;
         }
+
+        BlockStateSnapshot state = storage.getBlockState(x, y, z);
+        return ((long) state.getLegacyId() << 32) | (state.getLegacyData() & 0xffffffffL);
     }
 
     /**
@@ -794,6 +761,17 @@ public class LevelDBChunkSection implements ChunkSection {
         return this.storages[layer] != null;
     }
 
+    /**
+     * 无锁读用的层存储;缺失的层按空气处理。
+     * <p>
+     * Layer storage for lock-free reads; a missing layer reads as air.
+     */
+    @Nullable
+    private StateBlockStorage storageForLayer(int layer) {
+        StateBlockStorage[] storages = this.storages;
+        return layer < storages.length ? storages[layer] : null;
+    }
+
     protected void createLayer(int layer) {
         try {
             this.writeLock.lock();
@@ -805,13 +783,11 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     protected void createLayerUnsafe(int layer) {
-        StateBlockStorage[] storages;
-        if (this.storages.length <= layer) {
-            storages = Arrays.copyOf(this.storages, layer + 1);
-            this.storages = storages;
-        } else {
-            storages = this.storages;
-        }
+        // 复制到新数组后一次 volatile 写发布:读者要么看不到新层,要么看到构造完整的层。
+        // Copy into a fresh array and publish with one volatile store: a reader either misses
+        // the new layer or sees fully constructed storages, never a half-built one.
+        StateBlockStorage[] current = this.storages;
+        StateBlockStorage[] storages = Arrays.copyOf(current, Math.max(current.length, layer + 1));
 
         for (int i = layer; i >= 0; i--) {
             if (storages[i] != null) {
@@ -819,6 +795,7 @@ public class LevelDBChunkSection implements ChunkSection {
             }
             storages[i] = new StateBlockStorage();
         }
+        this.storages = storages;
     }
 
     @Override
