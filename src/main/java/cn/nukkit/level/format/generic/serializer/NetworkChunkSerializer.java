@@ -356,6 +356,7 @@ public class NetworkChunkSerializer {
          * 0 means absent and disables the check.
          */
         private long sequence;
+        private cn.nukkit.level.Level.ChunkRequestOwner requestOwner;
 
         public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
             this(gameVersion, timestamp, x, z, subChunkCount, payload, null, null, null);
@@ -368,6 +369,13 @@ public class NetworkChunkSerializer {
 
         public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
                                                   List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence) {
+            this(gameVersion, timestamp, x, z, subChunkCount, payload, subChunkBlobs, biomes, blockEntities, sequence, null);
+        }
+
+        public NetworkChunkSerializerCallbackData(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload,
+                                                  List<byte[]> subChunkBlobs, byte[] biomes, byte[] blockEntities, long sequence,
+                                                  cn.nukkit.level.Level.ChunkRequestOwner requestOwner) {
+            this.requestOwner = requestOwner;
             this.gameVersion = gameVersion;
             this.timestamp = timestamp;
             this.x = x;

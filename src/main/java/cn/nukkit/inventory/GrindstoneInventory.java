@@ -76,7 +76,7 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
             // plus 5% of the maximum durability of the output item (rounded down)
             // capped so it does not exceed the maximum durability of the output item
             // https://minecraft.wiki/w/Grindstone#Repairing_and_disenchanting
-            result.setDamage(Math.max(result.getMaxDurability() - ((result.getMaxDurability() - eq.getDamage()) + (iq.getMaxDurability() - iq.getDamage()) + NukkitMath.floorDouble(result.getMaxDurability() * 0.05)) + 1, 0));
+            result.setDamage(Math.max(result.getMaxDurability() - ((result.getMaxDurability() - eq.getDamage()) + (iq.getMaxDurability() - iq.getDamage()) + NukkitMath.floorDouble(result.getMaxDurability() * 0.05)), 0));
         }
 
         return result;

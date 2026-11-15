@@ -32,12 +32,16 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public abstract class BaseFullChunk implements FullChunk, ChunkManager {
+
+    private static final AtomicLongFieldUpdater<BaseFullChunk> MODIFICATION_VERSION_UPDATER =
+            AtomicLongFieldUpdater.newUpdater(BaseFullChunk.class, "modificationVersion");
 
     protected Long2ObjectNonBlockingMap<Entity> entities;
 
@@ -127,6 +131,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     private long hash;
 
     protected AtomicLong changes = new AtomicLong();
+    private volatile long modificationVersion;
 
     protected boolean isInit;
 
@@ -1029,6 +1034,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return changes.get();
     }
 
+    /** 不随存盘清零的修改版本。<p>Modification version that is not reset by saving. */
+    public long getModificationVersion() {
+        return this.modificationVersion;
+    }
+
     @Override
     public boolean hasChanged() {
         return this.changes.get() != 0;
@@ -1037,6 +1047,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setChanged() {
         this.changes.incrementAndGet();
+        MODIFICATION_VERSION_UPDATER.incrementAndGet(this);
         chunkPackets = null;
     }
 
