@@ -11,6 +11,9 @@ import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.vibration.VibrationManager;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.network.Network;
+import cn.nukkit.network.PacketPool;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.serverconfig.ServerConfig;
@@ -111,6 +114,24 @@ public final class MockServer {
                 // May fail if already initialized
             }
         }
+    }
+
+    /**
+     * 为 protocol &lt; 137 安装严格包池桩：只有指定包类有真实 id，其余回退 id 会让断言暴露错配。
+     * Installs a strict legacy packet-pool stub so unmapped classes fall back and expose mismatches.
+     */
+    public static void installLegacyPacketPool(Class<? extends DataPacket> packetClass, int packetId) {
+        PacketPool pool = Mockito.mock(PacketPool.class);
+        Mockito.lenient().when(pool.getPacketId(Mockito.any())).thenAnswer(invocation -> {
+            Class<?> requested = invocation.getArgument(0);
+            if (requested == packetClass) {
+                return packetId;
+            }
+            throw new IllegalArgumentException("No legacy packet id stub for " + requested);
+        });
+        Network network = Mockito.mock(Network.class);
+        Mockito.lenient().when(network.getPacketPool(Mockito.any(GameVersion.class))).thenReturn(pool);
+        Mockito.lenient().when(get().getNetwork()).thenReturn(network);
     }
 
     /**

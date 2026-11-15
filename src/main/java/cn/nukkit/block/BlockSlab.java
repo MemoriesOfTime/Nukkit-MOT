@@ -72,33 +72,22 @@ public abstract class BlockSlab extends BlockTransparentMeta {
         this.setDamage(this.getDamage() & SLAB_BLOCK_TYPE_BIT);
         if (face == BlockFace.DOWN) {
             if (target instanceof BlockSlab && ((BlockSlab) target).doubleSlab == this.doubleSlab && ((BlockSlab) target).hasTopBit() && (target.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
-                this.getLevel().setBlock(target, Block.get(doubleSlab, this.getDamage()), true);
-
-                return true;
+                return this.placeDoubleSlab(target, player);
             } else if (block instanceof BlockSlab && ((BlockSlab) block).doubleSlab == this.doubleSlab && (block.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
-                this.getLevel().setBlock(block, Block.get(doubleSlab, this.getDamage()), true);
-
-                return true;
+                return this.placeDoubleSlab(block, player);
             } else {
                 this.setTopBit(true);
             }
         } else if (face == BlockFace.UP) {
             if (target instanceof BlockSlab && ((BlockSlab) target).doubleSlab == this.doubleSlab && !((BlockSlab) target).hasTopBit() && (target.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
-                this.getLevel().setBlock(target, Block.get(doubleSlab, this.getDamage()), true);
-
-                return true;
+                return this.placeDoubleSlab(target, player);
             } else if (block instanceof BlockSlab && ((BlockSlab) block).doubleSlab == this.doubleSlab && (block.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
-                this.getLevel().setBlock(block, Block.get(doubleSlab, this.getDamage()), true);
-
-                return true;
+                return this.placeDoubleSlab(block, player);
             }
-            //TODO: check for collision
         } else {
             if (block instanceof BlockSlab && ((BlockSlab) block).doubleSlab == this.doubleSlab) {
                 if ((block.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
-                    this.getLevel().setBlock(block, Block.get(doubleSlab, this.getDamage()), true);
-
-                    return true;
+                    return this.placeDoubleSlab(block, player);
                 }
 
                 return false;
@@ -114,6 +103,22 @@ public abstract class BlockSlab extends BlockTransparentMeta {
         }
 
         this.getLevel().setBlock(this, this, true, true);
+        return true;
+    }
+
+    /**
+     * Merges this slab with the existing slab at {@code position} into a double slab. The double slab fills the
+     * whole block, so it is refused when an entity stands in the half that was empty; otherwise a mob or another
+     * player could be entombed inside a full block.
+     */
+    private boolean placeDoubleSlab(Block position, Player player) {
+        Block doubleSlabBlock = Block.get(doubleSlab, this.getDamage());
+        doubleSlabBlock.position(position);
+        AxisAlignedBB boundingBox = doubleSlabBlock.getBoundingBox();
+        if (boundingBox != null && position.getLevel().isBlockPlacementObstructed(boundingBox, player)) {
+            return false;
+        }
+        position.getLevel().setBlock(position, doubleSlabBlock, true);
         return true;
     }
 

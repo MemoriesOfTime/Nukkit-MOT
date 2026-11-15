@@ -10,8 +10,10 @@ import cn.nukkit.entity.EntityHumanType;
 import cn.nukkit.event.entity.EntityArmorChangeEvent;
 import cn.nukkit.event.entity.EntityInventoryChangeEvent;
 import cn.nukkit.event.player.PlayerItemHeldEvent;
+import cn.nukkit.event.player.PlayerOffhandInventoryChangeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemCrossbow;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
@@ -20,9 +22,11 @@ import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacket_v113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacket_v113;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Objects;
 
 /**
  * @author MagicDroidX
@@ -31,6 +35,8 @@ import java.util.Collection;
 public class PlayerInventory extends BaseInventory {
 
     protected int itemInHandIndex = 0;
+    private long heldItemRevision;
+    private boolean crossbowChangeInProgress;
 
     public PlayerInventory(EntityHumanType player) {
         super(player, InventoryType.PLAYER);
@@ -107,13 +113,23 @@ public class PlayerInventory extends BaseInventory {
 
     public void setHeldItemIndex(int index, boolean send) {
         if (index >= 0 && index < this.getHotbarSize()) {
-            this.itemInHandIndex = index;
+            this.updateHeldItemIndex(index);
 
             if (this.getHolder() instanceof Player && send) {
                 this.sendHeldItem((Player) this.getHolder());
             }
 
             this.sendHeldItem(this.getHolder().getViewers().values());
+        }
+    }
+
+    private void updateHeldItemIndex(int index) {
+        if (this.itemInHandIndex != index) {
+            this.itemInHandIndex = index;
+            this.heldItemRevision++;
+            if (this.getHolder() instanceof Player player) {
+                player.resetCrossbowInputState();
+            }
         }
     }
 
@@ -124,6 +140,121 @@ public class PlayerInventory extends BaseInventory {
         } else {
             return new ItemBlock(Block.get(BlockID.AIR), 0, 0);
         }
+    }
+
+    @ApiStatus.Internal
+    public long getHeldItemRevision() {
+        return this.heldItemRevision;
+    }
+
+    /**
+     * 事件通过后同时提交弩与弹药，将弩元数据回写到 after。
+     * <p>
+     * Commits both slots after event approval and copies crossbow metadata back to after.
+     */
+    @ApiStatus.Internal
+    public boolean commitCrossbowChange(long revision, ItemCrossbow before, ItemCrossbow after,
+                                        BaseInventory ammunitionInventory, int ammunitionSlot) {
+        if (this.crossbowChangeInProgress || !(this.getHolder() instanceof Player player)
+                || !player.isConnected() || !player.spawned || !player.isAlive() || player.isSpectator()
+                || revision != this.heldItemRevision || !before.equalsExact(this.getItemInHand())) {
+            return false;
+        }
+        int heldSlot = this.itemInHandIndex;
+        var level = player.getLevel();
+        int gamemode = player.getGamemode();
+        long inputGeneration = player.getCrossbowInputGeneration();
+        Item replacement = after.isNull() ? Item.AIR_ITEM.clone() : after.clone();
+        Item ammunition = null;
+        Item remaining = null;
+        Item ammunitionIdentity = null;
+        if (ammunitionInventory != null) {
+            if ((ammunitionInventory != this && ammunitionInventory != player.getOffhandInventory())
+                    || ammunitionSlot < 0 || ammunitionSlot >= ammunitionInventory.getSize()
+                    || (ammunitionInventory == this && ammunitionSlot == heldSlot)) {
+                return false;
+            }
+            ammunition = ammunitionInventory.getItem(ammunitionSlot);
+            if (ammunition.isNull() || !ammunition.equals(after.getChargedItem())) {
+                return false;
+            }
+            ammunitionIdentity = ammunitionInventory.getItemFast(ammunitionSlot);
+            remaining = ammunition.clone();
+            remaining.setCount(remaining.getCount() - 1);
+            if (remaining.isNull()) remaining = Item.AIR_ITEM.clone();
+        }
+
+        this.crossbowChangeInProgress = true;
+        try {
+            EntityInventoryChangeEvent heldEvent = new EntityInventoryChangeEvent(
+                    player, before.clone(), replacement.clone(), heldSlot);
+            player.getServer().getPluginManager().callEvent(heldEvent);
+            if (heldEvent.isCancelled() || !preservesCrossbowState(replacement, heldEvent.getNewItem())) {
+                return false;
+            }
+            // 保留服务端弩实例上的装填冷却，仅采纳事件修改的元数据。
+            // Keep the server crossbow's charge cooldown while accepting event metadata.
+            replacement.setCompoundTag(heldEvent.getNewItem().getCompoundTag().clone());
+            if (ammunitionInventory != null) {
+                EntityInventoryChangeEvent ammoEvent = new EntityInventoryChangeEvent(
+                        player, ammunition.clone(), remaining.clone(), ammunitionSlot);
+                player.getServer().getPluginManager().callEvent(ammoEvent);
+                if (ammoEvent.isCancelled() || !preservesStack(remaining, ammoEvent.getNewItem())) {
+                    return false;
+                }
+                remaining.setCompoundTag(ammoEvent.getNewItem().getCompoundTag().clone());
+                if (ammunitionInventory == player.getOffhandInventory()) {
+                    PlayerOffhandInventoryChangeEvent offhandEvent = new PlayerOffhandInventoryChangeEvent(
+                            player, ammunition.clone(), remaining.clone());
+                    player.getServer().getPluginManager().callEvent(offhandEvent);
+                    if (offhandEvent.isCancelled() || !preservesStack(remaining, offhandEvent.getNewItem())) {
+                        return false;
+                    }
+                    remaining.setCompoundTag(offhandEvent.getNewItem().getCompoundTag().clone());
+                }
+            }
+            if (!player.isConnected() || !player.spawned || !player.isAlive() || player.getGamemode() != gamemode
+                    || player.getCrossbowInputGeneration() != inputGeneration
+                    || player.getLevel() != level || heldSlot != this.itemInHandIndex
+                    || revision != this.heldItemRevision || !before.equalsExact(this.getItemInHand())
+                    || (ammunitionInventory != null
+                    && (ammunitionIdentity != ammunitionInventory.getItemFast(ammunitionSlot)
+                    || !ammunition.equalsExact(ammunitionInventory.getItem(ammunitionSlot))))) {
+                return false;
+            }
+
+            // 两处写入必须先于通知，通知可能同步调用插件。
+            // Both writes precede notifications, which can synchronously invoke plugins.
+            if (!replacement.isNull()) after.setCompoundTag(replacement.getCompoundTag().clone());
+            if (!replacement.isNull() && replacement.getStackNetId() == 0) replacement.autoAssignStackNetworkId();
+            if (remaining != null && !remaining.isNull() && remaining.getStackNetId() == 0) remaining.autoAssignStackNetworkId();
+            if (replacement.isNull()) this.slots.remove(heldSlot);
+            else this.slots.put(heldSlot, replacement);
+            if (ammunitionInventory != null) {
+                if (remaining.isNull()) ammunitionInventory.slots.remove(ammunitionSlot);
+                else ammunitionInventory.slots.put(ammunitionSlot, remaining);
+            }
+            this.onSlotChange(heldSlot, before, true);
+            if (ammunitionInventory != null) {
+                ammunitionInventory.onSlotChange(ammunitionSlot, ammunition, true);
+            }
+            return true;
+        } finally {
+            this.crossbowChangeInProgress = false;
+        }
+    }
+
+    private static boolean preservesCrossbowState(Item expected, Item proposed) {
+        return preservesStack(expected, proposed) && (expected.isNull()
+                || (proposed instanceof ItemCrossbow
+                && Objects.equals(expected.getNamedTagEntry("chargedItem"), proposed.getNamedTagEntry("chargedItem"))
+                && Objects.equals(expected.getNamedTagEntry("Charged"), proposed.getNamedTagEntry("Charged"))
+                && Objects.equals(expected.getNamedTagEntry("launchCount"), proposed.getNamedTagEntry("launchCount"))));
+    }
+
+    private static boolean preservesStack(Item expected, Item proposed) {
+        return proposed != null && expected.getCount() == proposed.getCount()
+                && expected.equals(proposed, true, false);
     }
 
     public Item getItemInHandFast() {
@@ -148,7 +279,7 @@ public class PlayerInventory extends BaseInventory {
             return;
         }
 
-        this.itemInHandIndex = slot;
+        this.updateHeldItemIndex(slot);
 
         if (this.getHolder() instanceof Player) {
             this.sendHeldItem((Player) this.getHolder());
@@ -194,6 +325,12 @@ public class PlayerInventory extends BaseInventory {
     @Override
     public void onSlotChange(int index, Item before, boolean send) {
         EntityHuman holder = this.getHolder();
+        if (index == this.itemInHandIndex) {
+            this.heldItemRevision++;
+            if (holder instanceof Player player) {
+                player.resetCrossbowInputState();
+            }
+        }
         if (holder instanceof Player && !((Player) holder).spawned) {
             return;
         }
@@ -618,12 +755,17 @@ public class PlayerInventory extends BaseInventory {
 
         if (p.protocol < 407) {
             if (p.protocol < ProtocolInfo.v1_2_0) {
+                // 1.1.x 仅创造模式下发创造列表，其余模式保留客户端内置列表。
+                // Only creative 1.1.x clients get the list; other modes keep the built-in one.
+                if (!p.isCreative()) {
+                    return;
+                }
                 ContainerSetContentPacket_v113 pk = new ContainerSetContentPacket_v113();
                 pk.windowid = ContainerSetContentPacket_v113.SPECIAL_CREATIVE;
                 pk.eid = p.getId();
-                if (!p.isSpectator()) {
-                    pk.slots = Item.getCreativeItems(p.getGameVersion()).toArray(Item.EMPTY_ARRAY);
-                }
+                // 1.1.x 解析不了的物品已由 getCreativeItems 按 isSupportedOn 过滤。
+                // Items a 1.1.x client cannot parse are already filtered by isSupportedOn.
+                pk.slots = Item.getCreativeItems(p.getGameVersion()).toArray(Item.EMPTY_ARRAY);
                 p.dataPacket(pk);
             } else {
                 InventoryContentPacket pk = new InventoryContentPacket();

@@ -24,7 +24,7 @@ public class RequestChunkRadiusProcessor extends DataPacketProcessor<RequestChun
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RequestChunkRadiusPacket pk) {
         Player player = playerHandle.player;
         ChunkRadiusUpdatedPacket chunkRadiusUpdatePacket = new ChunkRadiusUpdatedPacket();
-        playerHandle.setChunkRadius(Math.max(3, Math.min(pk.radius, player.getViewDistance())));
+        playerHandle.setChunkRadius(Math.max(3, Math.min(pk.radius, player.getMaximumViewDistance())));
         chunkRadiusUpdatePacket.radius = playerHandle.getChunkRadius();
         player.dataPacket(chunkRadiusUpdatePacket);
     }

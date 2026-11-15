@@ -258,6 +258,7 @@ public class InventoryTransactionPacket extends DataPacket {
 
                 itemData.actionType = this.getTransactionActionType();
                 if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    itemData.hasTriggerType = true;
                     itemData.triggerType = this.protocol >= ProtocolInfo.v1_26_30 ? this.getByte() & 0xff : (int) this.getUnsignedVarInt();
                 }
                 itemData.blockPos = this.getBlockVector3(this.gameVersion);

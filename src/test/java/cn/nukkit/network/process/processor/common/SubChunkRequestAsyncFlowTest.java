@@ -78,6 +78,7 @@ class SubChunkRequestAsyncFlowTest {
         when(player.getName()).thenReturn("bench");
         when(player.getId()).thenReturn(1L);
         when(player.isClientBlobCacheActive()).thenReturn(false);
+        when(player.dataPacket(any(cn.nukkit.network.protocol.DataPacket.class))).thenReturn(true);
 
         level = mock(Level.class);
         when(player.getLevel()).thenReturn(level);
@@ -241,6 +242,8 @@ class SubChunkRequestAsyncFlowTest {
 
     @Test
     void serializationFailureDegradesOnlyThatEntryAndAllowsRetry() {
+        long column = Level.chunkHash(3, 5);
+        state.onColumnSent(column, tick.get(), true);
         BaseChunk chunk = chunkWithSection();
         ChunkSection section = chunk.getSections()[0];
         doThrow(new IllegalStateException("broken section"))
@@ -264,6 +267,7 @@ class SubChunkRequestAsyncFlowTest {
         assertEquals(1, sent.size(), "a broken section must not swallow the whole answer");
         assertEquals(SubChunkRequestResult.CHUNK_NOT_FOUND, sent.get(0).subChunks.get(0).result);
         assertNull(sent.get(0).subChunks.get(0).data, "a degraded entry carries no payload");
+        assertFalse(state.isColumnDataReady(column, tick.get(), 200), "failed absolute Y=-4 stays missing");
 
         putChunkInView(chunkWithSection());
         SubChunkRequestProcessor.INSTANCE.handle(playerHandle, request(-4, 1));
@@ -271,6 +275,7 @@ class SubChunkRequestAsyncFlowTest {
         assertEquals(2, sentPackets().size(), "a later retry can still deliver terrain");
         assertEquals(SubChunkRequestResult.SUCCESS, sentPackets().get(1).subChunks.get(0).result);
         assertEquals(0, state.inFlightOffsetCount());
+        assertTrue(state.isColumnDataReady(column, tick.get(), 200), "the exact Y=-4 retry fulfills the missing receipt");
     }
 
     @Test
@@ -439,6 +444,78 @@ class SubChunkRequestAsyncFlowTest {
     }
 
     /** 手工完成应答：每份 count 个 SUCCESS 条目 / handcrafted answer: count SUCCESS entries each */
+    @Test
+    void overCapRequestIsAnsweredWithFailureEntries() {
+        fillDeferredQueue();
+        SubChunkRequestPacket overflow = overflowRequest(2);
+
+        SubChunkRequestProcessor.INSTANCE.handle(playerHandle, overflow);
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        List<SubChunkPacket.SubChunkData> answered = overflowEntries();
+        assertEquals(2, answered.size(), "every over-cap offset must be answered, or the client stays deduped");
+        assertTrue(answered.stream().allMatch(entry -> entry.result == SubChunkRequestResult.CHUNK_NOT_FOUND));
+        assertFalse(state.hasRejected());
+    }
+
+    @Test
+    void overCapFailureAnswersRespectTheSharedTickByteBudget() {
+        fillDeferredQueue();
+        SubChunkRequestProcessor.INSTANCE.handle(playerHandle, overflowRequest(3));
+        state.accountResponseBytes(tick.get(), state.remainingResponseBytes(tick.get()) - 40);
+
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        assertEquals(1, overflowEntries().size(), "only the entry that fits the remaining budget is sent");
+        assertTrue(state.hasRejected(), "the rest waits for the next tick");
+
+        tick.incrementAndGet();
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        assertEquals(3, overflowEntries().size());
+        assertFalse(state.hasRejected());
+    }
+
+    @Test
+    void refusedFailureAnswerIsRetriedNextTick() {
+        fillDeferredQueue();
+        SubChunkRequestProcessor.INSTANCE.handle(playerHandle, overflowRequest(2));
+        when(player.dataPacket(any(cn.nukkit.network.protocol.DataPacket.class))).thenReturn(false);
+
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        assertTrue(state.hasRejected(), "a refused failure answer stays queued");
+
+        when(player.dataPacket(any(cn.nukkit.network.protocol.DataPacket.class))).thenReturn(true);
+        tick.incrementAndGet();
+        SubChunkRequestProcessor.tickRequests(playerHandle);
+
+        assertFalse(state.hasRejected());
+    }
+
+    private void fillDeferredQueue() {
+        state.acquireInFlightOffsets(PlayerSubChunkRequestState.MAX_IN_FLIGHT_OFFSETS);
+        for (int i = 0; i < 256; i++) {
+            assertTrue(state.tryDefer(request(-4, 1)));
+        }
+    }
+
+    private SubChunkRequestPacket overflowRequest(int offsets) {
+        SubChunkRequestPacket pk = request(-4, 0);
+        pk.subChunkPosition = new BlockVector3(50, -4, 50);
+        for (int y = 0; y < offsets; y++) {
+            pk.positionOffsets.add(new BlockVector3(0, y, 0));
+        }
+        return pk;
+    }
+
+    private List<SubChunkPacket.SubChunkData> overflowEntries() {
+        return sentPackets().stream()
+                .filter(packet -> packet.centerPosition.x == 50)
+                .flatMap(packet -> packet.subChunks.stream())
+                .toList();
+    }
+
     private PlayerSubChunkRequestState.CompletedSubChunkAnswer answerOf(SubChunkRequestPacket pk, int count) {
         java.util.ArrayList<SubChunkPacket.SubChunkData> entries = new java.util.ArrayList<>(count);
         for (int i = 0; i < count; i++) {
