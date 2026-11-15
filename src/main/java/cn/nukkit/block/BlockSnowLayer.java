@@ -86,10 +86,13 @@ public class BlockSnowLayer extends BlockFallableMeta {
             }
 
             if (this.level.getBlockIdAt(this.getFloorX(), this.getFloorY(), this.getFloorZ()) == SNOW_LAYER && !this.canSurvive()) {
-                this.level.useBreakOn(this, null, null, true);
+                // 直接掉落必须先于收尾事件派发：插件在 outermost 事件上清理来源标记，之后到达的掉落无法再归因
+                // The direct drop must fire before the completion event: plugins clear source markers on the
+                // outermost event, so any drop arriving afterwards can no longer be attributed
                 if (this.level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
-                    this.level.dropItem(this, Item.get(Item.SNOWBALL));
+                    this.level.dropItemFromAutomaticBlock(this, Item.get(Item.SNOWBALL));
                 }
+                this.level.useBreakOn(this, null, null, true);
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if (this.getLevel().getBlockLightAt((int) this.x, (int) this.y, (int) this.z) >= 10) {

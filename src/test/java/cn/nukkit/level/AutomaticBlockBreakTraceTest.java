@@ -45,106 +45,19 @@ class AutomaticBlockBreakTraceTest {
     }
 
     @Test
-    void directDropsKeepTheExactSourceAcrossAThreeBlockChainButExcludeContents() {
+    void firstRemovalOfAReplacedCellWins() {
         AutomaticBlockBreakTrace trace = new AutomaticBlockBreakTrace();
-        Block first = at(Block.get(BlockID.POINTED_DRIPSTONE), 8, 40, 9, 0);
-        Block second = at(Block.get(BlockID.POINTED_DRIPSTONE), 8, 41, 9, 0);
-        Block third = at(Block.get(BlockID.POINTED_DRIPSTONE), 8, 42, 9, 0);
-
-        assertFalse(trace.isActive());
-        try (AutomaticBlockBreakTrace.Scope ignored = trace.enter()) {
-            assertTrue(trace.isActive());
-            for (Block source : new Block[] {first, second, third}) {
-                assertSame(source, trace.directDropSource(source));
-                Block air = at(
-                        Block.get(BlockID.AIR),
-                        source.getFloorX(),
-                        source.getFloorY(),
-                        source.getFloorZ(),
-                        0);
-                trace.record(source, air);
-                assertSame(source, trace.directDropSource(air));
-            }
-
-            trace.enterBlockEntityDrops();
-            try {
-                assertNull(trace.directDropSource(first));
-            } finally {
-                trace.leaveBlockEntityDrops();
-            }
-        }
-        assertFalse(trace.isActive());
-    }
-
-    @Test
-    void directDropsAlreadyDispatchedByAClosedNestedScopeAreNotReclassified() {
-        AutomaticBlockBreakTrace trace = new AutomaticBlockBreakTrace();
-        Block cactus = at(Block.get(BlockID.CACTUS), 5, 10, 5, 0);
+        Block original = at(Block.get(BlockID.CACTUS), 5, 10, 5, 0);
+        Block transition = at(Block.get(BlockID.STONE), 5, 10, 5, 0);
+        Block replayed = at(Block.get(BlockID.CACTUS), 5, 10, 5, 0);
         Block air = at(Block.get(BlockID.AIR), 5, 10, 5, 0);
 
-        try (AutomaticBlockBreakTrace.Scope outer = trace.enter()) {
-            try (AutomaticBlockBreakTrace.Scope ignored = trace.enter()) {
-                trace.record(cactus, air);
-                assertSame(cactus, trace.directDropSource(air));
-            }
-            // 同一批掉落已随内层终批派发，外层不得再次归因
-            assertNull(trace.directDropSource(air));
-        }
-    }
-
-    @Test
-    void aNewerNestedBreakAtTheSameCellKeepsItsOwnSource() {
-        AutomaticBlockBreakTrace trace = new AutomaticBlockBreakTrace();
-        Block first = at(Block.get(BlockID.CACTUS), 5, 10, 5, 0);
-        Block second = at(Block.get(BlockID.CACTUS), 5, 10, 5, 0);
-        Block air = at(Block.get(BlockID.AIR), 5, 10, 5, 0);
-
-        try (AutomaticBlockBreakTrace.Scope outer = trace.enter()) {
-            try (AutomaticBlockBreakTrace.Scope ignored = trace.enter()) {
-                trace.record(first, air);
-            }
-            assertNull(trace.directDropSource(air));
-
-            try (AutomaticBlockBreakTrace.Scope ignored = trace.enter()) {
-                trace.record(second, air);
-                assertSame(second, trace.directDropSource(air));
-            }
-        }
-    }
-
-    @Test
-    void aCellReplacedWithAnotherBlockIsNotReattributedAfterItsBatchWasDispatched() {
-        AutomaticBlockBreakTrace trace = new AutomaticBlockBreakTrace();
-        Block ice = at(Block.get(BlockID.ICE), 5, 10, 5, 0);
-        Block water = at(Block.get(BlockID.WATER), 5, 10, 5, 0);
-
-        try (AutomaticBlockBreakTrace.Scope outer = trace.enter()) {
-            try (AutomaticBlockBreakTrace.Scope ignored = trace.enter()) {
-                trace.record(ice, water);
-            }
-            // 内层终批已派发，替换后的水不得作为新的掉落来源
-            assertNull(trace.directDropSource(water));
-        }
-    }
-
-    @Test
-    void aFreshChainResolvesTheSameCellAgain() {
-        AutomaticBlockBreakTrace trace = new AutomaticBlockBreakTrace();
-        Block first = at(Block.get(BlockID.CACTUS), 5, 10, 5, 0);
-        Block second = at(Block.get(BlockID.CACTUS), 5, 10, 5, 0);
-        Block air = at(Block.get(BlockID.AIR), 5, 10, 5, 0);
-
-        try (AutomaticBlockBreakTrace.Scope outer = trace.enter()) {
-            try (AutomaticBlockBreakTrace.Scope ignored = trace.enter()) {
-                trace.record(first, air);
-            }
-            assertNull(trace.directDropSource(air));
-        }
-
-        // 已派发标记只作用于当前链，新链需重新归因同一格
-        try (AutomaticBlockBreakTrace.Scope next = trace.enter()) {
-            trace.record(second, air);
-            assertSame(second, trace.directDropSource(air));
+        try (AutomaticBlockBreakTrace.Scope scope = trace.enter()) {
+            trace.record(original, air);
+            trace.record(transition, air);
+            assertArrayEquals(new Block[] {original}, scope.changedBlocks());
+            trace.record(replayed, air);
+            assertArrayEquals(new Block[] {original}, scope.changedBlocks());
         }
     }
 

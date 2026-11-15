@@ -10,12 +10,19 @@ import java.util.Objects;
 /**
  * Called before a source-derived block drop is created. Interaction output preserves its source
  * without removing the block or completing a break chain. The terminal
- * event for a break runs after the block is removed; direct drops produced from inside
- * {@code Block.onBreak} run immediately
- * with {@link #isOutermostBreak()} false and an empty changed-block list.
+ * event for a break runs after the block is removed; direct drops produced by automatic removals
+ * run immediately with {@link #isOutermostBreak()} false and an empty changed-block list.
  * Player-authored breaks already expose their primary batch through {@code BlockBreakEvent}; they
  * therefore emit an empty terminal batch only to complete secondary-cell bookkeeping, while any
- * direct secondary drops still use this event normally.
+ * direct secondary drops fire their own events normally.
+ *
+ * <p>归因来源只有两个：useBreakOn 的终批与 {@code Level.dropItemFromAutomaticBlock}。
+ * 普通 {@code Level.dropItem} 从不触发本事件——自定义方块若想让 onBreak 内的掉落可取消，
+ * 必须改调 {@code dropItemFromAutomaticBlock}，而不是按坐标推断的隐式归因。
+ * <p>Drops are attributed only by the useBreakOn terminal batch or by
+ * {@code Level.dropItemFromAutomaticBlock}. Plain {@code Level.dropItem} never fires this
+ * event: custom blocks that want their onBreak drops cancellable must call
+ * {@code dropItemFromAutomaticBlock} instead of relying on coordinate-based inference.
  *
  * <p>The source block is kept even if it has already been replaced or removed from the level. Plugins can
  * therefore distinguish real block drops from items thrown at the same coordinates. The whole

@@ -4,13 +4,23 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.utils.Hash;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-/** Collects every main-layer block replaced by a synchronous automatic break chain. */
+/**
+ * Collects every main-layer block replaced by a synchronous automatic break chain.
+ * <p>
+ * 只做变更簿记，不做掉落归因：来源由 {@code Level.dropItemFromAutomaticBlock} 显式传入，
+ * 避免把链内同坐标的无关掉落误判为方块掉落。
+ * <p>Records replaced blocks only. Drop attribution is passed explicitly through
+ * {@code Level.dropItemFromAutomaticBlock} so unrelated drops at the same coordinates are
+ * never misattributed.
+ */
 final class AutomaticBlockBreakTrace {
 
     private final Deque<Scope> scopes = new ArrayDeque<>();
-    private int blockEntityDropDepth;
 
     boolean isActive() {
         return !scopes.isEmpty();
@@ -37,63 +47,10 @@ final class AutomaticBlockBreakTrace {
         }
     }
 
-    /**
-     * Returns the exact block snapshot responsible for a direct Level.dropItem call made from
-     * Block.onBreak. Block-entity onBreak hooks are excluded because those drops are container
-     * contents, records and books rather than copies of the removed block.
-     *
-     * <p>已被关闭的内层 scope 派发过的格子不再归因：内层终批在外层 scope 仍活跃时生成，
-     * 重复归因会让同一次物理掉落派发两次事件。
-     * <p>Cells dispatched by a closed inner scope are skipped: the inner terminal batch is spawned
-     * while the outer scope is still active, and re-attributing those cells would dispatch the
-     * same physical drop twice.
-     */
-    Block directDropSource(Block current) {
-        if (scopes.isEmpty() || blockEntityDropDepth > 0 || current == null) {
-            return null;
-        }
-        long key = Hash.hashBlock(current.getFloorX(), current.getFloorY(), current.getFloorZ());
-        if (current.getId() != BlockID.AIR) {
-            return anyDispatched(key) ? null : current;
-        }
-        for (Scope scope : scopes) {
-            // 派发标记优先于同层 changed 中的旧记录，避免内层关闭后二次归因
-            if (scope.dispatched.contains(key)) {
-                return null;
-            }
-            Block changed = scope.changed.get(key);
-            if (changed != null) {
-                return changed;
-            }
-        }
-        return null;
-    }
-
-    private boolean anyDispatched(long key) {
-        for (Scope scope : scopes) {
-            if (scope.dispatched.contains(key)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    void enterBlockEntityDrops() {
-        blockEntityDropDepth++;
-    }
-
-    void leaveBlockEntityDrops() {
-        if (blockEntityDropDepth <= 0) {
-            throw new IllegalStateException("Block-entity drop scopes closed out of order");
-        }
-        blockEntityDropDepth--;
-    }
-
     final class Scope implements AutoCloseable {
 
         private final boolean outermost;
         private final Map<Long, Block> changed = new LinkedHashMap<>();
-        private final Set<Long> dispatched = new HashSet<>();
         private boolean closed;
 
         private Scope(boolean outermost) {
@@ -118,11 +75,6 @@ final class AutomaticBlockBreakTrace {
             }
             scopes.pop();
             closed = true;
-            Scope parent = scopes.peek();
-            if (parent != null) {
-                // 内层终批随关闭派发，格子移交父层已派发集合
-                parent.dispatched.addAll(changed.keySet());
-            }
         }
     }
 }

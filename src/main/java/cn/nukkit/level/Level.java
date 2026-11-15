@@ -2980,48 +2980,34 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void dropItem(Vector3 source, Item item, Vector3 motion, boolean dropAround, int delay) {
-        Block automaticSource = null;
-        if (automaticBlockBreakTrace.isActive()) {
-            automaticSource =
-                    automaticBlockBreakTrace.directDropSource(
-                            this.getBlock(
-                                    source.getFloorX(),
-                                    source.getFloorY(),
-                                    source.getFloorZ()));
-        }
-        this.dropItem(source, item, motion, dropAround, delay, automaticSource);
+        this.spawnDroppedItem(source, item, motion, dropAround, delay);
     }
 
-    /** Drops an item explicitly caused by an automatic block removal outside Block.onBreak. */
+    /**
+     * 生成一件由自动移除的方块直接造成的掉落，并派发可取消的 AutomaticBlockDropsEvent。
+     * 这是 useBreakOn 终批之外唯一的归因入口；普通 dropItem 永不触发本事件。
+     * <p>Drops an item directly caused by an automatic block removal and exposes it through a
+     * cancellable AutomaticBlockDropsEvent. This is the only attribution entry besides the
+     * useBreakOn terminal batch; plain dropItem never fires this event.
+     */
     public void dropItemFromAutomaticBlock(Block source, Item item) {
-        this.dropItem(source.add(0.5, 0.5, 0.5), item, null, false, 10, source);
+        this.dropItemFromBlock(source, item, AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK);
     }
 
-    /** Drops an interaction's output without attributing it to an active block-break chain. */
+    /**
+     * 生成一次方块交互的产物，不归因于任何活跃的破坏链。
+     * <p>Drops an interaction's output without attributing it to an active block-break chain.
+     */
     public void dropItemFromBlockInteraction(Block source, Item item) {
+        this.dropItemFromBlock(source, item, AutomaticBlockDropsEvent.Cause.BLOCK_INTERACTION);
+    }
+
+    private void dropItemFromBlock(Block source, Item item, AutomaticBlockDropsEvent.Cause cause) {
         Vector3 position = source.add(0.5, 0.5, 0.5);
         Item[] drops = fireAutomaticBlockDrops(
-                source, new Item[] {item}, Block.EMPTY_ARRAY, false,
-                AutomaticBlockDropsEvent.Cause.BLOCK_INTERACTION);
+                source, new Item[] {item}, Block.EMPTY_ARRAY, false, cause);
         for (Item drop : drops) {
             this.spawnDroppedItem(position, drop, null, false, 10);
-        }
-    }
-
-    private void dropItem(
-            Vector3 source,
-            Item item,
-            Vector3 motion,
-            boolean dropAround,
-            int delay,
-            Block automaticSource) {
-        Item[] drops = new Item[] {item};
-        if (automaticSource != null) {
-            drops = fireAutomaticBlockDrops(
-                    automaticSource, drops, Block.EMPTY_ARRAY, false);
-        }
-        for (Item drop : drops) {
-            this.spawnDroppedItem(source, drop, motion, dropAround, delay);
         }
     }
 
@@ -3248,12 +3234,7 @@ public class Level implements ChunkManager, Metadatable {
         try {
             BlockEntity blockEntity = this.getBlockEntity(target);
             if (blockEntity != null) {
-                automaticBlockBreakTrace.enterBlockEntityDrops();
-                try {
-                    blockEntity.onBreak();
-                } finally {
-                    automaticBlockBreakTrace.leaveBlockEntityDrops();
-                }
+                blockEntity.onBreak();
                 blockEntity.close();
 
                 this.updateComparatorOutputLevel(target);
@@ -3280,8 +3261,8 @@ public class Level implements ChunkManager, Metadatable {
         } else {
             // BlockBreakEvent has already filtered the player's primary drop batch. The empty
             // terminal event only completes durable provenance for every secondary cell changed
-            // by Block.onBreak; direct secondary dropItem calls were filtered while the trace was
-            // active.
+            // by Block.onBreak; direct secondary drops fire their own events through
+            // dropItemFromAutomaticBlock.
             fireAutomaticBlockDrops(
                     target,
                     Item.EMPTY_ARRAY,
