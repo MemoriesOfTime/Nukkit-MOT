@@ -4,10 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.item.Item;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
 class AutomaticBlockDropsEventTest {
@@ -21,7 +18,8 @@ class AutomaticBlockDropsEventTest {
 
         AutomaticBlockDropsEvent event =
                 new AutomaticBlockDropsEvent(
-                        source, new Item[] {first}, new Block[] {source, companion}, true);
+                        source, new Item[] {first}, new Block[] {source, companion}, true,
+                        AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK);
 
         assertSame(source, event.getBlock());
         assertArrayEquals(new Item[] {first}, event.getDrops());

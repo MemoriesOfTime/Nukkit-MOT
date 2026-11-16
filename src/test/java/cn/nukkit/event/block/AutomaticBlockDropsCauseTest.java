@@ -4,32 +4,40 @@ import cn.nukkit.block.Block;
 import cn.nukkit.item.Item;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
 class AutomaticBlockDropsCauseTest {
 
     @Test
-    void legacyConstructorRetainsAutomaticBreakAndTerminalBookkeeping() {
+    void breakCausesRetainSourceAndTerminalBookkeeping() {
         Block source = mock(Block.class);
         Block[] changed = new Block[] {source};
-        AutomaticBlockDropsEvent legacy =
-                new AutomaticBlockDropsEvent(source, new Item[0], changed, true);
-        AutomaticBlockDropsEvent explicit = new AutomaticBlockDropsEvent(
-                source, new Item[0], changed, true,
-                AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK);
 
-        for (AutomaticBlockDropsEvent event : new AutomaticBlockDropsEvent[] {legacy, explicit}) {
-            assertEquals(AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK, event.getCause());
+        for (AutomaticBlockDropsEvent.Cause cause : new AutomaticBlockDropsEvent.Cause[] {
+                AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK,
+                AutomaticBlockDropsEvent.Cause.PLAYER_BREAK}) {
+            AutomaticBlockDropsEvent event =
+                    new AutomaticBlockDropsEvent(source, new Item[0], changed, true, cause);
+            assertEquals(cause, event.getCause());
             assertSame(source, event.getBlock());
             assertSame(changed, event.getChangedBlocks());
             assertTrue(event.isOutermostBreak());
         }
+    }
+
+    @Test
+    void playerBreakKeepsNestedBatchesCancellable() {
+        Block source = mock(Block.class);
+        Item drop = mock(Item.class);
+        AutomaticBlockDropsEvent event = new AutomaticBlockDropsEvent(
+                source, new Item[] {drop}, new Block[] {source}, false,
+                AutomaticBlockDropsEvent.Cause.PLAYER_BREAK);
+
+        assertFalse(event.isOutermostBreak());
+        assertArrayEquals(new Item[] {drop}, event.getDrops());
+        event.setCancelled();
+        assertTrue(event.isCancelled());
     }
 
     @Test

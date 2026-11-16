@@ -3055,13 +3055,17 @@ public class Level implements ChunkManager, Metadatable {
 
     /**
      * 生成一件由自动移除的方块直接造成的掉落，并派发可取消的 AutomaticBlockDropsEvent。
-     * 这是 useBreakOn 终批之外唯一的归因入口；普通 dropItem 永不触发本事件。
+     * 这是 useBreakOn 终批之外唯一的归因入口；活跃玩家破坏链内的掉落会标记为玩家来源。
      * <p>Drops an item directly caused by an automatic block removal and exposes it through a
      * cancellable AutomaticBlockDropsEvent. This is the only attribution entry besides the
-     * useBreakOn terminal batch; plain dropItem never fires this event.
+     * useBreakOn terminal batch; drops inside an active player chain are tagged as player-authored.
      */
     public void dropItemFromAutomaticBlock(Block source, Item item) {
-        this.dropItemFromBlock(source, item, AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK);
+        Player chainOrigin = automaticBlockBreakTrace.currentOrigin();
+        AutomaticBlockDropsEvent.Cause cause = chainOrigin == null
+                ? AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK
+                : AutomaticBlockDropsEvent.Cause.PLAYER_BREAK;
+        this.dropItemFromBlock(source, item, chainOrigin, cause);
     }
 
     /**
@@ -3069,16 +3073,26 @@ public class Level implements ChunkManager, Metadatable {
      * <p>Drops an interaction's output without attributing it to an active block-break chain.
      */
     public void dropItemFromBlockInteraction(Block source, Item item) {
-        this.dropItemFromBlock(source, item, AutomaticBlockDropsEvent.Cause.BLOCK_INTERACTION);
+        this.dropItemFromBlock(source, item, null, AutomaticBlockDropsEvent.Cause.BLOCK_INTERACTION);
     }
 
-    private void dropItemFromBlock(Block source, Item item, AutomaticBlockDropsEvent.Cause cause) {
+    private void dropItemFromBlock(
+            Block source, Item item, @Nullable Player chainOrigin, AutomaticBlockDropsEvent.Cause cause) {
         Vector3 position = source.add(0.5, 0.5, 0.5);
-        Item[] drops = fireAutomaticBlockDrops(
-                source, new Item[] {item}, Block.EMPTY_ARRAY, false, cause);
+        Item[] batch = keepsChainDrops(chainOrigin) ? new Item[] {item} : Item.EMPTY_ARRAY;
+        Item[] drops = fireAutomaticBlockDrops(source, batch, Block.EMPTY_ARRAY, false, cause);
         for (Item drop : drops) {
             this.spawnDroppedItem(position, drop, null, false, 10);
         }
+    }
+
+    /**
+     * 玩家链沿用玩家自己的掉落规则：创造模式不产出物品，自动链始终保留掉落。
+     * <p>Player chains keep the player's own drop rules (creative yields nothing); automatic chains
+     * always keep their drops.
+     */
+    private static boolean keepsChainDrops(@Nullable Player chainOrigin) {
+        return chainOrigin == null || chainOrigin.isSurvival() || chainOrigin.isAdventure();
     }
 
     private void spawnDroppedItem(
@@ -3114,13 +3128,6 @@ public class Level implements ChunkManager, Metadatable {
 
             itemEntity.spawnToAll();
         }
-    }
-
-    private Item[] fireAutomaticBlockDrops(
-            Block source, Item[] drops, Block[] changedBlocks, boolean outermostBreak) {
-        return fireAutomaticBlockDrops(
-                source, drops, changedBlocks, outermostBreak,
-                AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK);
     }
 
     private Item[] fireAutomaticBlockDrops(
@@ -3322,7 +3329,7 @@ public class Level implements ChunkManager, Metadatable {
             this.addParticle(new DestroyBlockParticle(target.add(0.5), target), players.values());
         }
 
-        AutomaticBlockBreakTrace.Scope automaticBreak = automaticBlockBreakTrace.enter();
+        AutomaticBlockBreakTrace.Scope automaticBreak = automaticBlockBreakTrace.enter(player);
         try {
             BlockEntity blockEntity = this.getBlockEntity(target);
             if (blockEntity != null) {
@@ -3346,12 +3353,22 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
+        Player chainOrigin = automaticBreak.getOrigin();
+        AutomaticBlockDropsEvent.Cause cause = chainOrigin == null
+                ? AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK
+                : AutomaticBlockDropsEvent.Cause.PLAYER_BREAK;
+
         if (player == null) {
+            // 玩家链内的嵌套破坏沿用玩家的掉落规则：创造模式不产出物品；纯自动链不受影响。
+            // Nested breaks inside a player chain keep the player's drop rules (creative yields
+            // nothing); purely automatic chains are unaffected.
+            Item[] batch = keepsChainDrops(chainOrigin) ? drops : Item.EMPTY_ARRAY;
             drops = fireAutomaticBlockDrops(
                     target,
-                    drops,
+                    batch,
                     automaticBreak.changedBlocks(),
-                    automaticBreak.isOutermost());
+                    automaticBreak.isOutermost(),
+                    cause);
         } else {
             // BlockBreakEvent has already filtered the player's primary drop batch. The empty
             // terminal event only completes durable provenance for every secondary cell changed
@@ -3361,7 +3378,8 @@ public class Level implements ChunkManager, Metadatable {
                     target,
                     Item.EMPTY_ARRAY,
                     automaticBreak.changedBlocks(),
-                    automaticBreak.isOutermost());
+                    automaticBreak.isOutermost(),
+                    cause);
         }
 
         if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)

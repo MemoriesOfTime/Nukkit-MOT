@@ -5,6 +5,7 @@ import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.*;
+import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.block.properties.enums.DripstoneThickness;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityChest;
@@ -607,7 +608,9 @@ class AutomaticBlockDropsAttributionTest {
         assertEquals(1, directDrop.getDrops().length);
         assertEquals(Item.SNOWBALL, directDrop.getDrops()[0].getId());
         assertTrue(directDrop.isCancelled(), "the direct drop must still be attributable when it fires");
+        assertEquals(AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK, directDrop.getCause());
         assertTrue(completion.isOutermostBreak(), "the completion event must be the chain's last event");
+        assertEquals(AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK, completion.getCause());
 
         assertTrue(fixture.spawned.isEmpty(), "the cancelled snowball must not spawn");
         assertEquals(
@@ -749,6 +752,177 @@ class AutomaticBlockDropsAttributionTest {
         assertEquals(Set.of(bottomCell, topCell), changedCells);
         assertEquals(1, fixture.spawned.size(), "the primary drop must be spawned exactly once");
         assertEquals(sunflowerItem, fixture.spawned.get(0).getId());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {BlockID.DOUBLE_PLANT, BlockID.PITCHER_PLANT, BlockID.PITCHER_CROP})
+    void playerTopHalfBreakKeepsTheHarvestInThePlayerChain(int blockId) {
+        Fixture fixture = new Fixture(event -> { });
+        Block lower = lowerHalf(blockId);
+        Block upper = upperHalf(blockId);
+        fixture.put(lower, 5, 64, 0);
+        fixture.put(upper, 5, 65, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+        int harvestItem = lower.getDrops(Item.get(Item.AIR))[0].getId();
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            assertNotNull(fixture.level.useBreakOn(
+                    new Vector3(5, 65, 0), BlockFace.DOWN, Item.get(Item.AIR), player, false));
+        }
+
+        assertEquals(1, fixture.playerBreakEvents.size());
+        assertEquals(0, fixture.playerBreakEvents.get(0).getDrops().length,
+                "the upper half never owns the harvest batch");
+        assertEquals(2, fixture.events.size(), "the nested batch and the closing event");
+        AutomaticBlockDropsEvent harvest = fixture.events.get(0);
+        assertFalse(harvest.isOutermostBreak(), "the nested batch runs before the chain closes");
+        assertEquals(AutomaticBlockDropsEvent.Cause.PLAYER_BREAK, harvest.getCause(),
+                "a player-started chain must not look like an automatic break");
+        assertEquals(1, harvest.getDrops().length);
+        AutomaticBlockDropsEvent terminal = fixture.events.get(1);
+        assertTrue(terminal.isOutermostBreak());
+        assertEquals(AutomaticBlockDropsEvent.Cause.PLAYER_BREAK, terminal.getCause());
+        assertEquals(0, terminal.getDrops().length, "the primary batch belongs to BlockBreakEvent");
+        assertEquals(1, fixture.spawned.size());
+        assertEquals(harvestItem, fixture.spawned.get(0).getId());
+        assertEquals(BlockID.AIR, fixture.level.getBlock(new Vector3(5, 64, 0)).getId());
+        assertEquals(BlockID.AIR, fixture.level.getBlock(new Vector3(5, 65, 0)).getId());
+    }
+
+    @Test
+    void outermostPlayerEventIsBookkeepingAndCannotRollBackTheHarvest() {
+        Fixture fixture = new Fixture(event -> {
+            if (event.isOutermostBreak()) {
+                event.setCancelled();
+            }
+        });
+        fixture.put(doublePlant(0), 5, 64, 0);
+        fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            fixture.level.useBreakOn(
+                    new Vector3(5, 65, 0), BlockFace.DOWN, Item.get(Item.AIR), player, false);
+        }
+
+        assertEquals(1, fixture.spawned.size(),
+                "the nested batch is already created before the closing event fires");
+        assertEquals(AutomaticBlockDropsEvent.Cause.PLAYER_BREAK, fixture.events.get(0).getCause());
+        assertFalse(fixture.events.get(0).isOutermostBreak());
+        assertTrue(fixture.events.get(1).isOutermostBreak());
+        assertTrue(fixture.events.get(1).isCancelled());
+    }
+
+    @Test
+    void automaticDropPolicyDoesNotSwallowPlayerHarvest() {
+        Fixture fixture = new Fixture(event -> {
+            if (event.getCause() == AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK) {
+                event.setCancelled();
+            }
+        });
+        fixture.put(doublePlant(0), 5, 64, 0);
+        fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            fixture.level.useBreakOn(
+                    new Vector3(5, 65, 0), BlockFace.DOWN, Item.get(Item.AIR), player, false);
+        }
+
+        assertEquals(1, fixture.spawned.size(),
+                "an automatic-drop policy must not suppress a player harvest");
+        assertEquals(doublePlant(0).toItem().getId(), fixture.spawned.get(0).getId());
+    }
+
+    @Test
+    void playerChainNestedBatchStaysCancellable() {
+        Fixture fixture = new Fixture(event -> {
+            if (event.getCause() == AutomaticBlockDropsEvent.Cause.PLAYER_BREAK
+                    && !event.isOutermostBreak()) {
+                event.setCancelled();
+            }
+        });
+        fixture.put(doublePlant(0), 5, 64, 0);
+        fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            fixture.level.useBreakOn(
+                    new Vector3(5, 65, 0), BlockFace.DOWN, Item.get(Item.AIR), player, false);
+        }
+
+        assertTrue(fixture.spawned.isEmpty(), "nested player batches must remain cancellable");
+        assertEquals(BlockID.AIR, fixture.level.getBlock(new Vector3(5, 64, 0)).getId());
+        assertEquals(BlockID.AIR, fixture.level.getBlock(new Vector3(5, 65, 0)).getId());
+    }
+
+    @Test
+    void creativeTopHalfBreakYieldsNoHarvest() {
+        Fixture fixture = new Fixture(event -> { });
+        fixture.put(doublePlant(0), 5, 64, 0);
+        fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
+        Player player = Mockito.mock(Player.class);
+        player.gamemode = Player.CREATIVE;
+        Mockito.when(player.getGamemode()).thenReturn(Player.CREATIVE);
+        Mockito.when(player.isCreative()).thenReturn(true);
+        player.lastBreak = -1;
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            fixture.level.useBreakOn(
+                    new Vector3(5, 65, 0), BlockFace.DOWN, Item.get(Item.AIR), player, false);
+        }
+
+        assertTrue(fixture.spawned.isEmpty(), "creative breaks must not produce harvest items");
+        assertEquals(2, fixture.events.size());
+        assertEquals(AutomaticBlockDropsEvent.Cause.PLAYER_BREAK, fixture.events.get(0).getCause());
+        assertEquals(0, fixture.events.get(0).getDrops().length);
+        assertEquals(BlockID.AIR, fixture.level.getBlock(new Vector3(5, 64, 0)).getId());
+        assertEquals(BlockID.AIR, fixture.level.getBlock(new Vector3(5, 65, 0)).getId());
+    }
+
+    @Test
+    void playerBookkeepingBatchIsDistinguishableFromAutomaticBreaks() {
+        Fixture playerFixture = new Fixture(event -> { });
+        playerFixture.put(Block.get(BlockID.SNOW_LAYER), 5, 64, 0);
+        playerFixture.put(Block.get(BlockID.STONE), 5, 63, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(EntityItem.class)) {
+            playerFixture.level.useBreakOn(
+                    new Vector3(5, 64, 0), BlockFace.UP, Item.get(Item.AIR), player, false);
+        }
+        assertEquals(1, playerFixture.events.size());
+        assertEquals(AutomaticBlockDropsEvent.Cause.PLAYER_BREAK,
+                playerFixture.events.get(0).getCause());
+        assertTrue(playerFixture.events.get(0).isOutermostBreak());
+        assertEquals(0, playerFixture.events.get(0).getDrops().length);
+
+        Fixture automaticFixture = new Fixture(event -> { });
+        automaticFixture.put(Block.get(BlockID.SNOW_LAYER), 5, 64, 0);
+        automaticFixture.put(Block.get(BlockID.STONE), 5, 63, 0);
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(EntityItem.class)) {
+            automaticFixture.level.useBreakOn(
+                    new Vector3(5, 64, 0), BlockFace.UP, Item.get(Item.STONE), null, true);
+        }
+        assertEquals(1, automaticFixture.events.size());
+        assertEquals(AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK,
+                automaticFixture.events.get(0).getCause());
+        assertTrue(automaticFixture.events.get(0).isOutermostBreak());
+        assertEquals(0, automaticFixture.events.get(0).getDrops().length);
     }
 
     @ParameterizedTest
@@ -1060,6 +1234,64 @@ class AutomaticBlockDropsAttributionTest {
         assertEquals(cancelDrop ? 2 : 3, fixture.spawned.size());
     }
 
+    @Test
+    void playerDripstoneColumnHarvestKeepsPlayerAttribution() {
+        Fixture fixture = new Fixture(event -> { });
+        fixture.put(dripstone(DripstoneThickness.BASE, false), 5, 64, 0);
+        fixture.put(dripstone(DripstoneThickness.MIDDLE, false), 5, 65, 0);
+        fixture.put(dripstone(DripstoneThickness.TIP, false), 5, 66, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            assertNotNull(fixture.level.useBreakOn(
+                    new Vector3(5, 64, 0), BlockFace.UP, Item.get(Item.AIR), player, false));
+        }
+
+        List<AutomaticBlockDropsEvent> direct = new ArrayList<>();
+        for (AutomaticBlockDropsEvent event : fixture.events) {
+            if (!event.isOutermostBreak()) {
+                direct.add(event);
+            }
+        }
+        assertEquals(2, direct.size(), "the two remaining segments drop directly");
+        assertTrue(direct.stream().allMatch(
+                        event -> event.getCause() == AutomaticBlockDropsEvent.Cause.PLAYER_BREAK),
+                "direct drops inside a player chain are player-authored");
+        AutomaticBlockDropsEvent terminal = fixture.events.get(fixture.events.size() - 1);
+        assertTrue(terminal.isOutermostBreak());
+        assertEquals(AutomaticBlockDropsEvent.Cause.PLAYER_BREAK, terminal.getCause());
+        assertEquals(3, fixture.spawned.size(), "the player harvest keeps all three segments");
+    }
+
+    @Test
+    void creativeDripstoneColumnHarvestYieldsNoItems() {
+        Fixture fixture = new Fixture(event -> { });
+        fixture.put(dripstone(DripstoneThickness.BASE, false), 5, 64, 0);
+        fixture.put(dripstone(DripstoneThickness.MIDDLE, false), 5, 65, 0);
+        fixture.put(dripstone(DripstoneThickness.TIP, false), 5, 66, 0);
+        Player player = Mockito.mock(Player.class);
+        player.gamemode = Player.CREATIVE;
+        Mockito.when(player.getGamemode()).thenReturn(Player.CREATIVE);
+        Mockito.when(player.isCreative()).thenReturn(true);
+        player.lastBreak = -1;
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            assertNotNull(fixture.level.useBreakOn(
+                    new Vector3(5, 64, 0), BlockFace.UP, Item.get(Item.AIR), player, false));
+        }
+
+        assertTrue(fixture.spawned.isEmpty(), "creative breaks must not produce direct drops");
+        assertTrue(fixture.events.stream()
+                        .filter(event -> !event.isOutermostBreak())
+                        .allMatch(event -> event.getCause() == AutomaticBlockDropsEvent.Cause.PLAYER_BREAK
+                                && event.getDrops().length == 0),
+                "creative direct drops stay player-authored but empty");
+    }
+
     private static BlockPointedDripstone dripstone(DripstoneThickness thickness, boolean hanging) {
         for (int meta = 0; meta < 16; meta++) {
             Block block = Block.get(BlockID.POINTED_DRIPSTONE, meta);
@@ -1074,6 +1306,44 @@ class AutomaticBlockDropsAttributionTest {
 
     private static BlockDoublePlant doublePlant(int meta) {
         return (BlockDoublePlant) Block.get(BlockID.DOUBLE_PLANT, meta);
+    }
+
+    private static Block lowerHalf(int blockId) {
+        switch (blockId) {
+            case BlockID.DOUBLE_PLANT:
+                return doublePlant(0);
+            case BlockID.PITCHER_PLANT: {
+                BlockPitcherPlant plant = (BlockPitcherPlant) Block.get(BlockID.PITCHER_PLANT);
+                plant.setPropertyValue(VanillaProperties.UPPER_BLOCK, false);
+                return plant;
+            }
+            case BlockID.PITCHER_CROP: {
+                BlockPitcherCrop crop = (BlockPitcherCrop) Block.get(BlockID.PITCHER_CROP);
+                crop.setPropertyValue(VanillaProperties.UPPER_BLOCK, false);
+                return crop;
+            }
+            default:
+                throw new IllegalArgumentException("unsupported block " + blockId);
+        }
+    }
+
+    private static Block upperHalf(int blockId) {
+        switch (blockId) {
+            case BlockID.DOUBLE_PLANT:
+                return doublePlant(BlockDoublePlant.TOP_HALF_BITMASK);
+            case BlockID.PITCHER_PLANT: {
+                BlockPitcherPlant plant = (BlockPitcherPlant) Block.get(BlockID.PITCHER_PLANT);
+                plant.setPropertyValue(VanillaProperties.UPPER_BLOCK, true);
+                return plant;
+            }
+            case BlockID.PITCHER_CROP: {
+                BlockPitcherCrop crop = (BlockPitcherCrop) Block.get(BlockID.PITCHER_CROP);
+                crop.setPropertyValue(VanillaProperties.UPPER_BLOCK, true);
+                return crop;
+            }
+            default:
+                throw new IllegalArgumentException("unsupported block " + blockId);
+        }
     }
 
     /**

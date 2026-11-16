@@ -1,8 +1,10 @@
 package cn.nukkit.level;
 
+import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.utils.Hash;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -10,13 +12,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Collects every main-layer block replaced by a synchronous automatic break chain.
+ * 记录一条同步破坏链替换过的主层方块，并保留链的发起玩家。
  * <p>
- * 只做变更簿记，不做掉落归因：来源由 {@code Level.dropItemFromAutomaticBlock} 显式传入，
- * 避免把链内同坐标的无关掉落误判为方块掉落。
- * <p>Records replaced blocks only. Drop attribution is passed explicitly through
- * {@code Level.dropItemFromAutomaticBlock} so unrelated drops at the same coordinates are
- * never misattributed.
+ * 只做簿记，不做掉落归因：来源由 {@code Level.dropItemFromAutomaticBlock} 显式传入，
+ * 避免把链内同坐标的无关掉落误判为方块掉落；嵌套作用域未显式传入玩家时继承外层发起者。
+ * <p>Records every main-layer cell replaced by a synchronous break chain together with the
+ * player that started it. Attribution itself stays explicit so unrelated drops at the same
+ * coordinates are never misattributed; nested scopes without a player inherit the outer origin.
  */
 final class AutomaticBlockBreakTrace {
 
@@ -26,8 +28,24 @@ final class AutomaticBlockBreakTrace {
         return !scopes.isEmpty();
     }
 
-    Scope enter() {
-        Scope scope = new Scope(scopes.isEmpty());
+    /**
+     * 当前最内层作用域的发起玩家；无活跃作用域或纯物理链为 {@code null}。
+     * <p>Origin of the innermost active scope, or {@code null} without one.
+     */
+    @Nullable
+    Player currentOrigin() {
+        Scope scope = scopes.peek();
+        return scope == null ? null : scope.origin;
+    }
+
+    /**
+     * 进入一层破坏作用域；无显式玩家时继承外层链的发起者。
+     * <p>Enters a break scope; without an explicit player the enclosing chain's origin is inherited.
+     */
+    Scope enter(@Nullable Player player) {
+        Scope parent = scopes.peek();
+        Player origin = player != null ? player : (parent == null ? null : parent.origin);
+        Scope scope = new Scope(scopes.isEmpty(), origin);
         scopes.push(scope);
         return scope;
     }
@@ -52,15 +70,23 @@ final class AutomaticBlockBreakTrace {
     final class Scope implements AutoCloseable {
 
         private final boolean outermost;
+        private final Player origin;
         private final Map<Long, Block> changed = new LinkedHashMap<>();
         private boolean closed;
 
-        private Scope(boolean outermost) {
+        private Scope(boolean outermost, @Nullable Player origin) {
             this.outermost = outermost;
+            this.origin = origin;
         }
 
         boolean isOutermost() {
             return outermost;
+        }
+
+        /** 发起本链的玩家；纯物理链为 {@code null}。The player that started this chain, or {@code null}. */
+        @Nullable
+        Player getOrigin() {
+            return origin;
         }
 
         Block[] changedBlocks() {
