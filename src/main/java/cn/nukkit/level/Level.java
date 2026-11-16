@@ -3211,12 +3211,27 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Item useBreakOn(Vector3 vector, BlockFace face, Item item, Player player, boolean createParticles) {
+        return this.useBreakOn(vector, face, item, player, createParticles, null);
+    }
+
+    /**
+     * 使用交互指定的掉落处理瞬时破坏，保留玩家权限和事件校验，不改写挖掘计时；工具损耗由调用方处理。
+     * <p>Breaks a block instantly with interaction-specific drops, retaining player permission and event checks
+     * without changing the mining timer; the caller handles tool wear.
+     */
+    public Item useBreakOnFromBlockInteraction(Vector3 vector, Item item, Player player, Item[] drops) {
+        return this.useBreakOn(vector, null, item, player, true, Objects.requireNonNull(drops, "drops"));
+    }
+
+    private Item useBreakOn(Vector3 vector, BlockFace face, Item item, Player player,
+                            boolean createParticles, @Nullable Item[] interactionDrops) {
         if (player != null && player.getGamemode() > Player.ADVENTURE) {
             return null;
         }
         Block target = this.getBlock(vector);
         Item[] drops;
         int dropExp = target.getDropExp();
+        boolean instantBreak = interactionDrops != null;
 
         if (item == null) {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
@@ -3259,16 +3274,19 @@ public class Level implements ChunkManager, Metadatable {
             double requiredSeconds = breakTime - graceSeconds;
 
             Item[] eventDrops;
-            if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
+            if (interactionDrops != null) {
+                eventDrops = player.isSurvival() || player.isAdventure() ? interactionDrops : Item.EMPTY_ARRAY;
+            } else if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
                 eventDrops = new Item[]{target.toItem()};
             } else {
                 eventDrops = target.getDrops(player, item);
             }
             // lastBreak < 0 表示首次挖掘（初始值 -1），直接放行；否则验证已等待足够时间。
             // 直接比较已用时间与阈值而不构造截止时间：高等级挖掘疲劳会把阈值推到 long 溢出。
-            boolean fastBreak = player.lastBreak >= 0
+            boolean fastBreak = !instantBreak && player.lastBreak >= 0
                     && (System.currentTimeMillis() - player.lastBreak) < requiredSeconds * 1000;
-            BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops, player.isCreative(), fastBreak);
+            BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops,
+                    instantBreak || player.isCreative(), fastBreak);
 
             if ((player.isSurvival() || player.isAdventure()) && !target.isBreakable(item)) {
                 ev.setCancelled();
@@ -3283,12 +3301,16 @@ public class Level implements ChunkManager, Metadatable {
                 return null;
             }
 
-            player.lastBreak = System.currentTimeMillis();
+            if (!instantBreak) {
+                player.lastBreak = System.currentTimeMillis();
+            }
 
             drops = ev.getDrops();
             dropExp = ev.getDropExp();
         } else if (!target.isBreakable(item)) {
             return null;
+        } else if (interactionDrops != null) {
+            drops = interactionDrops;
         } else if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
             drops = new Item[]{target.toItem()};
         } else {
@@ -3315,11 +3337,13 @@ public class Level implements ChunkManager, Metadatable {
             automaticBreak.close();
         }
 
-        item.useOn(target);
-        if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-            this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-            this.addParticle(new ItemBreakParticle(target, item));
-            item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+        if (!instantBreak) {
+            item.useOn(target);
+            if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                this.addParticle(new ItemBreakParticle(target, item));
+                item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+            }
         }
 
         if (player == null) {
@@ -3961,7 +3985,7 @@ public class Level implements ChunkManager, Metadatable {
                 : null;
         this.getChunk(x >> 4, z >> 4, true).setBlockId(x & 0x0f, y, z & 0x0f, layer, id & Block.ID_MASK);
         if (previous != null) {
-            Block current = Block.get(id, previous.getDamage());
+            Block current = Block.get(id & Block.ID_MASK, previous.getDamage());
             current.x = x;
             current.y = y;
             current.z = z;
@@ -3997,7 +4021,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (previous != null) {
-            Block current = Block.get(id, data);
+            Block current = Block.get(id & Block.ID_MASK, data & Block.DATA_MASK);
             current.x = x;
             current.y = y;
             current.z = z;

@@ -67,9 +67,11 @@ public class BlockSnow extends BlockSolid {
     @Override
     public boolean onActivate(Item item, Player player) {
         if (item.isShovel()) {
-            if (this.level.useBreakOn(this, item.clone(), player, true) != null) {
-                item.useOn(this);
+            Item[] drops = this.getDrops(item.clone().clearNamedTag());
+            if (this.level.useBreakOnFromBlockInteraction(this, item.clone(), player, drops) == null) {
+                return false;
             }
+            item.useOn(this);
             return true;
         }
         return false;

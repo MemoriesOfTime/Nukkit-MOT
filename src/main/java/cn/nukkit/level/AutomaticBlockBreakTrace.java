@@ -42,8 +42,10 @@ final class AutomaticBlockBreakTrace {
             return;
         }
         long key = Hash.hashBlock(previous.getFloorX(), previous.getFloorY(), previous.getFloorZ());
+        // 隔离回调复用及内层事件修改，保留各层原始快照。
+        // Keep each scope's original snapshot isolated from callback reuse and nested event edits.
         for (Scope scope : scopes) {
-            scope.changed.putIfAbsent(key, previous);
+            scope.changed.computeIfAbsent(key, ignored -> previous.clone());
         }
     }
 

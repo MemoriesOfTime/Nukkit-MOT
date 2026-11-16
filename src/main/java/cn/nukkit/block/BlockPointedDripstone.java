@@ -147,11 +147,12 @@ public class BlockPointedDripstone extends BlockSolidMeta implements BlockProper
                 this.getLevel().addParticle(new DestroyBlockParticle(block.add(0.5), block));
                 if (hanging) {
                     this.spawnFallingBlock(dripstone);
-                } else {
-                    this.getLevel().dropItemFromAutomaticBlock(block, block.toItem());
                 }
             }
             this.getLevel().setBlock(block, Block.get(BlockID.AIR), false, true);
+            if (this != dripstone && !hanging) {
+                this.getLevel().dropItemFromAutomaticBlock(block, block.toItem());
+            }
             block = hanging ? block.down() : block.up();
         }
         return true;

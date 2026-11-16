@@ -108,15 +108,16 @@ public class BlockDoublePlant extends BlockFlowable {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
             }
         } else {
-            // 两格须在本次破坏内同步移除，否则上半格脱离破坏链，破坏追踪与收尾事件都看不到它
-            // Both halves must go in this same break, or the top leaves the break chain
-            // and stays invisible to break tracing and the completion event (mirrors BlockDoor)
+            // 先清自身，再核对上半格原状态，避免误删同步回调放入的新方块。
+            // Clear self first, then verify the original top state to preserve synchronous callback replacements.
+            int originalTopFullId = this.up().getFullId();
+            this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
             Block up = this.up();
             if (up instanceof BlockDoublePlant
-                    && (up.getDamage() & TOP_HALF_BITMASK) == TOP_HALF_BITMASK) {
+                    && (up.getDamage() & TOP_HALF_BITMASK) == TOP_HALF_BITMASK
+                    && up.getFullId() == originalTopFullId) {
                 this.getLevel().setBlock(up, Block.get(BlockID.AIR), true, true);
             }
-            this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
         }
 
         return true;
