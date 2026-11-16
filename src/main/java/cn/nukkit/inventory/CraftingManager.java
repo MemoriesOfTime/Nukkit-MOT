@@ -1590,7 +1590,11 @@ public class CraftingManager {
             return;
         }
         recipe.setId(UUID.randomUUID());
-        this.furnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
+        for (Item input : expandWildcardSmeltingInput(recipe.getInput())) {
+            FurnaceRecipe expanded = new FurnaceRecipe(recipe.getResult(), input);
+            expanded.setId(recipe.getId());
+            this.furnaceRecipes.put(getItemHash(input), expanded);
+        }
     }
 
     @Deprecated
@@ -1600,17 +1604,50 @@ public class CraftingManager {
 
     public void registerBlastFurnaceRecipe(BlastFurnaceRecipe recipe) {
         recipe.setId(UUID.randomUUID());
-        this.blastFurnaceRecipes.put(getItemHash(recipe.getInput()), recipe);
+        for (Item input : expandWildcardSmeltingInput(recipe.getInput())) {
+            BlastFurnaceRecipe expanded = new BlastFurnaceRecipe(recipe.getResult(), input);
+            expanded.setId(recipe.getId());
+            this.blastFurnaceRecipes.put(getItemHash(input), expanded);
+        }
     }
 
     public void registerSmokerRecipe(SmokerRecipe recipe) {
         recipe.setId(UUID.randomUUID());
-        this.smokerRecipes.put(getItemHash(recipe.getInput()), recipe);
+        for (Item input : expandWildcardSmeltingInput(recipe.getInput())) {
+            SmokerRecipe expanded = new SmokerRecipe(recipe.getResult(), input);
+            expanded.setId(recipe.getId());
+            this.smokerRecipes.put(getItemHash(input), expanded);
+        }
     }
 
     public void registerCampfireRecipe(CampfireRecipe recipe) {
-        Item input = recipe.getInput();
-        this.campfireRecipes.put(getItemHash(input), recipe);
+        for (Item input : expandWildcardSmeltingInput(recipe.getInput())) {
+            this.campfireRecipes.put(getItemHash(input), new CampfireRecipe(recipe.getResult(), input));
+        }
+    }
+
+    /**
+     * Expands a wildcard smelting input (damage -1; the vanilla "any data" marker 32767 is
+     * normalized to -1 before registration) into one concrete input per data value.
+     * <p>
+     * The recipe hash key is {@code (id << DATA_BITS) | (damage & DATA_MASK)}, which folds
+     * -1 into DATA_MASK: a wildcard input therefore collides with the highest data value
+     * and silently overwrites (or gets overwritten by) that concrete recipe. With 16-way
+     * data blocks such as stained terracotta this makes the highest-data recipe unreachable
+     * and, once the client recipe list is rebuilt from this map, smelting results become
+     * wrong for the whole block family.
+     */
+    private static List<Item> expandWildcardSmeltingInput(Item input) {
+        if (input.getDamage() != -1) {
+            return List.of(input);
+        }
+        List<Item> expanded = new ArrayList<>(Block.DATA_MASK + 1);
+        for (int meta = 0; meta <= Block.DATA_MASK; meta++) {
+            Item item = input.clone();
+            item.setDamage(meta);
+            expanded.add(item);
+        }
+        return expanded;
     }
 
     private static int getItemHash(Item item) {
