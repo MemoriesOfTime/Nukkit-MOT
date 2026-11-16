@@ -2,6 +2,7 @@ package cn.nukkit.level;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
+import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.*;
 import cn.nukkit.block.properties.enums.DripstoneThickness;
@@ -9,7 +10,9 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.event.Event;
 import cn.nukkit.event.block.AutomaticBlockDropsEvent;
+import cn.nukkit.event.block.BlockBreakEvent;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
@@ -18,6 +21,8 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.Hash;
 import cn.nukkit.utils.MainLogger;
@@ -25,6 +30,8 @@ import cn.nukkit.utils.serverconfig.ServerConfig;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedConstruction;
 import org.mockito.Mockito;
 
@@ -107,8 +114,10 @@ class AutomaticBlockDropsAttributionTest {
         fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
 
         AtomicBoolean replayed = new AtomicBoolean();
+        AtomicReference<List<AutomaticBlockDropsEvent>> eventsAtReplay = new AtomicReference<>();
         fixture.onFirstSpawn = () -> {
             if (replayed.compareAndSet(false, true)) {
+                eventsAtReplay.set(List.copyOf(fixture.events));
                 // 内层终批开始生成时同格重放新滴水石，再破坏其下方一格触发逐段直接掉落
                 fixture.put(dripstone(DripstoneThickness.BASE, false), 5, 64, 0);
                 fixture.put(dripstone(DripstoneThickness.BASE, false), 5, 63, 0);
@@ -117,13 +126,18 @@ class AutomaticBlockDropsAttributionTest {
         };
 
         try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
-                EntityItem.class,
-                (mock, context) -> fixture.spawned.add(
-                        NBTIO.getItemHelper(((CompoundTag) context.arguments().get(1)).getCompound("Item"))))) {
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
             fixture.level.useBreakOn(new Vector3(5, 65, 0), BlockFace.UP, null, null, false);
         }
 
         assertTrue(replayed.get(), "the re-placed break must have been injected");
+        assertEquals(
+                1,
+                eventsAtReplay.get().size(),
+                "the inner completion event must fire before its first drop starts spawning");
+        assertFalse(
+                eventsAtReplay.get().get(0).isOutermostBreak(),
+                "the replay must start after the inner scope closes but before the outer scope completes");
         AutomaticBlockDropsEvent replacedDropEvent = fixture.events.stream()
                 .filter(event -> event.getBlock().getId() == BlockID.POINTED_DRIPSTONE
                         && event.getBlock().getFloorY() == 64)
@@ -137,6 +151,195 @@ class AutomaticBlockDropsAttributionTest {
         assertTrue(
                 fixture.spawned.stream().anyMatch(item -> item.getId() == sunflowerItem),
                 "the uncancelled inner drop still spawns");
+    }
+
+    @Test
+    void listenerReplacementControlsTheSpawnedAutomaticDrop() {
+        int dirtItem = Block.get(BlockID.DIRT).toItem().getId();
+        Fixture fixture = new Fixture(event -> {
+            if (event.getBlock().getId() == BlockID.DIRT) {
+                event.setDrops(new Item[] {Item.get(Item.DIAMOND)});
+            }
+        });
+        fixture.put(Block.get(BlockID.DIRT), 5, 64, 0);
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            assertNotNull(fixture.level.useBreakOn(
+                    new Vector3(5, 64, 0), BlockFace.UP, null, null, false));
+        }
+
+        assertEquals(1, fixture.events.size());
+        assertEquals(1, fixture.spawned.size(), "exactly the listener's replacement batch must spawn");
+        assertEquals(Item.DIAMOND, fixture.spawned.get(0).getId());
+        assertTrue(fixture.spawned.stream().noneMatch(item -> item.getId() == dirtItem),
+                "the replaced original drop must not spawn");
+    }
+
+    @Test
+    void pumpkinShearingEmitsCancellableInteractionDrop() {
+        Fixture fixture = new Fixture(event -> event.setCancelled());
+        Block pumpkin = Block.get(BlockID.PUMPKIN);
+        fixture.put(pumpkin, 5, 64, 0);
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            assertTrue(pumpkin.onActivate(Item.get(Item.SHEARS), null));
+        }
+
+        assertEquals(BlockID.CARVED_PUMPKIN, fixture.cells.get(Hash.hashBlock(5, 64, 0)).getId());
+        assertEquals(1, fixture.events.size(), "shearing must emit one interaction output event");
+        AutomaticBlockDropsEvent event = fixture.events.get(0);
+        assertSame(pumpkin, event.getBlock());
+        assertEquals(AutomaticBlockDropsEvent.Cause.BLOCK_INTERACTION, event.getCause());
+        assertEquals(0, event.getChangedBlocks().length);
+        assertFalse(event.isOutermostBreak());
+        assertEquals(1, event.getDrops().length);
+        assertEquals(Item.PUMPKIN_SEEDS, event.getDrops()[0].getId());
+        assertTrue(event.isCancelled());
+        assertTrue(fixture.spawned.isEmpty(), "cancelling the interaction event must suppress its seeds");
+    }
+
+    @Test
+    void disabledTileDropsStillEmitTerminalBookkeepingWithoutSpawning() {
+        int dirtItem = Block.get(BlockID.DIRT).toItem().getId();
+        Fixture fixture = new Fixture(event -> { });
+        fixture.gameRules.setGameRule(GameRule.DO_TILE_DROPS, false);
+        fixture.put(Block.get(BlockID.DIRT), 5, 64, 0);
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            assertNotNull(fixture.level.useBreakOn(
+                    new Vector3(5, 64, 0), BlockFace.UP, null, null, false));
+        }
+
+        assertTrue(fixture.spawned.isEmpty(), "disabled tile drops must not spawn items");
+        assertEquals(1, fixture.events.size(), "drop suppression must not skip terminal bookkeeping");
+        AutomaticBlockDropsEvent terminal = fixture.events.get(0);
+        assertTrue(terminal.isOutermostBreak());
+        assertEquals(1, terminal.getDrops().length, "the event still exposes the suppressed batch");
+        assertEquals(dirtItem, terminal.getDrops()[0].getId());
+        assertEquals(1, terminal.getChangedBlocks().length);
+        Block changed = terminal.getChangedBlocks()[0];
+        assertEquals(BlockID.DIRT, changed.getId());
+        assertEquals(5, changed.getFloorX());
+        assertEquals(64, changed.getFloorY());
+        assertEquals(0, changed.getFloorZ());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {BlockID.SNOW_BLOCK, BlockID.SNOW_LAYER})
+    void shovelActivationUsesPlayerBreakEvent(int blockId) {
+        Fixture fixture = new Fixture(event -> { });
+        Block block = Block.get(blockId);
+        fixture.put(block, 5, 64, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+        Item shovel = Item.get(Item.DIAMOND_SHOVEL);
+        shovel.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_EFFICIENCY).setLevel(1));
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(EntityItem.class)) {
+            assertTrue(block.onActivate(shovel, player));
+        }
+
+        assertEquals(1, shovel.getDamage(), "a successful break must consume durability exactly once");
+        assertEquals(1, fixture.playerBreakEvents.size(), "the activation must enter the player break path");
+        BlockBreakEvent breakEvent = fixture.playerBreakEvents.get(0);
+        assertSame(player, breakEvent.getPlayer());
+        Enchantment eventEfficiency = breakEvent.getItem().getEnchantment(Enchantment.ID_EFFICIENCY);
+        assertNotNull(eventEfficiency, "the player event must preserve tool enchantments");
+        assertEquals(1, eventEfficiency.getLevel(), "the event tool must retain the original enchantment level");
+        assertTrue(breakEvent.getDrops().length > 0, "the player event must expose the primary drop batch");
+
+        assertEquals(1, fixture.events.size(), "only the terminal bookkeeping event should remain");
+        AutomaticBlockDropsEvent terminal = fixture.events.get(0);
+        assertTrue(terminal.isOutermostBreak());
+        assertEquals(0, terminal.getDrops().length, "the automatic event must not duplicate the player batch");
+        assertEquals(1, terminal.getChangedBlocks().length, "the player terminal event must retain provenance");
+        Block changed = terminal.getChangedBlocks()[0];
+        assertEquals(blockId, changed.getId());
+        assertEquals(5, changed.getFloorX());
+        assertEquals(64, changed.getFloorY());
+        assertEquals(0, changed.getFloorZ());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {BlockID.SNOW_BLOCK, BlockID.SNOW_LAYER})
+    void cancelledShovelActivationDoesNotConsumeDurability(int blockId) {
+        Fixture fixture = new Fixture(event -> { });
+        Block block = Block.get(blockId);
+        fixture.put(block, 5, 64, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+        PluginManager pluginManager = fixture.server.getPluginManager();
+        Mockito.doAnswer(invocation -> {
+                    Event event = invocation.getArgument(0);
+                    if (event instanceof BlockBreakEvent breakEvent) {
+                        breakEvent.setCancelled();
+                    }
+                    return null;
+                })
+                .when(pluginManager)
+                .callEvent(Mockito.any(Event.class));
+        Item shovel = Item.get(Item.DIAMOND_SHOVEL);
+        int oldDamage = shovel.getDamage();
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(EntityItem.class)) {
+            assertTrue(block.onActivate(shovel, player));
+        }
+
+        assertEquals(blockId, fixture.cells.get(Hash.hashBlock(5, 64, 0)).getId());
+        assertEquals(oldDamage, shovel.getDamage(), "a denied break must not damage the shovel");
+    }
+
+    @Test
+    void efficiencyShovelKeepsItsTimingData() {
+        Fixture fixture = new Fixture(event -> { });
+        Block block = Block.get(BlockID.SNOW_BLOCK);
+        fixture.put(block, 5, 64, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = System.currentTimeMillis() - 180;
+        Item shovel = Item.get(Item.WOODEN_SHOVEL);
+        shovel.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_EFFICIENCY).setLevel(1));
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(EntityItem.class)) {
+            assertTrue(block.onActivate(shovel, player));
+        }
+
+        assertEquals(1, fixture.playerBreakEvents.size());
+        assertFalse(
+                fixture.playerBreakEvents.get(0).isCancelled(),
+                "efficiency must remain visible to fast-break validation");
+        assertEquals(BlockID.AIR, fixture.cells.get(Hash.hashBlock(5, 64, 0)).getId());
+    }
+
+    @Test
+    void adventureShovelKeepsCanDestroy() {
+        Fixture fixture = new Fixture(event -> { });
+        Block block = Block.get(BlockID.SNOW_BLOCK);
+        fixture.put(block, 5, 64, 0);
+        Player player = Mockito.mock(Player.class);
+        player.gamemode = Player.ADVENTURE;
+        Mockito.when(player.getGamemode()).thenReturn(Player.ADVENTURE);
+        Mockito.when(player.isAdventure()).thenReturn(true);
+        player.lastBreak = -1;
+        Item shovel = Item.get(Item.WOODEN_SHOVEL);
+        shovel.setNamedTag(new CompoundTag().putList(
+                new ListTag<StringTag>("CanDestroy").add(new StringTag("", "minecraft:snow"))));
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(EntityItem.class)) {
+            assertTrue(block.onActivate(shovel, player));
+        }
+
+        assertEquals(1, fixture.playerBreakEvents.size());
+        assertFalse(fixture.playerBreakEvents.get(0).isCancelled());
+        assertEquals(
+                BlockID.AIR,
+                fixture.cells.get(Hash.hashBlock(5, 64, 0)).getId(),
+                "CanDestroy must remain visible to adventure validation");
     }
 
     @Test
@@ -231,6 +434,40 @@ class AutomaticBlockDropsAttributionTest {
     }
 
     @Test
+    void playerDoublePlantBreakReportsBothHalvesWithoutDuplicatingDrops() {
+        long bottomCell = Hash.hashBlock(5, 64, 0);
+        long topCell = Hash.hashBlock(5, 65, 0);
+        int sunflowerItem = doublePlant(0).toItem().getId();
+
+        Fixture fixture = new Fixture(event -> { });
+        fixture.put(doublePlant(0), 5, 64, 0);
+        fixture.put(doublePlant(BlockDoublePlant.TOP_HALF_BITMASK), 5, 65, 0);
+        Player player = Mockito.mock(Player.class);
+        Mockito.when(player.isSurvival()).thenReturn(true);
+        player.lastBreak = -1;
+
+        try (MockedConstruction<EntityItem> ignored = Mockito.mockConstruction(
+                EntityItem.class, (mock, context) -> fixture.recordSpawn(context))) {
+            assertNotNull(fixture.level.useBreakOn(
+                    new Vector3(5, 64, 0), BlockFace.UP, Item.get(Item.AIR), player, false));
+        }
+
+        assertEquals(1, fixture.playerBreakEvents.size());
+        assertEquals(1, fixture.events.size(), "the player break needs only its terminal bookkeeping event");
+        AutomaticBlockDropsEvent terminal = fixture.events.get(0);
+        assertTrue(terminal.isOutermostBreak());
+        assertEquals(0, terminal.getDrops().length, "the primary batch belongs to BlockBreakEvent");
+        Set<Long> changedCells = new HashSet<>();
+        for (Block changed : terminal.getChangedBlocks()) {
+            changedCells.add(Hash.hashBlock(
+                    changed.getFloorX(), changed.getFloorY(), changed.getFloorZ()));
+        }
+        assertEquals(Set.of(bottomCell, topCell), changedCells);
+        assertEquals(1, fixture.spawned.size(), "the primary drop must be spawned exactly once");
+        assertEquals(sunflowerItem, fixture.spawned.get(0).getId());
+    }
+
+    @Test
     void topHalfBreakKeepsPluginBlockPlacedDuringTheInnerEvent() {
         long bottomCell = Hash.hashBlock(5, 64, 0);
         long topCell = Hash.hashBlock(5, 65, 0);
@@ -304,6 +541,7 @@ class AutomaticBlockDropsAttributionTest {
         final GameRules gameRules = GameRules.getDefault();
         final Map<Long, Block> cells = new HashMap<>();
         final List<AutomaticBlockDropsEvent> events = new ArrayList<>();
+        final List<BlockBreakEvent> playerBreakEvents = new ArrayList<>();
         final List<Item> spawned = new ArrayList<>();
 
         Runnable onFirstSetBlock;
@@ -319,6 +557,8 @@ class AutomaticBlockDropsAttributionTest {
                         if (event instanceof AutomaticBlockDropsEvent drops) {
                             events.add(drops);
                             listener.accept(drops);
+                        } else if (event instanceof BlockBreakEvent breakEvent) {
+                            playerBreakEvents.add(breakEvent);
                         }
                         return null;
                     })
@@ -369,6 +609,14 @@ class AutomaticBlockDropsAttributionTest {
             cells.put(Hash.hashBlock(x, y, z), block);
         }
 
+        void recordSpawn(MockedConstruction.Context context) {
+            if (spawnTriggered.compareAndSet(false, true) && onFirstSpawn != null) {
+                onFirstSpawn.run();
+            }
+            spawned.add(NBTIO.getItemHelper(
+                    ((CompoundTag) context.arguments().get(1)).getCompound("Item")));
+        }
+
         private Block cellAt(int x, int y, int z) {
             Block block = cells.get(Hash.hashBlock(x, y, z));
             if (block != null) {
@@ -395,6 +643,7 @@ class AutomaticBlockDropsAttributionTest {
             Mockito.doCallRealMethod().when(level).dropItem(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean(), Mockito.anyInt());
 
             Mockito.doCallRealMethod().when(level).dropItemFromAutomaticBlock(Mockito.any(), Mockito.any());
+            Mockito.doCallRealMethod().when(level).dropItemFromBlockInteraction(Mockito.any(), Mockito.any());
 
             // 真实 setBlock：破坏链簿记只在这里发生，不能再用测试替身绕开
             // Real setBlock: break-chain bookkeeping only happens here, so the fixture must not fake it
@@ -443,12 +692,7 @@ class AutomaticBlockDropsAttributionTest {
             Mockito.when(level.requireProvider()).thenReturn(provider);
             Mockito.when(provider.getMaximumLayer()).thenReturn(1);
             Mockito.when(level.getChunk(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyBoolean()))
-                    .thenAnswer(invocation -> {
-                        if (spawnTriggered.compareAndSet(false, true) && onFirstSpawn != null) {
-                            onFirstSpawn.run();
-                        }
-                        return chunk;
-                    });
+                    .thenReturn(chunk);
             Mockito.when(level.getChunkPlayers(Mockito.anyInt(), Mockito.anyInt())).thenReturn(new HashMap<>());
             Mockito.when(level.getChunkLoaders(Mockito.anyInt(), Mockito.anyInt())).thenReturn(new ChunkLoader[0]);
             Mockito.when(level.getNearbyEntities(Mockito.any())).thenReturn(new Entity[0]);

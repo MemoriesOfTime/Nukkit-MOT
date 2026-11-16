@@ -162,8 +162,9 @@ public class BlockSnowLayer extends BlockFallableMeta {
     @Override
     public boolean onActivate(Item item, Player player) {
         if (item.isShovel() && (player.gamemode & 0x2) == 0) {
-            item.useOn(this);
-            this.level.useBreakOn(this, item.clone().clearNamedTag(), null, true);
+            if (this.level.useBreakOn(this, item.clone(), player, true) != null) {
+                item.useOn(this);
+            }
             return true;
         } else if (item.getId() == SNOW_LAYER && (player.gamemode & 0x2) == 0) {
             if ((this.getDamage() & 0x7) != 0x7) {
