@@ -23,10 +23,7 @@ import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.ByteBufOutputStream;
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.*;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -1334,7 +1331,7 @@ public class LevelDBProvider implements LevelProvider {
                 || (deferredBlockUpdates != null && !deferredBlockUpdates.isEmpty())) {
             NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, deferredBlockUpdates, currentTick);
             if (ticks != null) {
-                ByteBuf byteBuf = Unpooled.buffer();
+                ByteBuf byteBuf = PooledByteBufAllocator.DEFAULT.heapBuffer();
                 try {
                     try (NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf))) {
                         outputStream.writeTag(ticks);

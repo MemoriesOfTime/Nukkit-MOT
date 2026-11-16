@@ -12,10 +12,8 @@ import cn.nukkit.utils.TextFormat;
 import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.util.internal.PlatformDependent;
 import lombok.extern.log4j.Log4j2;
@@ -218,6 +216,9 @@ public class NetherNetInterface implements AdvancedSourceInterface {
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(this.eventLoopGroup)
                 .channelFactory(NetherNetChannelFactory.server(channelSignaling))
+                // 与 RakNet 侧一致：全局默认 unpooled 会给每个媒体数据包注册 Cleaner。
+                // Same as RakNet: the unpooled global default registers a Cleaner per media datagram.
+                .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .option(NetherChannelOption.NETHER_SERVER_RTC_HANDSHAKE_TIMEOUT_SECONDS, handshakeTimeout)
                 .option(NetherChannelOption.NETHER_METRICS, this.stats)
                 .childHandler(new ChannelInitializer<>() {

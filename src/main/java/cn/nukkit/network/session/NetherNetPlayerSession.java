@@ -17,7 +17,7 @@ import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -371,7 +371,9 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
             return this.failUnsupportedPrefix();
         }
 
-        ByteBuf finalPayload = Unpooled.directBuffer((ci ? 1 : 0) + compressedPayload.length);
+        // 池化直连缓冲，避免每批次在 Cleaner 全局锁上排队。
+        // Pooled direct buffer; avoids queueing on the Cleaner global lock per batch.
+        ByteBuf finalPayload = PooledByteBufAllocator.DEFAULT.directBuffer((ci ? 1 : 0) + compressedPayload.length);
         if (ci) {
             finalPayload.writeByte(this.compressionOut.getPrefix());
         }

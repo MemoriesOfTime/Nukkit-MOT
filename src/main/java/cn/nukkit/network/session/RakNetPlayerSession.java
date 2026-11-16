@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
 import com.nukkitx.natives.util.Natives;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -496,7 +497,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             return this.failUnsupportedPrefix();
         }
 
-        ByteBuf finalPayload = Unpooled.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
+        // 池化直连缓冲：每批次新建 direct ByteBuffer 会在全局 Cleaner 锁上排队，拖慢所有网络事件循环。
+        // Pooled direct buffer: a fresh direct ByteBuffer per batch queues on the global Cleaner lock and stalls every event loop.
+        ByteBuf finalPayload = PooledByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
 
         if (this.encryptionCipher != null) {
