@@ -1145,10 +1145,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void setSkin(Skin skin) {
-        if (skin.isFullyTransparent()) {
-            skin = Skin.NO_PERSONA_SKIN;
-        }
         Skin previousSkin = this.getSkin();
+        // 公共默认皮肤不能承载单账号归属；其余皮肤未声明归属时继承当前账号，覆盖异步预登录路径
+        // The shared default cannot carry a per-account owner; other skins inherit it when omitted,
+        // covering async pre-login paths
+        if (previousSkin != null && !previousSkin.getUdid().isEmpty() && skin.getUdid().isEmpty()) {
+            if (skin == Skin.NO_PERSONA_SKIN) {
+                skin = previousSkin.getDefaultSkin();
+            } else {
+                skin.setUdid(previousSkin.getUdid());
+            }
+        }
+        if (skin.isFullyTransparent()) {
+            skin = skin.getDefaultSkin();
+        }
         super.setSkin(skin);
         if (!this.spawned) {
             return;
@@ -10090,12 +10100,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.uuid = loginChainData.getClientUUID(verifiedName);
         this.rawUUID = Binary.writeUUID(this.uuid);
 
+        // 网易皮肤归属：登录链 uid 即皮肤拥有者，写入 Skin 供换肤与存档携带
+        // NetEase skin ownership: the login-chain uid owns this skin; stored on Skin for later
+        // skin changes and persistence
+        if (this.gameVersion.isNetEase()) {
+            Long netEaseUid = loginChainData.getNetEaseUID();
+            if (netEaseUid != null && netEaseUid > 0) {
+                loginSkin.setUdid(Long.toString(netEaseUid));
+            }
+        }
+
         if (!loginSkin.isValid()) {
             this.close("", "disconnectionScreen.invalidSkin");
             return;
         }
         Skin skin = loginSkin;
-        this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+        this.setSkin(skin.isPersona() && !this.getServer().personaSkins ? skin.getDefaultSkin() : skin);
 
         // NetherNet 跳过加密握手，登录链改用信令身份断言绑定，防止捕获的链被重放
         // NetherNet skips the encryption handshake, so bind the login chain to the signaling identity instead

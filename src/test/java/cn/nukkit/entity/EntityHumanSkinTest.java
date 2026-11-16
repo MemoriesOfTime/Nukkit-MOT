@@ -112,6 +112,18 @@ class EntityHumanSkinTest {
     }
 
     @Test
+    void npcSkinUdidSurvivesNbtRoundTrip() {
+        CompoundTag nbt = npcNbt();
+        nbt.getCompound("Skin").putString("SkinUDID", "123456789");
+
+        TestHuman loaded = new TestHuman(newMockChunk(), nbt);
+        assertEquals("123456789", loaded.getSkin().getUdid());
+
+        TestHuman reloaded = new TestHuman(newMockChunk(), loaded.saveAndGetNbt());
+        assertEquals("123456789", reloaded.getSkin().getUdid());
+    }
+
+    @Test
     void v126PersonaNpcWithoutProfileHashAppliesSkinAfterSpawn() {
         CompoundTag nbt = npcNbt();
         nbt.getCompound("Skin").putBoolean("PersonaSkin", true);
