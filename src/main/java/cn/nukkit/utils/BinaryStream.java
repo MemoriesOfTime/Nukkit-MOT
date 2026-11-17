@@ -30,6 +30,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessi
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
@@ -1551,8 +1552,8 @@ public class BinaryStream {
 
         this.putVarInt(getBlockRuntimeId(gameVersion, item));
 
-        // Invocation-owned heap scratch; only its bytes are copied into the packet.
-        ByteBuf userDataBuf = Unpooled.buffer(64);
+        // Invocation-owned pooled scratch; only its bytes are copied into the packet.
+        ByteBuf userDataBuf = this.newUserDataScratch();
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable) {
                 byte[] nbt = item.getCompoundTag();
@@ -1600,6 +1601,14 @@ public class BinaryStream {
         } finally {
             userDataBuf.release();
         }
+    }
+
+    /**
+     * 物品 user data 的每次调用暂存缓冲；池化复用，子类/测试可覆写观察。
+     * <p>Per-call scratch buffer for item user data; pooled and overridable so tests can observe it.
+     */
+    ByteBuf newUserDataScratch() {
+        return PooledByteBufAllocator.DEFAULT.heapBuffer(64);
     }
 
     /**
@@ -1753,7 +1762,7 @@ public class BinaryStream {
         }
 
         // Keep the same little-endian writer without per-item native allocations.
-        ByteBuf userDataBuf = Unpooled.buffer(64);
+        ByteBuf userDataBuf = this.newUserDataScratch();
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable && runtimeEntry != null && !runtimeEntry.isHasDamage()) {
                 byte[] nbt = item.getCompoundTag();

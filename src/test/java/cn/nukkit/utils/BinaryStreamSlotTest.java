@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.MockedStatic;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -129,7 +128,10 @@ class BinaryStreamSlotTest {
     }
 
     static byte[] encode(Case c, Item item) {
-        BinaryStream stream = new BinaryStream();
+        return encode(c, item, new BinaryStream());
+    }
+
+    static byte[] encode(Case c, Item item, BinaryStream stream) {
         stream.putByte(0x5a); // append offset and following field must survive too
         c.write(stream, item);
         stream.putLInt(0x12345678);
@@ -159,16 +161,15 @@ class BinaryStreamSlotTest {
                 }));
     }
 
-    private static MockedStatic<Unpooled> capture(List<ByteBuf> buffers) {
-        return mockStatic(Unpooled.class, call -> {
-            if (call.getMethod().getName().equals("buffer") && call.getArguments().length == 1
-                    && Integer.valueOf(64).equals(call.getArgument(0))) {
+    private static BinaryStream recordingStream(List<ByteBuf> buffers) {
+        return new BinaryStream() {
+            @Override
+            ByteBuf newUserDataScratch() {
                 ByteBuf buffer = UnpooledByteBufAllocator.DEFAULT.heapBuffer(64);
                 buffers.add(buffer);
                 return buffer;
             }
-            return call.callRealMethod();
-        });
+        };
     }
 
     private static void assertReleasedHeap(List<ByteBuf> buffers) {
@@ -182,9 +183,7 @@ class BinaryStreamSlotTest {
     void releasesHeapAfterSuccess(Case c) {
         byte[] expected = encode(c, item(c));
         List<ByteBuf> buffers = new ArrayList<>();
-        try (var ignored = capture(buffers)) {
-            assertArrayEquals(expected, encode(c, item(c)));
-        }
+        assertArrayEquals(expected, encode(c, item(c), recordingStream(buffers)));
         assertReleasedHeap(buffers);
     }
 
@@ -195,9 +194,8 @@ class BinaryStreamSlotTest {
         IllegalStateException failure = new IllegalStateException("injected after NBT bytes");
         doThrow(failure).when(item).getNamedTag();
         List<ByteBuf> buffers = new ArrayList<>();
-        try (var ignored = capture(buffers)) {
-            assertSame(failure, assertThrows(IllegalStateException.class, () -> encode(c, item)));
-        }
+        assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> encode(c, item, recordingStream(buffers))));
         assertReleasedHeap(buffers);
         assertDoesNotThrow(() -> encode(c, item(c)), "next call cannot inherit partial userData");
     }
@@ -206,13 +204,18 @@ class BinaryStreamSlotTest {
     @MethodSource("majorPaths")
     void releasesHeapWhenDestinationThrows(Case c) {
         IllegalStateException failure = new IllegalStateException("injected destination failure");
+        List<ByteBuf> buffers = new ArrayList<>();
         BinaryStream stream = new BinaryStream() {
             @Override public void putByteArray(byte[] bytes) { throw failure; }
+
+            @Override
+            ByteBuf newUserDataScratch() {
+                ByteBuf buffer = UnpooledByteBufAllocator.DEFAULT.heapBuffer(64);
+                buffers.add(buffer);
+                return buffer;
+            }
         };
-        List<ByteBuf> buffers = new ArrayList<>();
-        try (var ignored = capture(buffers)) {
-            assertSame(failure, assertThrows(IllegalStateException.class, () -> c.write(stream, item(c))));
-        }
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> c.write(stream, item(c))));
         assertReleasedHeap(buffers);
     }
 
@@ -224,10 +227,9 @@ class BinaryStreamSlotTest {
         // Bypass Item's own validation to exercise the serializer's IOException path.
         doReturn(new byte[]{10, 0, 0, 8}).when(item).getCompoundTag();
         List<ByteBuf> buffers = new ArrayList<>();
-        try (var ignored = capture(buffers)) {
-            IllegalStateException failure = assertThrows(IllegalStateException.class, () -> encode(durable, item));
-            assertInstanceOf(IOException.class, failure.getCause());
-        }
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> encode(durable, item, recordingStream(buffers)));
+        assertInstanceOf(IOException.class, failure.getCause());
         assertReleasedHeap(buffers);
     }
 
