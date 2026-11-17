@@ -660,11 +660,12 @@ public class CraftingManager {
         }
 
         if (input.containsKey("damage")) {
+            // 通配标记 -1/32767 沿用标识符解析出的变体，不覆盖成 0。
+            // A wildcard marker -1/32767 keeps the variant resolved from the identifier instead of collapsing to 0.
             int inputDamage = ((Number) input.get("damage")).intValue();
-            if (inputDamage == 32767) {
-                inputDamage = -1;
+            if (inputDamage != 32767 && inputDamage != -1) {
+                inputItem.setDamage(inputDamage);
             }
-            inputItem.setDamage(inputDamage);
         }
 
         if (output.containsKey("damage")) {
