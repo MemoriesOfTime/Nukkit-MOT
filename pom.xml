@@ -44,7 +44,7 @@
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.12</leveldb-mcpe-jni.version>
         <block-state-updater.version>1.21.110-20250915.183018-1</block-state-updater.version>
-        <netty.version>4.2.20.Final</netty.version>
+        <netty.version>4.2.21.Final</netty.version>
         <maven.shade.skip>false</maven.shade.skip>
         <!-- 分配/性能测量默认不进入 mvn test；-Pperf 反向选择 perf 标签 -->
         <test.groups></test.groups>
