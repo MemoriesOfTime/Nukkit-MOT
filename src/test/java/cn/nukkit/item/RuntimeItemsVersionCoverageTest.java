@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -76,6 +78,31 @@ public class RuntimeItemsVersionCoverageTest {
         }
         assertTrue(unmapped.isEmpty(),
                 "以下 GameVersion 无法获取 RuntimeItemMapping: " + unmapped);
+    }
+
+    @Test
+    public void testProtocolCachesMatchTheExistingAnchorSelectionForAllVersions() {
+        for (GameVersion version : GameVersion.getValues()) {
+            RuntimeItemMapping expected = RuntimeItems.getMappingUncached(version);
+            assertSame(expected, RuntimeItems.getMapping(version), "first cache result for " + version);
+            assertSame(expected, RuntimeItems.getMapping(version), "stable cache result for " + version);
+        }
+    }
+
+    @Test
+    public void testNetEaseAndVanillaCachesRemainSeparateForSharedProtocols() {
+        Map<Integer, GameVersion> vanillaByProtocol = new HashMap<>();
+        for (GameVersion version : GameVersion.getValues()) {
+            if (!version.isNetEase()) vanillaByProtocol.putIfAbsent(version.getProtocol(), version);
+        }
+        for (GameVersion version : GameVersion.getValues()) {
+            if (!version.isNetEase()) continue;
+            GameVersion vanilla = vanillaByProtocol.get(version.getProtocol());
+            if (vanilla != null) {
+                assertNotSame(RuntimeItems.getMapping(vanilla), RuntimeItems.getMapping(version),
+                        "vanilla and NetEase must not share protocol cache slot " + version.getProtocol());
+            }
+        }
     }
 
     /**

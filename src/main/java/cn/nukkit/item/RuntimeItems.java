@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 @Log4j2
 @UtilityClass
@@ -46,9 +47,16 @@ public class RuntimeItems {
      */
     private static final Map<GameVersion, RuntimeItemMapping> MAPPINGS = new ConcurrentHashMap<>();
 
+    private static final int MAX_PROTOCOL_ID = java.util.Arrays.stream(GameVersion.getValues())
+            .mapToInt(GameVersion::getProtocol).max().orElse(0);
+    private static final AtomicReferenceArray<RuntimeItemMapping> MAPPINGS_BY_PROTOCOL =
+            new AtomicReferenceArray<>(MAX_PROTOCOL_ID + 1);
+    private static final AtomicReferenceArray<RuntimeItemMapping> NETEASE_MAPPINGS_BY_PROTOCOL =
+            new AtomicReferenceArray<>(MAX_PROTOCOL_ID + 1);
+
     private static RuntimeItemMapping[] allMappings;
 
-    private static boolean initialized;
+    private static volatile boolean initialized;
 
     private static RuntimeItemMapping of(GameVersion anchor) {
         if (!initialized) {
@@ -125,11 +133,10 @@ public class RuntimeItems {
         return allMappings;
     }
 
-    public static void init() {
+    public static synchronized void init() {
         if (initialized) {
             throw new IllegalStateException("RuntimeItems were already generated!");
         }
-        initialized = true;
         log.debug("Loading runtime items...");
         InputStream itemIdsStream = Server.class.getClassLoader().getResourceAsStream("legacy_item_ids.json");
         if (itemIdsStream == null) {
@@ -184,6 +191,8 @@ public class RuntimeItems {
             }
         }
 
+        initialized = true;
+
     }
 
     @Deprecated
@@ -192,10 +201,24 @@ public class RuntimeItems {
     }
 
     public static RuntimeItemMapping getMapping(GameVersion gameVersion) {
-        int protocolId = gameVersion.getProtocol();
-        if (gameVersion.isNetEase()) {
-            return getMappingNetEase(protocolId);
+        if (!initialized) {
+            throw new IllegalStateException("RuntimeItems are not initialized yet");
         }
+        int protocolId = gameVersion.getProtocol();
+        AtomicReferenceArray<RuntimeItemMapping> cache = gameVersion.isNetEase()
+                ? NETEASE_MAPPINGS_BY_PROTOCOL : MAPPINGS_BY_PROTOCOL;
+        if (protocolId < 0 || protocolId >= cache.length()) {
+            return getMappingUncached(gameVersion);
+        }
+        RuntimeItemMapping cached = cache.get(protocolId);
+        if (cached != null) return cached;
+        RuntimeItemMapping mapping = getMappingUncached(gameVersion);
+        return cache.compareAndSet(protocolId, null, mapping) ? mapping : cache.get(protocolId);
+    }
+
+    static RuntimeItemMapping getMappingUncached(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
+        if (gameVersion.isNetEase()) return getMappingNetEase(protocolId);
         if (protocolId >= ProtocolInfo.v1_26_60) {
             return of(GameVersion.V1_26_60);
         } else if (protocolId >= ProtocolInfo.v1_26_50_27) {
