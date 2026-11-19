@@ -5,6 +5,8 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockFence;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockWall;
+import cn.nukkit.block.BlockWall.WallConnectionType;
 import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.anvil.Anvil;
@@ -13,6 +15,7 @@ import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
+import cn.nukkit.math.BlockFace;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.junit.jupiter.api.Assertions;
@@ -22,9 +25,7 @@ import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,20 +58,19 @@ class LevelLegacyConnectionTest {
     void fenceNextToFenceGateInNonZeroChunkRegainsConnection() throws Exception {
         cn.nukkit.level.format.anvil.Chunk chunk = new cn.nukkit.level.format.anvil.Chunk(Anvil.class);
         chunk.setPosition(CHUNK_X, CHUNK_Z);
-        // 旧世界内容：栅栏与栅栏门均无连接位（meta=0）
-        // pre-1.26.50 content: neither fence nor gate carries connection bits (meta=0)
+        // 旧世界内容：栅栏无连接位、门无 in_wall；门朝东（meta=3），门板轴为南北
+        // pre-1.26.50 content: fence without connection bits, gate without in_wall; the gate
+        // faces east (meta=3), so its panel axis is north-south
         chunk.setBlockAtLayer(FENCE_LOCAL_X, Y, FENCE_LOCAL_Z, 0, BlockID.FENCE, 0);
-        chunk.setBlockAtLayer(FENCE_LOCAL_X, Y, FENCE_LOCAL_Z + 1, 0, BlockID.FENCE_GATE_OAK, 0);
+        chunk.setBlockAtLayer(FENCE_LOCAL_X, Y, FENCE_LOCAL_Z + 1, 0, BlockID.FENCE_GATE_OAK, 3);
         chunk.setNeedsLegacyConnectionFix(true);
 
         Assertions.assertEquals(BlockID.FENCE, chunk.getBlockId(FENCE_LOCAL_X, Y, FENCE_LOCAL_Z));
         Assertions.assertEquals(BlockID.FENCE_GATE_OAK, chunk.getBlockId(FENCE_LOCAL_X, Y, FENCE_LOCAL_Z + 1));
 
         Level level = Mockito.mock(Level.class, Mockito.CALLS_REAL_METHODS);
-        Field serverField = Level.class.getDeclaredField("server");
-        serverField.setAccessible(true);
         // final 字段在 mock（未跑构造器）上直接可写 / final field is writable on a mock (constructor never ran)
-        serverField.set(level, Server.getInstance());
+        serverField().set(level, Server.getInstance());
         List<Throwable> scanErrors = new ArrayList<>();
         cn.nukkit.utils.MainLogger logger = Server.getInstance().getLogger();
         Mockito.doAnswer(inv -> {
@@ -107,10 +107,7 @@ class LevelLegacyConnectionTest {
         Assertions.assertTrue(((BlockFence) raw).updateConnections());
         Assertions.assertEquals(BlockFence.FLAG_CONNECTION_SOUTH, raw.getDamage() & BlockFence.CONNECTION_FLAGS);
 
-        Method fix = Level.class.getDeclaredMethod("fixLegacyBlockConnections", int.class, int.class, BaseFullChunk.class);
-        fix.setAccessible(true);
-        fix.invoke(level, CHUNK_X, CHUNK_Z, chunk);
-
+        legacyConnectionFixMethod().invoke(level, CHUNK_X, CHUNK_Z, chunk);
         Assertions.assertTrue(scanErrors.isEmpty(), "scan must not throw: " + (scanErrors.isEmpty() ? "" : scanErrors.get(0)));
         Assertions.assertEquals(1, written.size(), "the fence must be written back once");
         Block fence = written.get(0);
@@ -121,6 +118,113 @@ class LevelLegacyConnectionTest {
                 chunk.getBlockData(FENCE_LOCAL_X, Y, FENCE_LOCAL_Z) & BlockFence.CONNECTION_FLAGS,
                 "write-back must land in the chunk");
         Assertions.assertFalse(chunk.isNeedsLegacyConnectionFix(), "flag clears after a successful scan");
+    }
+
+    /**
+     * 墙的状态依赖上方墙的连接与柱子位；迁移必须自顶向下，否则下层按尚未修正的上层状态计算，
+     * 而 update=false 的写回不会触发邻居重算，区块随后被标记完成，错误状态就此落盘。
+     * <p>
+     * Wall state depends on the wall above, so migration has to run top-down. A bottom-up pass
+     * computes lower walls against stale upper states, and the update=false write-back never
+     * revisits them before the chunk is marked complete.
+     */
+    @Test
+    void wallsMigrateTopDownAfterUpperWallLosesItsStaleConnection() throws Exception {
+        final int x = 10;
+        final int z = 10;
+        final int lowerY = 100;
+        final int upperY = 101;
+        final int aboveY = 102;
+
+        Map<Integer, int[]> blocks = new HashMap<>();
+        // 旧规则残留：两层墙都是东西直连、非柱子；上层东侧还连着南瓜（新规则例外）
+        // Pre-fix leftovers: both walls run east-west without a post; the upper one still
+        // connects to a pumpkin, which the vanilla rules except.
+        int staleStraight = wallMeta(WallConnectionType.TALL, WallConnectionType.TALL, false);
+        int plainWall = wallMeta(WallConnectionType.NONE, WallConnectionType.NONE, true);
+        BlockWall decoded = (BlockWall) Block.get(BlockID.STONE_WALL, staleStraight);
+        Assertions.assertEquals(WallConnectionType.TALL, decoded.getConnectionType(BlockFace.EAST),
+                "test fixture meta must round-trip wall states");
+
+        blocks.put(localKey(x, lowerY, z), new int[]{BlockID.STONE_WALL, staleStraight});
+        blocks.put(localKey(x - 1, lowerY, z), new int[]{BlockID.STONE_WALL, plainWall});
+        blocks.put(localKey(x + 1, lowerY, z), new int[]{BlockID.STONE_WALL, plainWall});
+        blocks.put(localKey(x, upperY, z), new int[]{BlockID.STONE_WALL, staleStraight});
+        blocks.put(localKey(x - 1, upperY, z), new int[]{BlockID.STONE_WALL, plainWall});
+        blocks.put(localKey(x + 1, upperY, z), new int[]{BlockID.PUMPKIN, 0});
+        blocks.put(localKey(x, aboveY, z), new int[]{BlockID.STONE, 0});
+
+        BaseFullChunk chunk = Mockito.mock(BaseFullChunk.class);
+        Mockito.when(chunk.getX()).thenReturn(0);
+        Mockito.when(chunk.getZ()).thenReturn(0);
+        Mockito.when(chunk.isNeedsLegacyConnectionFix()).thenReturn(true);
+        Mockito.when(chunk.getBlockId(anyInt(), anyInt(), anyInt()))
+                .thenAnswer(inv -> blockAt(blocks, inv.getArgument(0), inv.getArgument(1), inv.getArgument(2))[0]);
+        Mockito.when(chunk.getBlockState(anyInt(), anyInt(), anyInt(), anyInt()))
+                .thenAnswer(inv -> blockAt(blocks, inv.getArgument(0), inv.getArgument(1), inv.getArgument(2)).clone());
+
+        Level level = Mockito.mock(Level.class, Mockito.CALLS_REAL_METHODS);
+        Field serverField = Level.class.getDeclaredField("server");
+        serverField.setAccessible(true);
+        serverField.set(level, Server.getInstance());
+        Mockito.doReturn(0).when(level).getMinBlockY();
+        Mockito.doReturn(255).when(level).getMaxBlockY();
+        Mockito.doReturn(chunk).when(level).getChunk(anyInt(), anyInt(), anyBoolean());
+        Mockito.doReturn(populatedNeighbourMock()).when(level).getChunkIfLoaded(anyInt(), anyInt());
+        Mockito.doAnswer(inv -> {
+            Block written = inv.getArgument(2);
+            blocks.put(localKey(written.getFloorX(), written.getFloorY(), written.getFloorZ()),
+                    new int[]{written.getId(), written.getDamage()});
+            return true;
+        }).when(level).setBlock(Mockito.any(), Mockito.anyInt(), Mockito.any(Block.class),
+                Mockito.anyBoolean(), Mockito.anyBoolean());
+
+        legacyConnectionFixMethod().invoke(level, 0, 0, chunk);
+
+        BlockWall upperAfter = wallAt(blocks, x, upperY, z);
+        Assertions.assertEquals(WallConnectionType.NONE, upperAfter.getConnectionType(BlockFace.EAST),
+                "the pumpkin must no longer connect");
+        Assertions.assertTrue(upperAfter.isWallPost(), "a single remaining connection is not straight");
+
+        BlockWall lowerAfter = wallAt(blocks, x, lowerY, z);
+        Assertions.assertEquals(WallConnectionType.SHORT, lowerAfter.getConnectionType(BlockFace.EAST),
+                "with the upper east arm gone the lower east arm must be short, not tall");
+        Assertions.assertTrue(lowerAfter.isWallPost(),
+                "the lower wall must inherit the corrected post state from above");
+    }
+
+    private static int localKey(int x, int y, int z) {
+        return (y << 8) | (x << 4) | z;
+    }
+
+    private static int[] blockAt(Map<Integer, int[]> blocks, int x, int y, int z) {
+        return blocks.getOrDefault(localKey(x, y, z), new int[]{BlockID.AIR, 0});
+    }
+
+    private static BlockWall wallAt(Map<Integer, int[]> blocks, int x, int y, int z) {
+        int[] state = blockAt(blocks, x, y, z);
+        Assertions.assertEquals(BlockID.STONE_WALL, state[0], "expected a wall at " + x + "," + y + "," + z);
+        return (BlockWall) Block.get(state[0], state[1]);
+    }
+
+    private static int wallMeta(WallConnectionType east, WallConnectionType west, boolean post) {
+        BlockWall wall = new BlockWall();
+        wall.setConnection(BlockFace.EAST, east);
+        wall.setConnection(BlockFace.WEST, west);
+        wall.setWallPost(post);
+        return wall.getDamage();
+    }
+
+    private static Field serverField() throws Exception {
+        Field field = Level.class.getDeclaredField("server");
+        field.setAccessible(true);
+        return field;
+    }
+
+    private static Method legacyConnectionFixMethod() throws Exception {
+        Method method = Level.class.getDeclaredMethod("fixLegacyBlockConnections", int.class, int.class, BaseFullChunk.class);
+        method.setAccessible(true);
+        return method;
     }
 
     /**
@@ -270,9 +374,7 @@ class LevelLegacyConnectionTest {
 
     private record Fixture(Level level, BaseFullChunk chunk) {
         void run() throws Exception {
-            Method fix = Level.class.getDeclaredMethod("fixLegacyBlockConnections", int.class, int.class, BaseFullChunk.class);
-            fix.setAccessible(true);
-            fix.invoke(level, 0, 0, chunk);
+            legacyConnectionFixMethod().invoke(level, 0, 0, chunk);
         }
 
         void verifyComplete() {

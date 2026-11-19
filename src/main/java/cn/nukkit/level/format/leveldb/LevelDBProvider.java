@@ -67,7 +67,8 @@ public class LevelDBProvider implements LevelProvider {
     private static final DBProvider JAVA_LDB_PROVIDER = (DBProvider) FeatureBuilder.create(LevelDBProvider.class).addJava("net.daporkchop.ldbjni.java.JavaDBProvider").build();
     private static final byte[] FINALIZATION_STATE_ENCODING_KEY = "NukkitMOTFinalizationStateEncoding".getBytes(StandardCharsets.UTF_8);
     private static final byte[] FINALIZATION_STATE_ENCODING_BEDROCK = new byte[]{1};
-    private static final byte[] CONN_FIX_DONE = new byte[]{1};
+    private static final byte CONNECTION_FIX_VERSION = 2;
+    private static final byte[] CONN_FIX_DONE = new byte[]{CONNECTION_FIX_VERSION};
     private static final byte[] CONN_FIX_PENDING = new byte[]{0};
 
     protected final Long2ObjectMap<BaseFullChunk> chunks = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
@@ -744,16 +745,17 @@ public class LevelDBProvider implements LevelProvider {
      * 失去标志（连接永久显示为断开）；此标记是唯一可靠事实源，缺失（旧版本保存/外部工具重写）
      * 一律重算，幂等扫描代价一次性。
      * <p>
-     * Per-chunk persisted 1.26.50 connection-migration marker: missing/0 = recompute from
-     * neighbours. State-keys detection alone is insufficient — the load path upgrades keyless
-     * states to keyed (all-false) ones that get baked by any save before the recompute, so on
-     * reload such chunks look migrated and silently lose the flag (connections render detached
-     * forever). This marker is the authoritative source; a missing marker (saved by older builds
-     * or rewritten by external tools) always triggers one idempotent recompute pass.
+     * Per-chunk persisted 1.26.50 connection-migration marker: missing or older than
+     * {@link #CONNECTION_FIX_VERSION} = recompute from neighbours. State-keys detection alone is
+     * insufficient — the load path upgrades keyless states to keyed (all-false) ones that get baked
+     * by any save before the recompute, so on reload such chunks look migrated and silently lose the
+     * flag (connections render detached forever). This marker is the authoritative source; a missing
+     * marker (saved by older builds or rewritten by external tools) always triggers one idempotent
+     * recompute pass. Bumping the version forces a rescan after a connection-rule change.
      */
     private void applyConnectionFixMarker(DB db, int chunkX, int chunkZ, int dimensionId, ChunkBuilder chunkBuilder) {
         byte[] marker = db.get(LevelDBKey.NUKKIT_CONN_FIX_DONE.getKey(chunkX, chunkZ, dimensionId));
-        if (marker == null || marker.length == 0 || marker[0] == 0) {
+        if (marker == null || marker.length == 0 || marker[0] < CONNECTION_FIX_VERSION) {
             chunkBuilder.needsLegacyConnectionFix();
         }
     }

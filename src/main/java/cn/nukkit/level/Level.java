@@ -4626,8 +4626,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     /**
-     * 旧世界迁移：1.26.50 之前保存的玻璃板/铁栏/栅栏/楼梯/绊线没有连接/角落位，而 v2193+ 客户端
-     * 渲染完全由这些状态驱动。按邻居重算并写回，使已有建筑立即恢复连接外观。
+     * 旧世界迁移：1.26.50 之前保存（或按旧连接规则算过）的玻璃板/铁栏/栅栏/楼梯/绊线/栅栏门/墙
+     * 没有或带有错误连接/角落位，而 v2193+ 客户端渲染完全由这些状态驱动。按邻居重算并写回，使已有建筑
+     * 立即恢复连接外观。
      * <p>
      * 挂载尾段（finishChunkLoad）为主触发点（光照 population 同款模式），发送路径保留为兜底。
      * 标志由区块加载/生成路径设置（LevelDB 反序列化时检测磁盘状态缺 corner/connection 键；
@@ -4637,9 +4638,10 @@ public class Level implements ChunkManager, Metadatable {
      * 避免把跨界连接误算为断开；扫描成功后才清标志（中途异常保留待重试），重算后的状态
      * 落盘即升级为 1.26.50，标志自然消失。新放置方块的连接由 place/onUpdate 路径维护。
      * <p>
-     * Legacy-world migration: panes/bars/fences/stairs/tripwire saved before 1.26.50 carry no
-     * connection/corner bits, yet v2193+ clients render them purely from those states. Recompute
-     * the bits from neighbours so existing builds regain their looks.
+     * Legacy-world migration: panes/bars/fences/stairs/tripwire/fence gates/walls saved before
+     * 1.26.50 (or before a connection-rule fix) carry no or stale connection/corner bits, yet
+     * v2193+ clients render them purely from those states. Recompute the bits from neighbours so
+     * existing builds regain their looks.
      * <p>
      * Primarily triggered from the mount tail (finishChunkLoad, same pattern as light
      * population), with the send path kept as a fallback. The flag is set on the chunk-load and
@@ -4681,6 +4683,10 @@ public class Level implements ChunkManager, Metadatable {
             Chunk sectionedChunk = chunk instanceof Chunk ? (Chunk) chunk : null;
             ChunkSection[] sections = sectionedChunk == null ? null : sectionedChunk.getSections();
             int sectionOffset = sectionedChunk == null ? 0 : sectionedChunk.getSectionOffset();
+            // 墙的 TALL/柱子位取决于上方墙的当前状态，须等上方墙算完再算；先收集，扫描后自顶向下处理
+            // A wall's TALL/post bit depends on the state of the wall above, so collect walls here
+            // and process them top-down after the scan
+            IntArrayList wallPositions = new IntArrayList();
             for (int sectionY = minY >> 4; sectionY <= (maxY >> 4); sectionY++) {
                 int sectionIndex = sectionY + sectionOffset;
                 ChunkSection section = sections != null && sectionIndex >= 0 && sectionIndex < sections.length
@@ -4712,12 +4718,28 @@ public class Level implements ChunkManager, Metadatable {
                                 changed = stairs.updateCorner();
                             } else if (block instanceof BlockTripWire wire) {
                                 changed = wire.updateConnections();
+                            } else if (block instanceof BlockFenceGate gate) {
+                                changed = gate.updateInWall();
+                            } else if (block instanceof BlockWall) {
+                                wallPositions.add(((blockY - minY) << 8) | (bx << 4) | bz);
                             }
                             if (changed) {
                                 this.setBlock(block, 0, block, true, false);
                             }
                         }
                     }
+                }
+            }
+            // 逆序即按 Y 从高到低：上方墙先定型，下层墙再读到已修正的上方状态
+            // Reversed order is descending Y: upper walls are finalised before lower ones read them
+            for (int i = wallPositions.size() - 1; i >= 0; i--) {
+                int packed = wallPositions.getInt(i);
+                int wallY = (packed >>> 8) + minY;
+                int bx = (packed >>> 4) & 0xF;
+                int bz = packed & 0xF;
+                Block wallBlock = this.getBlock(baseX + bx, wallY, baseZ + bz, 0);
+                if (wallBlock instanceof BlockWall wall && wall.autoConfigureState()) {
+                    this.setBlock(wallBlock, 0, wallBlock, true, false);
                 }
             }
             // 成功完成后才清标志：中途异常保留标志，待发送/邻居挂载时重试
@@ -4788,7 +4810,9 @@ public class Level implements ChunkManager, Metadatable {
                         if (type != null && (BlockThin.class.isAssignableFrom(type)
                                 || BlockFence.class.isAssignableFrom(type)
                                 || BlockStairs.class.isAssignableFrom(type)
-                                || BlockTripWire.class.isAssignableFrom(type))) {
+                                || BlockTripWire.class.isAssignableFrom(type)
+                                || BlockFenceGate.class.isAssignableFrom(type)
+                                || BlockWall.class.isAssignableFrom(type))) {
                             found.add(id);
                         }
                     }
