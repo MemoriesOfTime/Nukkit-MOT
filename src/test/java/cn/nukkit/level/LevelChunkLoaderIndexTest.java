@@ -31,6 +31,7 @@ class LevelChunkLoaderIndexTest {
         doCallRealMethod().when(level).unregisterChunkLoader(any(), anyInt(), anyInt());
         doCallRealMethod().when(level).getChunkLoaders(anyInt(), anyInt());
         doCallRealMethod().when(level).getChunkPlayers(anyInt(), anyInt());
+        doCallRealMethod().when(level).getChunkPlayersView(anyInt(), anyInt());
         doCallRealMethod().when(level).isChunkInUse(anyLong());
     }
 
@@ -112,6 +113,23 @@ class LevelChunkLoaderIndexTest {
         assertFalse(level.isChunkInUse(Level.chunkHash(0, 0)));
         assertEquals(java.util.Map.of(11, first), level.getChunkPlayers(-1, -1));
         assertTrue(level.getChunkPlayers(9, 10).isEmpty());
+    }
+
+    @Test
+    void internalChunkPlayerViewReusesBackingMapAndSharedEmptyMap() {
+        assertSame(java.util.Collections.emptyMap(), level.getChunkPlayersView(9, 10));
+
+        Player first = mock(Player.class);
+        Player second = mock(Player.class);
+        when(first.getLoaderId()).thenReturn(21);
+        when(second.getLoaderId()).thenReturn(22);
+        level.registerChunkLoader(first, 2, 3, false);
+        var view = level.getChunkPlayersView(2, 3);
+
+        level.registerChunkLoader(second, 2, 3, false);
+
+        assertSame(view, level.getChunkPlayersView(2, 3));
+        assertEquals(java.util.Map.of(21, first, 22, second), view);
     }
 
     private ChunkLoader loader(int id) {

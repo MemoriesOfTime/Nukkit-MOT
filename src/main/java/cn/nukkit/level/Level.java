@@ -1083,7 +1083,7 @@ public class Level implements ChunkManager, Metadatable {
     public void addParticle(Particle particle, Player[] players, int count) {
         Object2ObjectMap<GameVersion, ObjectList<Player>> targets;
         if (players == null) {
-            targets = Server.groupPlayersByGameVersion(this.getChunkPlayers(particle.getChunkX(), particle.getChunkZ()).values());
+            targets = Server.groupPlayersByGameVersion(this.getChunkPlayersView(particle.getChunkX(), particle.getChunkZ()).values());
         } else {
             targets = Server.groupPlayersByGameVersion(players);
         }
@@ -1200,13 +1200,13 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Map<Integer, Player> getChunkPlayers(int chunkX, int chunkZ) {
+        return new HashMap<>(this.getChunkPlayersView(chunkX, chunkZ));
+    }
+
+    Map<Integer, Player> getChunkPlayersView(int chunkX, int chunkZ) {
         long index = Level.chunkHash(chunkX, chunkZ);
         Map<Integer, Player> map = this.playerLoaders.get(index);
-        if (map != null) {
-            return new HashMap<>(map);
-        } else {
-            return new HashMap<>();
-        }
+        return map != null ? map : Collections.emptyMap();
     }
 
     public ChunkLoader[] getChunkLoaders(int chunkX, int chunkZ) {
@@ -1480,11 +1480,11 @@ public class Level implements ChunkManager, Metadatable {
                             continue;
                         }
                         if (this.shouldResendWholeChunk(blocks)) {
-                            for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
+                            for (Player p : this.getChunkPlayersView(chunkX, chunkZ).values()) {
                                 p.onChunkChanged(chunk);
                             }
                         } else {
-                            Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(Player.EMPTY_ARRAY);
+                            Player[] playerArray = this.getChunkPlayersView(chunkX, chunkZ).values().toArray(Player.EMPTY_ARRAY);
                             Vector3[] blocksArray = new Vector3[blocks.size()];
                             int i = 0;
                             for (int blockHash : blocks.keySet()) {
@@ -1547,7 +1547,7 @@ public class Level implements ChunkManager, Metadatable {
             Long index = entry.getKey();
             int chunkX = Level.getHashX(index);
             int chunkZ = Level.getHashZ(index);
-            Map<Integer, Player> map = this.getChunkPlayers(chunkX, chunkZ);
+            Map<Integer, Player> map = this.getChunkPlayersView(chunkX, chunkZ);
             if (!map.isEmpty()) {
                 Player[] chunkPlayers = map.values().toArray(Player.EMPTY_ARRAY);
                 for (DataPacket pk : entry.getValue()) {
@@ -3230,7 +3230,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (createParticles) {
-            Map<Integer, Player> players = this.getChunkPlayers((int) target.x >> 4, (int) target.z >> 4);
+            Map<Integer, Player> players = this.getChunkPlayersView((int) target.x >> 4, (int) target.z >> 4);
             this.addParticle(new DestroyBlockParticle(target.add(0.5), target), players.values());
         }
 
@@ -3556,7 +3556,7 @@ public class Level implements ChunkManager, Metadatable {
 
 
         if (playSound) {
-            Object2ObjectMap<GameVersion, ObjectList<Player>> players = Server.groupPlayersByGameVersion(this.getChunkPlayers(hand.getChunkX(), hand.getChunkZ()).values());
+            Object2ObjectMap<GameVersion, ObjectList<Player>> players = Server.groupPlayersByGameVersion(this.getChunkPlayersView(hand.getChunkX(), hand.getChunkZ()).values());
             for (GameVersion gameVersion : players.keySet()) {
                 ObjectList<Player> targets = players.get(gameVersion);
                 int soundData = GlobalBlockPalette.getOrCreateRuntimeId(gameVersion.getProtocol() > ProtocolInfo.v1_2_10 ? gameVersion : GameVersion.getLastVersion(), // no block palette in <= 1.2.10
