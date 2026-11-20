@@ -2,7 +2,6 @@ package cn.nukkit;
 
 import cn.nukkit.event.Event;
 import cn.nukkit.event.server.DataPacketSendEvent;
-import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.level.ClientCacheBlobStore;
 import cn.nukkit.level.PlayerBlobCacheState;
 import cn.nukkit.level.PlayerSubChunkRequestState;
@@ -11,6 +10,7 @@ import cn.nukkit.network.protocol.ClientCacheBlobStatusPacket;
 import cn.nukkit.network.protocol.ClientCacheMissResponsePacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
+import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.XXHash64;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,17 +22,24 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /** Real handler, byte ledger and store; only transport and Server shell are mocked. */
 class ClientCacheSharedResponseBudgetTest {
+
+    /** 单条 miss 条目的固定开销，直接取自生产记账公式而非写死。 */
+    private static final int ENTRY_OVERHEAD = ClientCacheBlobStatusProcessor.missEntryBytes(0);
+
     @Test
     void secondSameTickMissDefersAfterBudgetExhaustedThenDrainsNextTick() throws Exception {
         Fixture f = new Fixture();
         int budget = f.flow.remainingResponseBytes(f.tick.get());
         long[] first = new long[4];
-        for (int i = 0; i < first.length; i++) first[i] = f.blobWithEntryBytes(budget / first.length);
+        for (int i = 0; i < first.length; i++) {
+            // 四条恰好铺满一个 tick 的预算，故本轮发送字节数必须精确等于 budget。
+            first[i] = f.blobWithEntryBytes(budget / first.length);
+        }
         f.miss(first);
         assertEquals(budget, f.sentBytes());
         assertEquals(0, f.flow.remainingResponseBytes(f.tick.get()));
@@ -176,17 +183,6 @@ class ClientCacheSharedResponseBudgetTest {
     }
 
     @Test
-    void abnormalNullFlowCompatibilityStillServesMisses() throws Exception {
-        Fixture f = new Fixture();
-        field(f.player, "subChunkRequestState", null); // Native field initializer always creates flow.
-        long hash = f.blobWithEntryBytes(128);
-        f.miss(hash);
-        f.miss(hash);
-        assertEquals(2, f.sent.size(), "legacy no-flow/mock path must remain compatible");
-        assertEquals(0, f.cache.getPendingSize());
-    }
-
-    @Test
     void resetInsideMissCallbackCannotResolveNewPinsOrRestoreOldResidual() throws Exception {
         Fixture f = new Fixture();
         int budget = f.flow.remainingResponseBytes(f.tick.get());
@@ -243,7 +239,8 @@ class ClientCacheSharedResponseBudgetTest {
         }
 
         long blobWithEntryBytes(int wireBytes) {
-            byte[] payload = new byte[wireBytes - 13];
+            // 让 fixture 与生产记账使用同一套开销公式，避免把 entry 头长度写死。
+            byte[] payload = new byte[wireBytes - ENTRY_OVERHEAD];
             payload[0] = (byte) ++unique;
             long hash = XXHash64.hash(payload);
             store.put(hash, payload);

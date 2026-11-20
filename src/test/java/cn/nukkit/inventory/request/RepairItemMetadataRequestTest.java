@@ -40,13 +40,13 @@ class RepairItemMetadataRequestTest {
         bindPlayer(version);
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1).setCustomName("First shovel");
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1);
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
         assertTrue(ui.getBigCraftingGrid().getItem(1).isNull());
         Item result = inventory.getItem(2);
         assertEquals(Item.IRON_SHOVEL, result.getId());
-        assertEquals(163, result.getDamage());
+        assertEquals(162, result.getDamage());
         assertEquals(1, result.getCount());
         assertFalse(result.hasCustomName());
     }
@@ -57,7 +57,7 @@ class RepairItemMetadataRequestTest {
         bindPlayer(version);
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1).setCustomName("First shovel");
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1).setNamedTag(new CompoundTag().putString("example:owner", "owned"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));
@@ -72,7 +72,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString(key, "owned"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));
@@ -87,7 +87,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:origin", "example:original"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
         assertTrue(ui.getBigCraftingGrid().getItem(1).isNull());
@@ -103,7 +103,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:origin", "example:original"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));
@@ -118,7 +118,7 @@ class RepairItemMetadataRequestTest {
                 .setNamedTag(new CompoundTag().putString("example:owner", "first"));
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:owner", "second"));
-        Item output = Item.get(Item.IRON_SHOVEL, 163, 1).setNamedTag(first.getNamedTag().copy());
+        Item output = Item.get(Item.IRON_SHOVEL, 162, 1).setNamedTag(first.getNamedTag().copy());
         execute(first, second, output);
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
@@ -133,7 +133,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1)
                 .setNamedTag(new CompoundTag().putString("example:origin", "example:original"));
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1).setNamedTag(first.getNamedTag().copy());
-        Item output = Item.get(Item.IRON_SHOVEL, 163, 1).setNamedTag(first.getNamedTag().copy());
+        Item output = Item.get(Item.IRON_SHOVEL, 162, 1).setNamedTag(first.getNamedTag().copy());
         execute(first, second, output);
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
@@ -148,7 +148,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         first.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_EFFICIENCY).setLevel(2));
         first.setNamedTag(first.getNamedTag().putInt("RepairCost", 3));
-        execute(first, Item.get(Item.IRON_SHOVEL, 225, 1), Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, Item.get(Item.IRON_SHOVEL, 225, 1), Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
         assertTrue(ui.getBigCraftingGrid().getItem(1).isNull());
@@ -169,7 +169,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:owner", "original"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));

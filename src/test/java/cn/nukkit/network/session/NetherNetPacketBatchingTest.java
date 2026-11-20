@@ -4,12 +4,16 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.session.login.SessionLoginPhase;
 import cn.nukkit.utils.BinaryStream;
 import com.sun.management.ThreadMXBean;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.DefaultChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.ImmediateEventExecutor;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -22,11 +26,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /** NetherNet batches go through the same reusable scratch as RakNet and keep identical wire bytes. */
@@ -53,6 +57,17 @@ class NetherNetPacketBatchingTest {
     static Stream<CompressionProvider> providers() {
         return Stream.of(CompressionProvider.NONE, CompressionProvider.ZLIB, CompressionProvider.ZLIB_RAW,
                 CompressionProvider.SNAPPY);
+    }
+
+    /**
+     * 只有能写前缀的编码才覆盖 1.20.60+；ZLIB 带 zlib 头，没有前缀形态，只能停在无前缀的老版本上。
+     * <p>Only prefix-capable codecs cover 1.20.60+; ZLIB is header-bearing and has no prefixed form, so it
+     * stays on the legacy versions that need no prefix.
+     */
+    private static GameVersion[] versionsFor(CompressionProvider provider) {
+        return provider.supportsPrefix()
+                ? new GameVersion[]{GameVersion.V1_20_0, GameVersion.V1_20_60, GameVersion.V1_26_50}
+                : new GameVersion[]{GameVersion.V1_20_0};
     }
 
     private static final class Fixture {
@@ -110,7 +125,7 @@ class NetherNetPacketBatchingTest {
     @ParameterizedTest
     @MethodSource("providers")
     void keepsLegacyWireBytesAndSplitBoundaries(CompressionProvider provider) throws Exception {
-        for (GameVersion version : new GameVersion[]{GameVersion.V1_20_0, GameVersion.V1_20_60, GameVersion.V1_26_50}) {
+        for (GameVersion version : versionsFor(provider)) {
             Fixture fixture = new Fixture(version, provider);
             List<List<DataPacket>> cases = List.of(
                     List.of(packet(version, 1, 1)),
@@ -120,6 +135,9 @@ class NetherNetPacketBatchingTest {
                             packet(version, 7, 2_000_000), packet(version, 8, 17)));
             for (List<DataPacket> packets : cases) {
                 List<byte[]> expected = fixture.legacy(packets);
+                // 空帧对比是 0 == 0 的假通过：两条路径都必须真的出帧
+                // Comparing empty lists passes on 0 == 0, so both paths must really produce frames
+                assertFalse(expected.isEmpty(), provider + " " + version + " produced no frames");
                 List<byte[]> actual = fixture.send(packets);
                 assertEquals(expected.size(), actual.size(), provider + " " + version + " frame count");
                 for (int i = 0; i < expected.size(); i++) {
@@ -135,6 +153,105 @@ class NetherNetPacketBatchingTest {
     }
 
     @Test
+    void prefixIncapableCompressionClosesOnceInsteadOfDroppingEveryBatch() throws Exception {
+        Fixture fixture = new Fixture(GameVersion.V1_26_50, CompressionProvider.ZLIB);
+        List<DataPacket> packets = List.of(packet(GameVersion.V1_26_50, 1, 64));
+
+        assertTrue(fixture.send(packets).isEmpty(), "a codec without a prefix cannot frame anything");
+        assertTrue(fixture.send(packets).isEmpty(), "later batches stay silent");
+        assertEquals(SessionLoginPhase.DISCONNECTED, fixture.session.getState().getLogin().getPhase());
+        assertEquals("Your client does not support this game version over this connection",
+                fixture.session.getState().getLogin().getDisconnectCauseHint(), "the prefix guard must close the session");
+
+        Fixture prefixed = new Fixture(GameVersion.V1_26_50, CompressionProvider.ZLIB_RAW);
+        assertEquals(1, prefixed.send(packets).size(), "the legal combination still frames");
+    }
+
+    @Test
+    void legacyCustomCompressionProviderStillFramesBatches() throws Exception {
+        // 只实现旧接口（compress/decompress/getPrefix）的插件编码器不能因新增的能力方法被断开
+        // A plugin codec implementing only the old surface must not be disconnected by the new capability method
+        CompressionProvider legacy = new CompressionProvider() {
+            @Override
+            public byte[] compress(BinaryStream packet, int level) throws Exception {
+                return CompressionProvider.ZLIB_RAW.compress(packet, level);
+            }
+
+            @Override
+            public byte[] decompress(byte[] compressed) throws Exception {
+                return CompressionProvider.ZLIB_RAW.decompress(compressed);
+            }
+
+            @Override
+            public byte getPrefix() {
+                return CompressionProvider.ZLIB_RAW.getPrefix();
+            }
+        };
+
+        Fixture fixture = new Fixture(GameVersion.V1_26_50, legacy);
+        assertEquals(1, fixture.send(List.of(packet(GameVersion.V1_26_50, 1, 64))).size(),
+                "a legacy plugin codec must keep framing on prefixed transports");
+        assertNotEquals(SessionLoginPhase.DISCONNECTED, fixture.session.getState().getLogin().getPhase());
+    }
+
+    @Test
+    void directWritePrefixFailureDoesNotRunSuccessCallback() throws Exception {
+        // 同 RakNet：前缀不可用时批次未写出，DIRECT_WRITE 不得按成功执行回调
+        // Same as RakNet: the batch is never written when the prefix is unavailable, so DIRECT_WRITE
+        // must not run success callbacks
+        EventLoop loop = mock(EventLoop.class);
+        doAnswer(call -> {
+            ((Runnable) call.getArgument(0)).run();
+            return null;
+        }).when(loop).execute(any(Runnable.class));
+        NetherNetChildChannel channel = mock(NetherNetChildChannel.class);
+        when(channel.eventLoop()).thenReturn(loop);
+        when(channel.isActive()).thenReturn(true);
+        ChannelFuture closeFuture = mock(ChannelFuture.class);
+        when(closeFuture.addListener(any())).thenReturn(closeFuture);
+        when(channel.closeFuture()).thenReturn(closeFuture);
+        stubCompletedFutures(channel);
+
+        NetherNetPlayerSession session = new NetherNetPlayerSession(null, channel);
+        session.getState().getProtocol().setGameVersion(GameVersion.V1_26_50);
+        session.setCompression(CompressionProvider.ZLIB);
+
+        AtomicBoolean callbackRan = new AtomicBoolean();
+        session.sendImmediatePacket(packet(GameVersion.V1_26_50, 1, 64), () -> callbackRan.set(true),
+                NetworkPlayerSession.ImmediatePacketMode.DIRECT_WRITE);
+
+        assertFalse(callbackRan.get(), "an unwritten packet must not report success to DIRECT_WRITE");
+        verify(channel, never()).writeAndFlush(any(ByteBuf.class));
+        assertEquals(SessionLoginPhase.DISCONNECTED, session.getState().getLogin().getPhase(),
+                "the phase set by the prefix close must survive the failure branch");
+        assertEquals("Your client does not support this game version over this connection",
+                session.getState().getLogin().getDisconnectCauseHint(),
+                "the failure branch's disconnect must stay a no-op against the prefix close reason");
+    }
+
+    /**
+     * 用真实 Netty future 替换 mock 的已完成 future：监听器同步触发，防止 mock 吞掉回调掩盖回归。
+     * <p>Replaces the mock's completed futures with real Netty ones so listeners fire synchronously
+     * and a mock cannot swallow the callback and hide a regression.
+     */
+    private static void stubCompletedFutures(Channel channel) {
+        when(channel.newSucceededFuture()).thenAnswer(call ->
+                completedPromise(channel, null));
+        when(channel.newFailedFuture(any(Throwable.class))).thenAnswer(call ->
+                completedPromise(channel, call.getArgument(0)));
+    }
+
+    private static DefaultChannelPromise completedPromise(Channel channel, Throwable cause) {
+        DefaultChannelPromise promise = new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE);
+        if (cause == null) {
+            promise.setSuccess();
+        } else {
+            promise.setFailure(cause);
+        }
+        return promise;
+    }
+
+    @Test
     void steadyBatchesDoNotRegrowAFreshStream() throws Exception {
         assumeTrue(ManagementFactory.getThreadMXBean() instanceof ThreadMXBean);
         ThreadMXBean allocations = (ThreadMXBean) ManagementFactory.getThreadMXBean();
@@ -142,7 +259,7 @@ class NetherNetPacketBatchingTest {
         allocations.setThreadAllocatedMemoryEnabled(true);
 
         GameVersion version = GameVersion.V1_26_50;
-        Fixture fixture = new Fixture(version, CompressionProvider.ZLIB);
+        Fixture fixture = new Fixture(version, CompressionProvider.ZLIB_RAW);
         int payload = 256 * 1024;
         List<DataPacket> packets = new ArrayList<>();
         for (int i = 0; i < 8; i++) packets.add(packet(version, i, payload / 8));

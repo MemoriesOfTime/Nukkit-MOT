@@ -131,6 +131,7 @@ class PlayerChunkPublisherAdmissionTest {
         Fixture() throws Exception {
             field(player, "usedChunks", new Long2ObjectOpenHashMap<Boolean>());
             field(player, "loadQueue", new LongLinkedOpenHashSet());
+            field(player, "pendingChunkRetries", Player.newPendingRetryQueue());
             field(player, "server", server);
             field(player, "networkSession", network);
             field(player, "gameVersion", GameVersion.V1_21_70);

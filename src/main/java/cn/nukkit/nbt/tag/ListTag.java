@@ -52,6 +52,11 @@ public class ListTag<T extends Tag> extends Tag {
         type = dis.readByte();
         int size = dis.readInt();
 
+        // Unknown types fall back to EndTag, whose decoder consumes no bytes.
+        if (dis.isReadSafely() && type != TAG_End && Tag.newTag(type, null) instanceof EndTag) {
+            throw new IOException("Unsupported list element type: " + Byte.toUnsignedInt(type));
+        }
+
         if (type == TAG_End) {
             list = new ArrayList<>();
             return;

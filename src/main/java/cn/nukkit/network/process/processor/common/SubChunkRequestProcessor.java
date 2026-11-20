@@ -27,13 +27,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
@@ -89,15 +83,15 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
 
     /**
      * 处理子区块请求：去重后按剩余 in-flight 额度提交异步序列化；已有排队/完成应答、
-     * 本 tick 条目/字节上限耗尽或额度不足时入队（队列有上限，超限丢弃新请求——客户端会重新
-     * 请求）。工作量上界取 offset 数（O(1)，每个 offset 至多产出一个昂贵条目），宁可保守
+     * 本 tick 条目/字节上限耗尽或额度不足时入队（队列有上限，超限的新请求以失败条目
+     * 应答）。工作量上界取 offset 数（O(1)，每个 offset 至多产出一个昂贵条目），宁可保守
      * 排队也不在入队判定前对最多 8192 个 offset 逐项探测区块。
      * <p>
      * Handles a sub-chunk request: deduplicated, then submitted for async serialization
      * with the remaining in-flight credit; queued when answers are already queued or
      * completed, when this tick's entry/byte ceiling is exhausted, or when the credit cannot
-     * cover the request. The queue is capped; new requests are dropped over the caps
-     * (the client re-requests). The work bound is the offset count (O(1); each offset
+     * cover the request. The queue is capped; new requests over the caps are answered
+     * with failure entries. The work bound is the offset count (O(1); each offset
      * yields at most one expensive entry) — queue conservatively instead of probing up
      * to 8192 offsets per arrival just to make the enqueue decision.
      */
@@ -118,13 +112,57 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         if (state.hasDeferred() || state.hasCompletions() || state.responseBytesExceeded(tick)
                 || state.remainingEntryBudget(tick, subChunkEntriesPerTickBudget(player)) <= 0
                 || PlayerSubChunkRequestState.requestOffsetCount(pk) > state.remainingInFlightOffsets()) {
-            if (!state.tryDefer(pk)) {
-                player.getServer().getLogger().debug(player.getName() + "(" + player.getId() + "): dropped sub-chunk request over deferred queue caps ("
-                        + state.deferredPacketCount() + " packets / " + state.deferredOffsetCount() + " offsets queued)");
-            }
+            deferOrReject(player, state, pk);
             return;
         }
         submitSubChunkRequest(playerHandle, pk, Integer.MAX_VALUE);
+    }
+
+    private static void deferOrReject(Player player, PlayerSubChunkRequestState state, SubChunkRequestPacket pk) {
+        if (!state.tryDefer(pk) && !state.tryReject(pk)) {
+            player.getServer().getLogger().debug(player.getName() + "(" + player.getId() + "): dropped sub-chunk request over queue caps ("
+                    + state.deferredPacketCount() + " packets / " + state.deferredOffsetCount() + " offsets queued)");
+        }
+    }
+
+    /**
+     * 以失败条目应答超限请求，受共享字节预算约束。
+     * <p>
+     * Answers over-cap requests with failure entries within the shared byte budget.
+     */
+    private static void sendRejected(PlayerHandle playerHandle, PlayerSubChunkRequestState state) {
+        Player player = playerHandle.player;
+        Level sourceLevel = player.getLevel();
+        int sourceEpoch = state.epoch();
+        int tick = player.getServer().getTick();
+        SubChunkRequestPacket pk;
+        while ((pk = state.pollRejected()) != null) {
+            List<BlockVector3> offsets = subChunkRequestOffsets(pk);
+            SubChunkPacket packet = newSubChunkResponse(pk, false);
+            int sent = 0;
+            for (; sent < offsets.size(); sent++) {
+                SubChunkPacket.SubChunkData entry = failureEntry(offsets.get(sent));
+                int entryBytes = subChunkEntryWireBytes(entry);
+                if (state.responseBytesExceeded(tick)
+                        || (entryBytes > state.remainingResponseBytes(tick) && state.hasResponseBytes(tick))) {
+                    break;
+                }
+                state.accountResponseBytes(tick, entryBytes);
+                packet.subChunks.add(entry);
+            }
+            boolean accepted = sent == 0 || player.dataPacket(packet);
+            if (state.epoch() != sourceEpoch || player.getLevel() != sourceLevel) {
+                return;
+            }
+            if (!accepted) {
+                state.pushRejectedFront(pk);
+                return;
+            }
+            if (sent < offsets.size()) {
+                state.pushRejectedFront(residualRequest(pk, offsets, sent));
+                return;
+            }
+        }
     }
 
     /**
@@ -143,6 +181,10 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         Player player = playerHandle.player;
         Level sourceLevel = player.getLevel();
         int sourceEpoch = state.epoch();
+        sendRejected(playerHandle, state);
+        if (state.epoch() != sourceEpoch || player.getLevel() != sourceLevel) {
+            return;
+        }
         sendCompletions(playerHandle, state);
         if (state.epoch() != sourceEpoch || player.getLevel() != sourceLevel) {
             return;
@@ -273,7 +315,7 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
         } catch (RuntimeException | Error failure) {
             if (state.epoch() == requestEpoch) {
                 state.releaseInFlightOffsets(granted);
-                state.tryDefer(pk);
+                deferOrReject(player, state, pk);
             }
             throw failure;
         }
@@ -591,7 +633,17 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                 if (!currentAnswer(player, state, answer, sourceLevel)) return false;
                 SubChunkPacket.SubChunkData entry = entries.get(sent);
                 if (!currentColumn(state, answer, submitted.get(sent))) {
-                    settled[sent] = true; // A replacement shell owns a different outstanding ledger.
+                    // Stale snapshots are answered with a failure entry
+                    SubChunkPacket.SubChunkData stale = failureEntry(entry.offset);
+                    int staleBytes = subChunkEntryWireBytes(stale);
+                    if (state.responseBytesExceeded(tick)
+                            || (staleBytes > state.remainingResponseBytes(tick) && state.hasResponseBytes(tick))) {
+                        break;
+                    }
+                    settled[sent] = true;
+                    state.accountResponseBytes(tick, staleBytes);
+                    buffer.add(stale);
+                    if (!currentAnswer(player, state, answer, sourceLevel)) return false;
                     continue;
                 }
                 if (state.responseBytesExceeded(tick)
@@ -655,7 +707,7 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
                     request.subChunkPosition = new BlockVector3(answer.request.subChunkPosition.x,
                             answer.request.subChunkPosition.y, answer.request.subChunkPosition.z);
                     request.positionOffsets = retry;
-                    state.tryDefer(request);
+                    deferOrReject(player, state, request);
                 }
             }
         }
@@ -664,6 +716,13 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
     private static boolean currentAnswer(Player player, PlayerSubChunkRequestState state,
                                          PlayerSubChunkRequestState.CompletedSubChunkAnswer answer, Level level) {
         return state.epoch() == answer.epoch && player.getLevel() == level;
+    }
+
+    private static SubChunkPacket.SubChunkData failureEntry(BlockVector3 offset) {
+        SubChunkPacket.SubChunkData entry = new SubChunkPacket.SubChunkData();
+        entry.offset = offset;
+        entry.result = SubChunkRequestResult.CHUNK_NOT_FOUND;
+        return entry;
     }
 
     private static boolean currentColumn(PlayerSubChunkRequestState state,
@@ -816,11 +875,15 @@ public class SubChunkRequestProcessor extends DataPacketProcessor<SubChunkReques
      */
     private static void requeueSubChunkRequestResidual(PlayerSubChunkRequestState state,
                                                        SubChunkRequestPacket pk, List<BlockVector3> offsets, int from) {
+        state.requeue(residualRequest(pk, offsets, from));
+    }
+
+    private static SubChunkRequestPacket residualRequest(SubChunkRequestPacket pk, List<BlockVector3> offsets, int from) {
         SubChunkRequestPacket residual = new SubChunkRequestPacket();
         residual.dimension = pk.dimension;
         residual.subChunkPosition = pk.subChunkPosition;
         residual.positionOffsets = new ArrayList<>(offsets.subList(from, offsets.size()));
-        state.requeue(residual);
+        return residual;
     }
 
     /**

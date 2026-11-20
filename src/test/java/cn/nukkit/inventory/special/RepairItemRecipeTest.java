@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RepairItemRecipeTest {
 
-    private static final int ELYTRA_MAX_DURABILITY = 432;
+    private static final int ELYTRA_MAX_DURABILITY = 433;
 
     private RepairItemRecipe recipe;
 
@@ -54,7 +54,7 @@ class RepairItemRecipeTest {
     void testElytraCombineWithRemainingDamage() {
         Item elytra1 = Item.get(Item.ELYTRA, 300);
         Item elytra2 = Item.get(Item.ELYTRA, 300);
-        Item output = Item.get(Item.ELYTRA, 148);
+        Item output = Item.get(Item.ELYTRA, 146);
 
         assertTrue(recipe.canExecute(null, output, List.of(elytra1, elytra2)));
     }
@@ -63,7 +63,7 @@ class RepairItemRecipeTest {
     void testElytraWrongOutputDamage() {
         Item elytra1 = Item.get(Item.ELYTRA, 300);
         Item elytra2 = Item.get(Item.ELYTRA, 300);
-        Item wrongOutput = Item.get(Item.ELYTRA, 149);
+        Item wrongOutput = Item.get(Item.ELYTRA, 147);
 
         assertFalse(recipe.canExecute(null, wrongOutput, List.of(elytra1, elytra2)));
     }
@@ -146,7 +146,7 @@ class RepairItemRecipeTest {
 
     @Test
     void testCalculateDamageHeavyDamage() {
-        assertEquals(248, recipe.calculateDamage(350, 350, ELYTRA_MAX_DURABILITY));
+        assertEquals(246, recipe.calculateDamage(350, 350, ELYTRA_MAX_DURABILITY));
     }
 
     @Test
@@ -202,14 +202,14 @@ class RepairItemRecipeTest {
     }
     @Test void forgedOutputAndWrongDurabilityStayRejected() {
         Item named = first().setCustomName("First shovel");
-        assertFalse(matches(named, second(), new ItemShovelIron(162, 1)));
+        assertFalse(matches(named, second(), new ItemShovelIron(163, 1)));
         assertFalse(matches(named, second(), output().setCustomName("Forged")));
         assertFalse(matches(named, second(), output().setNamedTag(new CompoundTag().putString("example:origin", "example:forged"))));
     }
 
     private Item first() { return new ItemShovelIron(200, 1); }
     private Item second() { return new ItemShovelIron(225, 1); }
-    private Item output() { return new ItemShovelIron(163, 1); }
+    private Item output() { return new ItemShovelIron(162, 1); }
     private boolean matches(Item first, Item second, Item output) {
         Item beforeFirst = first.clone(), beforeSecond = second.clone(), beforeOutput = output.clone();
         boolean result = recipe.canExecute(null, output, List.of(first, second));

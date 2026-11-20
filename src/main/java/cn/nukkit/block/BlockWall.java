@@ -497,27 +497,42 @@ public class BlockWall extends BlockTransparentMeta implements BlockPropertiesHe
         );
     }
 
+    /**
+     * 邻居朝向本方块的一面是否与墙相连。
+     * <p>
+     * Whether the neighbour's face towards this wall connects.
+     *
+     * @param block        相邻方块 / the neighbouring block
+     * @param neighborFace 邻居朝向本方块的那一面 / the neighbour's face touching this block
+     */
+    public boolean canConnect(Block block, BlockFace neighborFace) {
+        if (block instanceof BlockWall || block instanceof BlockThin) {
+            return true;
+        }
+        if (block instanceof BlockFenceGate fenceGate) {
+            // 只在门板轴向（与门朝向垂直的轴）连接 / connect along the gate panel axis
+            return fenceGate.getBlockFace().getAxis() != neighborFace.getAxis();
+        }
+        return ConnectionSupport.providesFullSupport(block, neighborFace);
+    }
+
+    /**
+     * 旧布尔入口：内部重算仍经此虚调用，保留既有插件覆写；默认按坐标推断邻居朝向本方块的面。
+     * <p>
+     * Legacy boolean entry: internal recomputation dispatches through it so existing plugin
+     * overrides keep working; by default it infers the neighbour's face towards this block.
+     */
     public boolean canConnect(Block block) {
-        switch (block.getId()) {
-            case GLASS -> {
+        BlockFace neighborFace = ConnectionSupport.faceFromNeighbor(this, block);
+        if (neighborFace != null) {
+            return this.canConnect(block, neighborFace);
+        }
+        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
+            if (this.canConnect(block, side)) {
                 return true;
             }
-            default -> {
-                if (block instanceof BlockThin || block instanceof BlockGlassStained || block instanceof BlockWall) {
-                    return true;
-                }
-                if (block instanceof BlockFenceGate fenceGate) {
-                    return fenceGate.getBlockFace().getAxis() != calculateAxis(this, block);
-                }
-                if (block instanceof BlockStairs) {
-                    return ((BlockStairs) block).getBlockFace().getOpposite() == calculateFace(this, block);
-                }
-                if (block instanceof BlockTrapdoor trapdoor) {
-                    return trapdoor.isOpen() && trapdoor.getBlockFace() == calculateFace(this, trapdoor);
-                }
-                return block.isSolid() && !block.isTransparent();
-            }
         }
+        return false;
     }
 
     public boolean isConnected(BlockFace face) {

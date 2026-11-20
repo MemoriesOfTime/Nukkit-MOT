@@ -186,8 +186,7 @@ public class PlayerSubChunkRequestStateTest {
         for (int i = 0; i < 256; i++) {
             assertTrue(state.tryDefer(request(1)));
         }
-        // 超限丢弃新请求，客户端会重新请求 / over the cap the new request is dropped
-        // (the client re-requests)
+        // over the cap the new request is refused
         assertFalse(state.tryDefer(request(1)));
         assertEquals(256, state.deferredPacketCount());
     }
@@ -314,6 +313,38 @@ public class PlayerSubChunkRequestStateTest {
         state.clear();
         assertEquals(0, state.deferredMissHashCount());
         assertTrue(state.tryDeferMissBatch(new long[]{1}), "clear resets the backlog");
+    }
+
+    @Test
+    public void rejectedBacklogIsCappedAndClearResets() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        assertTrue(state.tryReject(request(65536)));
+        assertFalse(state.tryReject(request(1)), "over the offset cap the request is refused");
+
+        state.clear();
+        assertFalse(state.hasRejected());
+        for (int i = 0; i < 256; i++) {
+            assertTrue(state.tryReject(request(1)));
+        }
+        assertFalse(state.tryReject(request(1)), "over the packet cap the request is refused");
+    }
+
+    @Test
+    public void rejectedResidualReturnsToTheHead() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        SubChunkRequestPacket first = request(2);
+        SubChunkRequestPacket second = request(1);
+        assertTrue(state.tryReject(first));
+        assertTrue(state.tryReject(second));
+
+        assertSame(first, state.pollRejected());
+        SubChunkRequestPacket residual = request(1);
+        state.pushRejectedFront(residual);
+
+        assertSame(residual, state.pollRejected());
+        assertSame(second, state.pollRejected());
+        assertNull(state.pollRejected());
+        assertTrue(state.tryReject(request(65536)), "polling returns the offsets to the cap");
     }
 
     @Test

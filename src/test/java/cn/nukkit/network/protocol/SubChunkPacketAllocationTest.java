@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.types.SubChunkRequestResult;
 import com.sun.management.ThreadMXBean;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.lang.management.ManagementFactory;
@@ -42,6 +43,7 @@ class SubChunkPacketAllocationTest {
         }
     }
 
+    @Tag("perf")
     @Test
     void presizingCutsLargePayloadAllocationsInEveryEncoderBranch() {
         ThreadMXBean allocations = (ThreadMXBean) ManagementFactory.getThreadMXBean();

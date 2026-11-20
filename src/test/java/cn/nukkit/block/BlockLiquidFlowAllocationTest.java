@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.Vector3;
 import com.sun.management.ThreadMXBean;
+import org.junit.jupiter.api.Tag;
 import sun.misc.Unsafe;
 
 import java.lang.management.ManagementFactory;
@@ -18,6 +19,7 @@ import java.util.Locale;
  * No mocks, copied flow implementation or escape-analysis JVM switches are used.
  */
 public final class BlockLiquidFlowAllocationTest {
+    @Tag("perf")
     @org.junit.jupiter.api.Test
     void nativeFlowRetainsBitsReadsAndCacheWithinAllocationBudget(
             @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporaryDirectory) throws Exception {

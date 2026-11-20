@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.zip.GZIPInputStream;
 
 @Log4j2
@@ -56,6 +57,14 @@ public class GlobalBlockPalette {
     private static final Int2IntOpenHashMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
 
     private static final Map<GameVersion, BlockPalette> paletteCache = new ConcurrentHashMap<>();
+
+    private static final int PALETTE_LOOKUP_SIZE = Math.max(
+            GameVersion.getLastVersion().getProtocol(),
+            GameVersion.getLastNetEaseVersion().getProtocol()) + 1;
+    private static final AtomicReferenceArray<BlockPalette> STANDARD_PALETTES =
+            new AtomicReferenceArray<>(PALETTE_LOOKUP_SIZE);
+    private static final AtomicReferenceArray<BlockPalette> NETEASE_PALETTES =
+            new AtomicReferenceArray<>(PALETTE_LOOKUP_SIZE);
 
     // Standard protocol → palette version mapping (threshold protocol → palette GameVersion)
     private static final NavigableMap<Integer, GameVersion> STANDARD_PALETTE_THRESHOLDS = new TreeMap<>();
@@ -377,15 +386,30 @@ public class GlobalBlockPalette {
 
     public static BlockPalette getPaletteByProtocol(GameVersion gameVersion) {
         int protocol = gameVersion.getProtocol();
-        NavigableMap<Integer, GameVersion> thresholds = gameVersion.isNetEase()
+        boolean netEase = gameVersion.isNetEase();
+        boolean indexable = protocol >= 0 && protocol < PALETTE_LOOKUP_SIZE;
+
+        AtomicReferenceArray<BlockPalette> palettes = netEase ? NETEASE_PALETTES : STANDARD_PALETTES;
+        if (indexable) {
+            BlockPalette cached = palettes.get(protocol);
+            if (cached != null) {
+                return cached;
+            }
+        }
+
+        NavigableMap<Integer, GameVersion> thresholds = netEase
                 ? NETEASE_PALETTE_THRESHOLDS
                 : STANDARD_PALETTE_THRESHOLDS;
         Map.Entry<Integer, GameVersion> entry = thresholds.floorEntry(protocol);
         if (entry == null) {
             throw new IllegalArgumentException("Tried to get BlockPalette for unsupported protocol version: " + protocol
-                    + (gameVersion.isNetEase() ? " (NetEase)" : ""));
+                    + (netEase ? " (NetEase)" : ""));
         }
-        return paletteCache.computeIfAbsent(entry.getValue(), BlockPalette::new);
+        BlockPalette palette = paletteCache.computeIfAbsent(entry.getValue(), BlockPalette::new);
+        if (indexable) {
+            palettes.set(protocol, palette);
+        }
+        return palette;
     }
 
     @Deprecated

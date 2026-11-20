@@ -13,8 +13,11 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Queue;
+import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,8 +39,12 @@ class PlayerChunkSendTest {
             player.level = level;
             player.connected = true;
             player.protocol = 0;
+            Server server = mock(Server.class);
+            when(server.isPrimaryThread()).thenReturn(true);
+            UnloadRead.set(Entity.class, player, "server", server);
             field("usedChunks", new Long2ObjectOpenHashMap<Boolean>());
             field("loadQueue", new LongLinkedOpenHashSet());
+            field("pendingChunkRetries", Player.newPendingRetryQueue());
             player.usedChunks.put(index, Boolean.FALSE);
             doCallRealMethod().when(player).sendChunk(anyInt(), anyInt(), any(DataPacket.class));
         }
@@ -66,6 +73,18 @@ class PlayerChunkSendTest {
             player.sendChunk(3, 5, packet);
             assertFalse(player.usedChunks.get(index));
             assertTrue(player.loadQueue.contains(index));
+            assertEquals(0, sent());
+        }
+
+        @Test
+        void rejectedSubmissionFromPreviousOrderDoesNotRetryInRebuiltQueue() throws Exception {
+            doAnswer(call -> {
+                field("chunkOrderEpoch", 1L);
+                return false;
+            }).when(player).dataPacket(packet);
+            player.sendChunk(3, 5, packet);
+            assertFalse(player.usedChunks.get(index));
+            assertTrue(player.loadQueue.isEmpty());
             assertEquals(0, sent());
         }
 
@@ -245,6 +264,7 @@ class PlayerChunkSendTest {
             when(player.getLoaderId()).thenReturn(7);
             set(Player.class, player, "usedChunks", new Long2ObjectOpenHashMap<>());
             set(Player.class, player, "loadQueue", new LongLinkedOpenHashSet());
+            set(Player.class, player, "pendingChunkRetries", Player.newPendingRetryQueue());
             player.usedChunks.put(hash, Boolean.TRUE);
             player.loadQueue.add(hash);
             doCallRealMethod().when(player).unloadChunk(anyInt(), anyInt(), nullable(Level.class));
@@ -356,6 +376,202 @@ class PlayerChunkSendTest {
             var field = type.getDeclaredField(name);
             field.setAccessible(true);
             field.set(target, value);
+        }
+    }
+
+    @Nested
+    class ChunkRetryQueue {
+        @Test
+        void asyncProducersOnlyStageRetriesUntilMainThreadDrain() throws Exception {
+            RetryFixture f = new RetryFixture();
+            int chunkCount = 32;
+            for (int i = 0; i < chunkCount; i++) {
+                f.player.usedChunks.put(Level.chunkHash(i, i), Boolean.FALSE);
+            }
+
+            ExecutorService pool = Executors.newFixedThreadPool(8);
+            CountDownLatch start = new CountDownLatch(1);
+            try {
+                List<Future<?>> producers = new ArrayList<>();
+                for (int thread = 0; thread < 8; thread++) {
+                    producers.add(pool.submit(() -> {
+                        start.await();
+                        for (int i = 0; i < 500; i++) {
+                            long index = Level.chunkHash(i % chunkCount, i % chunkCount);
+                            f.handle.requestChunkRetry(index);
+                        }
+                        return null;
+                    }));
+                }
+                start.countDown();
+                for (Future<?> producer : producers) {
+                    producer.get(10, TimeUnit.SECONDS);
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+
+            assertTrue(f.player.loadQueue.isEmpty(), "async producers must not touch the ordered queue");
+            f.runOnMainThread();
+            f.drain();
+            assertEquals(chunkCount, f.player.loadQueue.size(), "main-thread drain must deduplicate retries");
+        }
+
+        @Test
+        void mainThreadRetriesApplyImmediatelyAndSnapshotIsDetached() throws Exception {
+            RetryFixture f = new RetryFixture();
+            f.runOnMainThread();
+            long first = Level.chunkHash(1, 1);
+            long second = Level.chunkHash(2, 2);
+            f.player.usedChunks.put(first, Boolean.FALSE);
+            f.player.usedChunks.put(second, Boolean.FALSE);
+
+            f.handle.requestChunkRetry(first);
+            f.handle.requestChunkRetry(second);
+            f.handle.requestChunkRetry(first);
+
+            assertEquals(List.of(first, second), new ArrayList<>(f.player.loadQueue));
+            LongLinkedOpenHashSet snapshot = f.handle.getLoadQueueSnapshot();
+            snapshot.clear();
+            assertEquals(2, f.player.loadQueue.size());
+        }
+
+        @Test
+        void staleRetriesAreDroppedAfterLifecycleChanges() throws Exception {
+            RetryFixture f = new RetryFixture();
+            long index = Level.chunkHash(3, 5);
+            f.player.usedChunks.put(index, Boolean.FALSE);
+
+            f.handle.requestChunkRetry(index);
+            UnloadRead.set(Player.class, f.player, "chunkOrderEpoch", 1L);
+            f.drain();
+            assertTrue(f.player.loadQueue.isEmpty(), "old order retry");
+
+            f.handle.requestChunkRetry(index);
+            UnloadRead.set(Player.class, f.player, "chunkDeliveryEpoch", 1L);
+            f.drain();
+            assertTrue(f.player.loadQueue.isEmpty(), "old delivery retry");
+
+            f.handle.requestChunkRetry(index);
+            f.player.level = mock(Level.class);
+            f.drain();
+            assertTrue(f.player.loadQueue.isEmpty(), "old world retry");
+
+            f.handle.requestChunkRetry(index);
+            f.player.connected = false;
+            f.drain();
+            assertTrue(f.player.loadQueue.isEmpty(), "disconnected retry");
+        }
+
+        @Test
+        void deliveredAndUntrackedChunksAreNotRetried() throws Exception {
+            RetryFixture f = new RetryFixture();
+            long index = Level.chunkHash(3, 5);
+            f.player.usedChunks.put(index, Boolean.TRUE);
+            f.handle.requestChunkRetry(index);
+            f.drain();
+            assertTrue(f.player.loadQueue.isEmpty());
+
+            f.player.usedChunks.remove(index);
+            f.handle.requestChunkRetry(index);
+            f.drain();
+            assertTrue(f.player.loadQueue.isEmpty());
+        }
+
+        @SuppressWarnings("deprecation")
+        @Test
+        void rawQueueAccessIsRejectedOffTheMainThread() throws Exception {
+            RetryFixture f = new RetryFixture();
+            assertThrows(IllegalStateException.class, () -> f.handle.getLoadQueue());
+            assertThrows(IllegalStateException.class, () -> f.handle.getLoadQueueSnapshot());
+        }
+
+        @Test
+        void asyncSendChunkRejectionIsStagedNotAppliedToLoadQueue() throws Exception {
+            RetryFixture f = new RetryFixture();
+            long index = Level.chunkHash(3, 5);
+            f.player.usedChunks.put(index, Boolean.FALSE);
+            doReturn(false).when(f.player).dataPacket(any(DataPacket.class));
+
+            f.player.sendChunk(3, 5, new LevelChunkPacket());
+
+            assertTrue(f.player.loadQueue.isEmpty(), "async sendChunk must not touch the ordered queue");
+            assertEquals(1, f.pendingRetries.size(), "rejected submission is staged for the main thread");
+            f.runOnMainThread();
+            f.drain();
+            assertTrue(f.player.loadQueue.contains(index));
+        }
+
+        @Test
+        void unloadDropsStagedRetries() throws Exception {
+            RetryFixture f = new RetryFixture();
+            f.handle.requestChunkRetry(Level.chunkHash(3, 5));
+            assertEquals(1, f.pendingRetries.size());
+
+            f.player.preSwitchLevel();
+
+            assertTrue(f.pendingRetries.isEmpty(), "world switch must drop staged retries");
+            f.runOnMainThread();
+            f.drain();
+            assertTrue(f.player.loadQueue.isEmpty());
+        }
+
+        @Test
+        void retryQueueIsBoundedAndDropsOverflow() throws Exception {
+            RetryFixture f = new RetryFixture();
+            int overflow = 16;
+            for (int i = 0; i < Player.MAX_PENDING_CHUNK_RETRIES + overflow; i++) {
+                f.handle.requestChunkRetry(Level.chunkHash(i, i));
+            }
+
+            assertEquals(Player.MAX_PENDING_CHUNK_RETRIES, f.pendingRetries.size(),
+                    "over-cap retries are dropped instead of growing the queue");
+            f.runOnMainThread();
+            f.drain();
+            assertTrue(f.pendingRetries.isEmpty());
+            assertTrue(f.player.loadQueue.isEmpty(), "dropped retries must not resurrect");
+        }
+
+        @Test
+        void checkNetworkDrainsStagedRetriesBeforeTheOnlineGate() throws Exception {
+            RetryFixture f = new RetryFixture();
+            long index = Level.chunkHash(3, 5);
+            f.player.usedChunks.put(index, Boolean.FALSE);
+            f.handle.requestChunkRetry(index);
+            assertEquals(1, f.pendingRetries.size());
+
+            // connected but not logged in: checkNetwork returns at the online gate, so only the drain runs
+            f.runOnMainThread();
+            f.player.checkNetwork();
+
+            assertTrue(f.pendingRetries.isEmpty(), "checkNetwork is the drain call site");
+            assertTrue(f.player.loadQueue.contains(index), "a still-valid retry is applied by the drain");
+        }
+    }
+
+    private static final class RetryFixture {
+        final Player player = mock(Player.class, CALLS_REAL_METHODS);
+        final Server server = mock(Server.class);
+        final Level level = mock(Level.class);
+        final PlayerHandle handle = new PlayerHandle(player);
+        final Queue<?> pendingRetries = Player.newPendingRetryQueue();
+
+        RetryFixture() throws Exception {
+            UnloadRead.set(Player.class, player, "usedChunks", new ConcurrentHashMap<Long, Boolean>());
+            UnloadRead.set(Player.class, player, "loadQueue", new LongLinkedOpenHashSet());
+            UnloadRead.set(Player.class, player, "pendingChunkRetries", pendingRetries);
+            UnloadRead.set(Entity.class, player, "server", server);
+            player.level = level;
+            player.connected = true;
+            when(server.isPrimaryThread()).thenReturn(false);
+        }
+
+        void runOnMainThread() {
+            when(server.isPrimaryThread()).thenReturn(true);
+        }
+
+        void drain() {
+            player.drainChunkRetries();
         }
     }
 }

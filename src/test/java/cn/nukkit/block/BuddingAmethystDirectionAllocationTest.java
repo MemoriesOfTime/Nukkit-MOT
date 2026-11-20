@@ -9,6 +9,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginManager;
 import com.sun.management.ThreadMXBean;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -150,6 +151,7 @@ class BuddingAmethystDirectionAllocationTest {
         verifyNoInteractions(f.plugins, f.level);
     }
 
+    @Tag("perf")
     @Test
     void randomTickDoesNotAllocateDirectionArrays(@TempDir Path directory) throws Exception {
         assumeTrue(ManagementFactory.getThreadMXBean() instanceof ThreadMXBean bean

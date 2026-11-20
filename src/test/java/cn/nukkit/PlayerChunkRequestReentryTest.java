@@ -26,6 +26,7 @@ class PlayerChunkRequestReentryTest {
         PluginManager plugins = mock(PluginManager.class);
         field(player, "usedChunks", new Long2ObjectOpenHashMap<Boolean>());
         field(player, "loadQueue", new LongLinkedOpenHashSet());
+        field(player, "pendingChunkRetries", Player.newPendingRetryQueue());
         field(player, "server", server);
         field(player, "hasSpawnChunks", true);
         player.level = level;
@@ -72,6 +73,7 @@ class PlayerChunkRequestReentryTest {
         BaseFullChunk loaded = mock(BaseFullChunk.class);
         field(player, "usedChunks", new Long2ObjectOpenHashMap<Boolean>());
         field(player, "loadQueue", new LongLinkedOpenHashSet());
+        field(player, "pendingChunkRetries", Player.newPendingRetryQueue());
         field(player, "server", server);
         field(player, "hasSpawnChunks", true);
         player.level = original;

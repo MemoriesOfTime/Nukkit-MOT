@@ -186,7 +186,7 @@ public final class NetherNetUdpPorts {
      * An RFC 1123 host name: dot-separated letter/digit/hyphen labels (1-63 chars, no leading
      * or trailing hyphen), at most 253 chars overall plus one trailing root dot.
      */
-    private static boolean isHostName(String text) {
+    static boolean isHostName(String text) {
         String name = text.endsWith(".") ? text.substring(0, text.length() - 1) : text;
         if (name.isEmpty() || name.length() > 253) {
             return false;

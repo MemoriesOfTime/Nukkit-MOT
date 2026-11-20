@@ -91,7 +91,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     private short inLoveTicks = 0;
     private short inLoveCooldown = 0;
 
-    private boolean baby = false;
+    private boolean baby;
     private boolean friendly = false;
     private int lastDamageTick;
     @Setter

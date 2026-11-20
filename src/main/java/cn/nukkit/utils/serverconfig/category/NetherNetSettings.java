@@ -37,4 +37,20 @@ public class NetherNetSettings extends OkaeriConfig {
     @Comment("Operator name in the client trust prompt, empty uses the MOTD")
     @CustomKey("identity-domain")
     private String identityDomain = "";
+
+    @Comment("TLS certificate for the signaling port: a PEM chain (leaf first) or a PKCS12 file, resolved against the server root. Players joining over HTTPS do not see the first-use trust prompt, and iOS clients cannot join without it. Leave empty to serve plaintext")
+    @CustomKey("https-certificate")
+    private String httpsCertificate = "";
+
+    @Comment("PEM private key for https-certificate. Leave empty when https-certificate is a PKCS12 file")
+    @CustomKey("https-private-key")
+    private String httpsPrivateKey = "";
+
+    @Comment("Password for the PKCS12 file or an encrypted PEM private key. Supports file:/path/to/password to read it from a file instead")
+    @CustomKey("https-password")
+    private String httpsPassword = "";
+
+    @Comment("Once a certificate is configured, answer plaintext signaling with HTTP 426 instead of serving it. Set false to keep accepting plaintext alongside TLS on the same port")
+    @CustomKey("https-reject-plaintext")
+    private boolean httpsRejectPlaintext = true;
 }

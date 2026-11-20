@@ -5,6 +5,7 @@ import cn.nukkit.block.BlockAir;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import com.sun.management.ThreadMXBean;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -122,6 +123,7 @@ class RedstoneNeighborTraversalAllocationTest {
         assertEquals(List.of(-1d, 1d, 0d, 0d, 0d, 0d), seen);
     }
 
+    @Tag("perf")
     @Test
     void enumerationDoesNotAllocatePerDispatch(@TempDir Path directory) throws Exception {
         assumeTrue(ManagementFactory.getThreadMXBean() instanceof ThreadMXBean bean
