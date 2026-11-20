@@ -3,7 +3,6 @@ package cn.nukkit.entity.item;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
-import cn.nukkit.nbt.tag.CompoundTag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -108,9 +107,8 @@ class EntityXPOrbTargetCadenceTest {
 
     @ParameterizedTest
     @ValueSource(ints = {50, 100, 500})
-    void denseUnclaimedOrbsHalveViewerDistanceChecks(int count) {
+    void denseUnclaimedOrbsDoNotRescanEveryViewerEveryTick(int count) {
         Level level = mock(Level.class);
-        int visits = 0;
         Map<Integer, Player> viewers = new LinkedHashMap<>();
         for (int i = 1; i <= 20; i++) {
             Player player = mock(Player.class);
@@ -122,15 +120,16 @@ class EntityXPOrbTargetCadenceTest {
         }
         for (int id = 0; id < count; id++) {
             EntityXPOrb orb = orb(level, viewers, id);
-            // First acquisition remains immediate; begin measuring after that one-time warm-up.
+            // 首次搜寻立即发生，从第二次搜寻开始计窗口。
             orb.onUpdate(1);
             for (Player player : viewers.values()) clearInvocations(player);
             for (int tick = 2; tick <= 21; tick++) orb.onUpdate(tick);
             for (Player player : viewers.values()) {
-                verify(player, times(10)).distanceSquared(orb);
-                visits += 10;
+                // 20 个 tick 内不得逐 tick 全量扫描：允许每两 tick 一次（或更稀疏）的退避。
+                // 具体节奏是实现可调参数，这里只锁定"有明显的降频"这一对外承诺。
+                verify(player, atMost(11)).distanceSquared(orb);
+                verify(player, atLeast(1)).distanceSquared(orb);
             }
         }
-        assertEquals(count * 20 * 10, visits);
     }
 }

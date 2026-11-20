@@ -21,11 +21,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -76,6 +72,7 @@ public class CraftingManager {
 
     public final Collection<Recipe> recipes = new ArrayDeque<>();
 
+    private static BatchPacket packet113;
     private static BatchPacket packet313;
     private static BatchPacket packet340;
     private static BatchPacket packet361;
@@ -123,6 +120,7 @@ public class CraftingManager {
     private static BatchPacket packet1001;
     private static BatchPacket packet2168;
     private static BatchPacket packet2193;
+    private static BatchPacket packet2225;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
@@ -662,11 +660,12 @@ public class CraftingManager {
         }
 
         if (input.containsKey("damage")) {
+            // 通配标记 -1/32767 沿用标识符解析出的变体，不覆盖成 0。
+            // A wildcard marker -1/32767 keeps the variant resolved from the identifier instead of collapsing to 0.
             int inputDamage = ((Number) input.get("damage")).intValue();
-            if (inputDamage == 32767) {
-                inputDamage = -1;
+            if (inputDamage != 32767 && inputDamage != -1) {
+                inputItem.setDamage(inputDamage);
             }
-            inputItem.setDamage(inputDamage);
         }
 
         if (output.containsKey("damage")) {
@@ -910,41 +909,64 @@ public class CraftingManager {
         CraftingDataPacket pk = new CraftingDataPacket();
         pk.protocol = protocol;
         pk.gameVersion = gameVersion;
-        for (Recipe recipe : this.getRecipes()) {
-            if (recipe instanceof ShapedRecipe shapedRecipe) {
-                boolean isSupported = true;
-                for (Item item : shapedRecipe.getAllResults()) {
-                    if (!item.isSupportedOn(gameVersion)) {
+        // 1.1.x：熔炉条目前置，合成按 有序变体 → 有序基础 → 无序变体 → 无序基础 下发；
+        // 交错或熔炉靠后会崩背包。现代协议保持原顺序。
+        // 1.1.x sends furnace first, then shaped/shapeless variants before basics; interleaving or
+        // trailing furnace entries crashes the inventory. Modern protocols keep the original order.
+        boolean legacyVariantOrder = protocol < ProtocolInfo.v1_2_0;
+        if (legacyVariantOrder) {
+            this.addFurnaceRecipes(pk, gameVersion);
+        }
+        int recipesPasses = legacyVariantOrder ? 4 : 1;
+        for (int pass = 0; pass < recipesPasses; pass++) {
+            boolean shapedPass = !legacyVariantOrder || pass < 2;
+            boolean variantPass = !legacyVariantOrder || pass % 2 == 0;
+            for (Recipe recipe : this.getRecipes()) {
+                if (legacyVariantOrder) {
+                    if ((recipe instanceof ShapedRecipe) != shapedPass) {
+                        continue;
+                    }
+                    if (isLegacy113VariantRecipe(recipe) != variantPass) {
+                        continue;
+                    }
+                }
+                if (recipe instanceof ShapedRecipe shapedRecipe) {
+                    boolean isSupported = true;
+                    for (Item item : shapedRecipe.getAllResults()) {
+                        if (!item.isSupportedOn(gameVersion)) {
+                            isSupported = false;
+                            break;
+                        }
+                    }
+                    if (isSupported) {
+                        for (Item ingredient : shapedRecipe.getIngredientList()) {
+                            if (!ingredient.isSupportedOn(gameVersion)) {
+                                isSupported = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (isSupported && !legacy113FireworkRecipe(gameVersion, shapedRecipe.getAllResults())
+                            && !legacy113TippedArrowRecipe(gameVersion, shapedRecipe.getAllResults())) {
+                        pk.addShapedRecipe(shapedRecipe);
+                    }
+                } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
+                    boolean isSupported = true;
+                    if (!shapelessRecipe.getResult().isSupportedOn(gameVersion)) {
                         isSupported = false;
-                        break;
                     }
-                }
-                if (isSupported) {
-                    for (Item ingredient : shapedRecipe.getIngredientList()) {
-                        if (!ingredient.isSupportedOn(gameVersion)) {
-                            isSupported = false;
-                            break;
+                    if (isSupported) {
+                        for (Item ingredient : shapelessRecipe.getIngredientList()) {
+                            if (!ingredient.isSupportedOn(gameVersion)) {
+                                isSupported = false;
+                                break;
+                            }
                         }
                     }
-                }
-                if (isSupported) {
-                    pk.addShapedRecipe(shapedRecipe);
-                }
-            } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
-                boolean isSupported = true;
-                if (!shapelessRecipe.getResult().isSupportedOn(gameVersion)) {
-                    isSupported = false;
-                }
-                if (isSupported) {
-                    for (Item ingredient : shapelessRecipe.getIngredientList()) {
-                        if (!ingredient.isSupportedOn(gameVersion)) {
-                            isSupported = false;
-                            break;
-                        }
+                    if (isSupported && !legacy113FireworkRecipe(gameVersion, java.util.Collections.singletonList(shapelessRecipe.getResult()))
+                            && !legacy113TippedArrowRecipe(gameVersion, java.util.Collections.singletonList(shapelessRecipe.getResult()))) {
+                        pk.addShapelessRecipe(shapelessRecipe);
                     }
-                }
-                if (isSupported) {
-                    pk.addShapelessRecipe(shapelessRecipe);
                 }
             }
         }
@@ -964,22 +986,8 @@ public class CraftingManager {
             }
         }
         //TODO Fix 1.10.0 - 1.14.0 client crash
-        if (protocol < ProtocolInfo.v1_10_0 || protocol > ProtocolInfo.v1_13_0) {
-            for (FurnaceRecipe recipe : this.getFurnaceRecipes().values()) {
-                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
-                    pk.addFurnaceRecipe(recipe);
-                }
-            }
-            for (BlastFurnaceRecipe recipe : this.getBlastFurnaceRecipes().values()) {
-                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
-                    pk.addFurnaceRecipe(recipe);
-                }
-            }
-            for (SmokerRecipe recipe : this.getSmokerRecipes().values()) {
-                if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
-                    pk.addFurnaceRecipe(recipe);
-                }
-            }
+        if (!legacyVariantOrder && (protocol < ProtocolInfo.v1_10_0 || protocol > ProtocolInfo.v1_13_0)) {
+            this.addFurnaceRecipes(pk, gameVersion);
         }
         if (protocol >= ProtocolInfo.v1_13_0) {
             for (BrewingRecipe recipe : this.getBrewingRecipes().values()) {
@@ -1004,12 +1012,95 @@ public class CraftingManager {
                 }
             }
         }
+        // 1.1.x 参考实现首次下发用 false，保留客户端内置配方。
+        // 1.1.x reference implementations send false to keep the client's built-in recipes.
+        pk.cleanRecipes = protocol >= ProtocolInfo.v1_2_0;
         pk.tryEncode();
         return pk.compress(Deflater.BEST_COMPRESSION);
     }
 
+    /**
+     * 1.1.5 渲染烟花结果时读取 Fireworks NBT，配方结果没有 NBT 会崩，旧协议不下发。
+     * 1.1.5 reads Fireworks NBT when rendering results, which recipe results lack; skip on legacy.
+     */
+    private static boolean legacy113FireworkRecipe(GameVersion gameVersion, Collection<Item> results) {
+        if (gameVersion.getProtocol() >= ProtocolInfo.v1_2_0) {
+            return false;
+        }
+        for (Item item : results) {
+            if (item != null && (item.getId() == Item.FIREWORKS || item.getId() == Item.FIREWORKSCHARGE)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 材料或产物带非 0、非通配 damage 的配方；1.1.x 必须先发这类再发基础配方。
+     * Recipes whose ingredients or results carry a real damage value; legacy must send these first.
+     */
+    private static boolean isLegacy113VariantRecipe(Recipe recipe) {
+        if (recipe instanceof ShapedRecipe shapedRecipe) {
+            return hasLegacy113AuxVariant(shapedRecipe.getAllResults())
+                    || hasLegacy113AuxVariant(shapedRecipe.getIngredientList());
+        }
+        if (recipe instanceof ShapelessRecipe shapelessRecipe) {
+            return hasLegacy113AuxVariant(java.util.Collections.singletonList(shapelessRecipe.getResult()))
+                    || hasLegacy113AuxVariant(shapelessRecipe.getIngredientList());
+        }
+        return false;
+    }
+
+    private static boolean hasLegacy113AuxVariant(Collection<Item> items) {
+        for (Item item : items) {
+            if (item == null) {
+                continue;
+            }
+            int damage = item.getDamage();
+            if (damage > 0 && damage != 0x7fff) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 1.1.5 用结果 damage 查药水表，查不到会空指针，旧协议不下发带 damage 的箭配方。
+     * 1.1.5 resolves arrow icons through its potion table and null-dereferences on unknown potions.
+     */
+    private static boolean legacy113TippedArrowRecipe(GameVersion gameVersion, Collection<Item> results) {
+        if (gameVersion.getProtocol() >= ProtocolInfo.v1_2_0) {
+            return false;
+        }
+        for (Item item : results) {
+            if (item != null && item.getId() == Item.ARROW && item.getDamage() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void addFurnaceRecipes(CraftingDataPacket pk, GameVersion gameVersion) {
+        for (FurnaceRecipe recipe : this.getFurnaceRecipes().values()) {
+            if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
+                pk.addFurnaceRecipe(recipe);
+            }
+        }
+        for (BlastFurnaceRecipe recipe : this.getBlastFurnaceRecipes().values()) {
+            if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
+                pk.addFurnaceRecipe(recipe);
+            }
+        }
+        for (SmokerRecipe recipe : this.getSmokerRecipes().values()) {
+            if (recipe.getInput().isSupportedOn(gameVersion) && recipe.getResult().isSupportedOn(gameVersion)) {
+                pk.addFurnaceRecipe(recipe);
+            }
+        }
+    }
+
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet2225 = null;
         packet2193 = null;
         packet2168 = null;
         packet1001 = null;
@@ -1057,6 +1148,7 @@ public class CraftingManager {
         packet354 = null;
         packet340 = null;
         packet313 = null;
+        packet113 = null;
 
         packet_netease_630 = null;
         packet_netease_686 = null;
@@ -1123,7 +1215,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
+        if (protocol >= GameVersion.V1_26_60.getProtocol()) {
+            if (packet2225 == null) {
+                packet2225 = packetFor(GameVersion.V1_26_60);
+            }
+            return packet2225;
+        } else if (protocol >= GameVersion.V1_26_50_27.getProtocol()) {
             if (packet2193 == null) {
                 packet2193 = packetFor(GameVersion.V1_26_50);
             }
@@ -1358,6 +1455,11 @@ public class CraftingManager {
                 packet313 = packetFor(GameVersion.V1_8_0);
             }
             return packet313;
+        } else if (protocol == ProtocolInfo.v1_1_0) {
+            if (packet113 == null) {
+                packet113 = packetFor(GameVersion.V1_1_0);
+            }
+            return packet113;
         }
         return null;
     }

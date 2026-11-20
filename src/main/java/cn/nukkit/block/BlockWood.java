@@ -51,16 +51,16 @@ public class BlockWood extends BlockSolidMeta {
         return 10;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Oak Wood",
+            "Spruce Wood",
+            "Birch Wood",
+            "Jungle Wood"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Oak Wood",
-                "Spruce Wood",
-                "Birch Wood",
-                "Jungle Wood"
-        };
-
-        return names[this.getDamage() & 0x03];
+        return NAMES[this.getDamage() & 0x03];
     }
 
     @Override

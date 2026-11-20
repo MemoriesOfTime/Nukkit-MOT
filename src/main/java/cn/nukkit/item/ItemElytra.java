@@ -20,7 +20,7 @@ public class ItemElytra extends ItemArmor {
 
     @Override
     public int getMaxDurability() {
-        return 432;
+        return 433;
     }
 
     @Override

@@ -150,12 +150,33 @@ class BootstrapParallelDownloadTest {
         artifacts.put(artifactPath("a"), bytes("a"));
         startServer(artifacts);
 
+        // 基线可能捕获到上一个测试方法尚未退净的 client 工作线程（close 异步生效），该线程在
+        // 等待窗口内退出属正常，不应判失败；本测试只对本次下载新增且未释放的线程负责——client
+        // id 单调递增，新 client 的线程名不可能与基线重名，故断言 after ⊆ before
+        // The baseline may capture a previous method's client worker still winding down after its
+        // close() (which lands asynchronously); that thread exiting inside the wait window is fine and
+        // must not fail the test. This test owns only threads the download added and failed to release —
+        // client ids are monotonic, so the fresh client's thread names can never alias the baseline
         Set<String> before = httpClientThreadNames();
         Bootstrap.downloadAll(manifest("a").entries(), repos(), libs, true);
-        Thread.sleep(3_000); // close 异步生效 / close() takes effect asynchronously
 
-        assertEquals(before, httpClientThreadNames(),
-                "下载完成后不应残留 HttpClient 线程 / no HttpClient threads may linger after the download");
+        Set<String> lingering = newHttpClientThreadsSince(before);
+        assertTrue(lingering.isEmpty(),
+                "下载完成后不应残留新增 HttpClient 线程 / no new HttpClient threads may linger after the download: " + lingering);
+    }
+
+    /** close 异步生效：轮询至多 5s，返回基线之外仍存活的 HttpClient 线程 / close() lands asynchronously: poll up to 5s for HttpClient threads absent from the baseline to exit */
+    private static Set<String> newHttpClientThreadsSince(Set<String> before) throws InterruptedException {
+        Set<String> fresh = new HashSet<>();
+        for (int attempt = 0; attempt < 20; attempt++) {
+            fresh = httpClientThreadNames();
+            fresh.removeAll(before);
+            if (fresh.isEmpty()) {
+                return fresh;
+            }
+            Thread.sleep(250);
+        }
+        return fresh;
     }
 
     private static boolean closeAvailable() {

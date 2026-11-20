@@ -72,7 +72,13 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
             return false;
         }
 
-        this.explode();
+        if (!super.attack(source)) {
+            return false;
+        }
+
+        if (!this.closed) {
+            this.explode();
+        }
 
         return true;
     }
@@ -92,22 +98,33 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
 
     @Override
     public void explode() {
-        this.close();
-        if (!this.detonated) {
+        if (!this.closed && !this.detonated) {
             this.detonated = true;
 
             EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, 6);
-            this.server.getPluginManager().callEvent(ev);
+            try {
+                this.server.getPluginManager().callEvent(ev);
+            } catch (RuntimeException | Error failure) {
+                if (!this.closed) {
+                    try { this.close(); }
+                    catch (RuntimeException | Error closeFailure) {
+                        if (closeFailure != failure) failure.addSuppressed(closeFailure);
+                    }
+                }
+                throw failure;
+            }
+            if (this.closed) {
+                return;
+            }
+            this.close();
             if (ev.isCancelled()) {
                 return;
             }
 
             Position pos = this.getPosition();
-            Explosion explode = new Explosion(pos, 6, this);
+            Explosion explode = new Explosion(pos, ev.getForce(), this);
 
-            this.close();
-
-            if (this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
+            if (ev.isBlockBreaking() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
                 explode.explodeA();
                 explode.explodeB();
             } else {

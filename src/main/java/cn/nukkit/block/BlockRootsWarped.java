@@ -12,6 +12,11 @@ public class BlockRootsWarped extends BlockRoots {
     }
 
     @Override
+    public boolean canBeReplaced() {
+        return true;
+    }
+
+    @Override
     public String getName() {
         return "Warped Roots";
     }

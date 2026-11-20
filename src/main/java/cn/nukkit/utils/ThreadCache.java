@@ -2,8 +2,8 @@ package cn.nukkit.utils;
 
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
 
-import java.util.BitSet;
 import java.io.IOException;
+import java.util.BitSet;
 
 /**
  * Thread cache
@@ -38,6 +38,41 @@ public class ThreadCache {
     // Bound idle retention, not the size of an operation. Once a scratch buffer
     // grows past this limit, only its caller owns it, even if that caller fails.
     static final int MAX_CACHED_BUFFER_BYTES = 1024 * 1024;
+
+    private static final ThreadLocal<BinaryStreamSlot> leasedBinaryStream = ThreadLocal.withInitial(BinaryStreamSlot::new);
+
+    /**
+     * 借用独占暂存流；必须在同线程的 finally 中归还，返回的结果应使用独立快照。
+     * <p>
+     * Borrows exclusive scratch storage; release in a same-thread finally and return only owned snapshots.
+     */
+    public static BinaryStream acquireBinaryStream() {
+        BinaryStreamSlot slot = leasedBinaryStream.get();
+        BinaryStream stream = slot.idle;
+        slot.idle = null;
+        return stream == null ? new BinaryStream() : stream;
+    }
+
+    /**
+     * 归还后不得继续访问；每线程仅保留一份有界缓冲，重入时优先保留较大的可复用缓冲。
+     * <p>
+     * Ends the lease; retains one bounded buffer per thread, preferring the larger reusable buffer on reentry.
+     */
+    public static void releaseBinaryStream(BinaryStream stream) {
+        byte[] bytes = stream.getBufferUnsafe();
+        stream.reset();
+        if (bytes == null || bytes.length > MAX_CACHED_BUFFER_BYTES || stream.getClass() != BinaryStream.class) {
+            return;
+        }
+        BinaryStreamSlot slot = leasedBinaryStream.get();
+        if (slot.idle == null || slot.idle.getBufferUnsafe().length < bytes.length) {
+            slot.idle = stream;
+        }
+    }
+
+    private static final class BinaryStreamSlot {
+        private BinaryStream idle;
+    }
 
     private static final class CachedOutputStream extends FastByteArrayOutputStream {
         private boolean detached;
@@ -74,6 +109,15 @@ public class ThreadCache {
 
     private static final class CachedBinaryStream extends BinaryStream {
         private boolean detached;
+
+        @Override
+        public void reserve(int additionalBytes) {
+            try {
+                super.reserve(additionalBytes);
+            } finally {
+                detachIfOversized();
+            }
+        }
 
         @Override
         public void put(byte[] bytes) {

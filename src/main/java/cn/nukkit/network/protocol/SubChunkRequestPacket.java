@@ -45,7 +45,10 @@ public class SubChunkRequestPacket extends DataPacket {
                 // The legacy count remains fixed-width; each offset needs three signed bytes.
                 long availableOffsets = Math.max(0L,
                         Math.min(this.count, this.getBufferUnsafe().length) - (long) this.offset) / 3;
-                if (count < 0 || count > availableOffsets) {
+                // 与 v1_26_30+ 路径同上限：否则旧协议仅受包长约束，可携带百万级 offset
+                // / Same cap as the v1_26_30+ path: without it the legacy count is bounded
+                // only by packet size, admitting millions of offsets
+                if (count < 0 || count > MAX_POSITION_OFFSETS || count > availableOffsets) {
                     throw new IllegalArgumentException("Invalid sub chunk position offset count: " + count);
                 }
                 for (int i = 0; i < count; i++) {

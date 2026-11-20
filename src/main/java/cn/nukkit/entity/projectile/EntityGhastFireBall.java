@@ -101,7 +101,11 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
         entity.attack(ev);
         this.isCollided = true;
-        entity.setOnFire(5);
+        EntityCombustByEntityEvent combustEvent = new EntityCombustByEntityEvent(this, entity, 5);
+        this.server.getPluginManager().callEvent(combustEvent);
+        if (!combustEvent.isCancelled()) {
+            entity.setOnFire(combustEvent.getDuration());
+        }
     }
 
     @Override
