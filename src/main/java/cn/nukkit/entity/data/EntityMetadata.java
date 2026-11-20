@@ -74,6 +74,15 @@ public class EntityMetadata {
     }
 
     public int getByte(int id) {
+        if (getClass() == EntityMetadata.class) {
+            EntityData value = this.map.get(id);
+            if (value == null) {
+                return 0;
+            }
+            if (value.getClass() == ByteEntityData.class) {
+                return ((ByteEntityData) value.setId(id)).data & 0xff;
+            }
+        }
         return (int) this.getOrDefault(id, new ByteEntityData(id, 0)).getData() & 0xff;
     }
 
@@ -82,14 +91,41 @@ public class EntityMetadata {
     }
 
     public int getInt(int id) {
+        if (getClass() == EntityMetadata.class) {
+            EntityData value = this.map.get(id);
+            if (value == null) {
+                return 0;
+            }
+            if (value.getClass() == IntEntityData.class) {
+                return ((IntEntityData) value.setId(id)).data;
+            }
+        }
         return (int) this.getOrDefault(id, new IntEntityData(id, 0)).getData();
     }
 
     public long getLong(int id) {
+        if (getClass() == EntityMetadata.class) {
+            EntityData value = this.map.get(id);
+            if (value == null) {
+                return 0L;
+            }
+            if (value.getClass() == LongEntityData.class) {
+                return ((LongEntityData) value.setId(id)).data;
+            }
+        }
         return (Long) this.getOrDefault(id, new LongEntityData(id, 0)).getData();
     }
 
     public float getFloat(int id) {
+        if (getClass() == EntityMetadata.class) {
+            EntityData value = this.map.get(id);
+            if (value == null) {
+                return 0.0f;
+            }
+            if (value.getClass() == FloatEntityData.class) {
+                return ((FloatEntityData) value.setId(id)).data;
+            }
+        }
         return (float) this.getOrDefault(id, new FloatEntityData(id, 0)).getData();
     }
 
