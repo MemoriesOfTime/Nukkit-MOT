@@ -1288,6 +1288,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.getDataFlag(DATA_FLAGS, DATA_FLAG_ACTION) && this.startAction > -1;
     }
 
+    private static boolean isRepeatedConsumableUse(Item item, int ticksUsed) {
+        int useDuration = item.getUseDuration();
+        return item.canRelease() && useDuration > 0 && ticksUsed < useDuration;
+    }
+
     public void setUsingItem(boolean value) {
         if (!value && this.crossbowInput != null) {
             this.crossbowInput.reset();
@@ -6535,6 +6540,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
 
                                 int ticksUsed = this.server.getTick() - this.startAction;
+                                if (isRepeatedConsumableUse(item, ticksUsed)) {
+                                    break;
+                                }
                                 this.setUsingItem(false);
                                 if (!item.onUse(this, ticksUsed)) {
                                     this.inventory.sendContents(this);
