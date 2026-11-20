@@ -217,6 +217,9 @@ public class EntityHuman extends EntityHumanType {
                 if (skinTag.contains("IsTrustedSkin")) {
                     newSkin.setTrusted(skinTag.getBoolean("IsTrustedSkin"));
                 }
+                if (skinTag.contains("SkinUDID")) {
+                    newSkin.setUdid(skinTag.getString("SkinUDID"));
+                }
                 this.setSkin(newSkin);
             }
 
@@ -306,6 +309,10 @@ public class EntityHuman extends EntityHumanType {
 
             if (!this.getSkin().getPlayFabId().isEmpty()) {
                 skinTag.putString("PlayFabId", this.getSkin().getPlayFabId());
+            }
+
+            if (!this.getSkin().getUdid().isEmpty()) {
+                skinTag.putString("SkinUDID", this.getSkin().getUdid());
             }
 
             this.namedTag.putCompound("Skin", skinTag);

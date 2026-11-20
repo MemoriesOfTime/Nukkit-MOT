@@ -12,6 +12,8 @@ public class CompoundTag extends Tag implements Cloneable {
 
     protected final Map<String, Tag> tags;
 
+    private static final Tag MISSING_TAG = new EndTag();
+
     public CompoundTag() {
         this("");
     }
@@ -257,39 +259,53 @@ public class CompoundTag extends Tag implements Cloneable {
         return (T) tags.remove(name);
     }
 
+    private Tag findTag(String name) {
+        Class<?> mapType = tags == null ? null : tags.getClass();
+        if (mapType == HashMap.class || mapType == LinkedHashMap.class) {
+            return tags.getOrDefault(name, MISSING_TAG);
+        }
+        return tags.containsKey(name) ? tags.get(name) : MISSING_TAG;
+    }
+
     public int getByte(String name) {
-        if (!tags.containsKey(name)) return (byte) 0;
-        return ((NumberTag) tags.get(name)).getData().intValue();
+        Tag tag = findTag(name);
+        if (tag == MISSING_TAG) return (byte) 0;
+        return ((NumberTag) tag).getData().intValue();
     }
 
     public int getShort(String name) {
-        if (!tags.containsKey(name)) return 0;
-        return ((NumberTag) tags.get(name)).getData().intValue();
+        Tag tag = findTag(name);
+        if (tag == MISSING_TAG) return 0;
+        return ((NumberTag) tag).getData().intValue();
     }
 
     public int getInt(String name) {
-        if (!tags.containsKey(name)) return 0;
-        return ((NumberTag) tags.get(name)).getData().intValue();
+        Tag tag = findTag(name);
+        if (tag == MISSING_TAG) return 0;
+        return ((NumberTag) tag).getData().intValue();
     }
 
     public long getLong(String name) {
-        if (!tags.containsKey(name)) return 0;
-        return ((NumberTag) tags.get(name)).getData().longValue();
+        Tag tag = findTag(name);
+        if (tag == MISSING_TAG) return 0;
+        return ((NumberTag) tag).getData().longValue();
     }
 
     public float getFloat(String name) {
-        if (!tags.containsKey(name)) return (float) 0;
-        return ((NumberTag) tags.get(name)).getData().floatValue();
+        Tag tag = findTag(name);
+        if (tag == MISSING_TAG) return (float) 0;
+        return ((NumberTag) tag).getData().floatValue();
     }
 
     public double getDouble(String name) {
-        if (!tags.containsKey(name)) return 0;
-        return ((NumberTag) tags.get(name)).getData().doubleValue();
+        Tag tag = findTag(name);
+        if (tag == MISSING_TAG) return 0;
+        return ((NumberTag) tag).getData().doubleValue();
     }
 
     public String getString(String name) {
-        if (!tags.containsKey(name)) return "";
-        Tag tag = tags.get(name);
+        Tag tag = findTag(name);
+        if (tag == MISSING_TAG) return "";
         if (tag instanceof NumberTag) {
             return String.valueOf(((NumberTag) tag).getData());
         }

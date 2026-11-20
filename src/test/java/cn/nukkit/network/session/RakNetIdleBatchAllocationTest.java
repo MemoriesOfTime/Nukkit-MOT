@@ -19,6 +19,7 @@ import org.cloudburstmc.netty.channel.raknet.RakChannel;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.cloudburstmc.netty.channel.raknet.RakServerChannel;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -71,6 +72,7 @@ class RakNetIdleBatchAllocationTest {
                 .filter(version -> version.getProtocol() >= GameVersion.V1_20_0.getProtocol());
     }
 
+    @Tag("perf")
     @Test
     void idleTicksAfterOrdinaryTrafficDoNotAllocatePerTickScratch() throws Exception {
         assumeTrue(ManagementFactory.getThreadMXBean() instanceof ThreadMXBean);

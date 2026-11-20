@@ -100,6 +100,7 @@ class TickColdChunkReadTest {
             set(level, "chunkPackets", new ConcurrentHashMap<>());
             set(level, "chunkSendQueues", new Object2ObjectOpenHashMap<>());
             set(level, "pendingChunkRequests", new Object2ObjectOpenHashMap<>());
+            set(level, "asyncChunkRequestCallbackQueue", new ConcurrentLinkedQueue<>());
             set(level, "asyncChunkRequestFailedQueue", new ConcurrentLinkedQueue<>());
             set(level, "completedChunkLoads", new ConcurrentLinkedQueue<>());
             level.gameRules = GameRules.getDefault();

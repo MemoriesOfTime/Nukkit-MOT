@@ -8,15 +8,17 @@ import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.format.leveldb.LevelDBKey;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
-import java.util.function.Consumer;
 import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
 import cn.nukkit.utils.ChunkException;
 import cn.nukkit.utils.Utils;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
+
+import java.util.function.Consumer;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.CURRENT_LEVEL_SUBCHUNK_VERSION;
 
@@ -48,7 +50,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
 
             final int capturedSectionY = ySection;
             LevelDBChunkSection.SaveToken token = section.captureSave(chunk, ySection, storages -> {
-                ByteBuf byteBuf = Unpooled.buffer();
+                ByteBuf byteBuf = PooledByteBufAllocator.DEFAULT.heapBuffer();
                 try {
                     byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
                     ChunkSectionSerializers.serializer(byteBuf, storages, capturedSectionY, CURRENT_LEVEL_SUBCHUNK_VERSION);
