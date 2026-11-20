@@ -2763,8 +2763,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
             }
 
-            block.onEntityCollide(this);
-            block.getLevelBlockAtLayer(1).onEntityCollide(this);
+            this.handleBlockCollision(block);
         }
 
         this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_IN_SCAFFOLDING, scaffolding);

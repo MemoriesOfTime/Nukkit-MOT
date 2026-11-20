@@ -3160,6 +3160,13 @@ public abstract class Entity extends Location implements Metadatable {
         return true;
     }
 
+    protected void handleBlockCollision(Block block) {
+        block.onEntityCollide(this);
+        if (block.getLevel().getBlockIdAt(block.getFloorX(), block.getFloorY(), block.getFloorZ(), 1) != Block.AIR) {
+            block.getLevelBlockAtLayer(1).onEntityCollide(this);
+        }
+    }
+
     protected void checkBlockCollision() {
         if (this.noClip) {
             return;
@@ -3180,8 +3187,7 @@ public abstract class Entity extends Location implements Metadatable {
                 continue;
             }
 
-            block.onEntityCollide(this);
-            block.getLevelBlockAtLayer(1).onEntityCollide(this);
+            this.handleBlockCollision(block);
             block.addVelocityToEntity(this, vector);
         }
 
