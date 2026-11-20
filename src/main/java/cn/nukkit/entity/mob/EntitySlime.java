@@ -8,6 +8,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 
 import java.util.HashMap;
@@ -166,5 +167,10 @@ public class EntitySlime extends EntityJumpingMob {
 
     public int getSlimeSize() {
         return this.size;
+    }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        return effectId != Effect.OOZING && super.canBeAffected(effectId);
     }
 }

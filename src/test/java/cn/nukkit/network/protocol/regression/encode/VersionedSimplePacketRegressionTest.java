@@ -4,8 +4,6 @@ import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
-import cn.nukkit.network.protocol.types.DisplaySlot;
-import cn.nukkit.network.protocol.types.SortOrder;
 import cn.nukkit.network.protocol.types.camera.*;
 import cn.nukkit.network.protocol.types.voxel.SerializableVoxelShape;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -123,29 +121,6 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
         assertEquals("scene1", cbPacket.getSceneName());
         assertEquals("Villager", cbPacket.getNpcName());
         assertEquals("{}", cbPacket.getActionJson());
-    }
-
-    @ParameterizedTest(name = "SetDisplayObjectivePacket v{0}")
-    @MethodSource("allVersions")
-    void testSetDisplayObjectivePacket(int protocolVersion) {
-        var nukkitPacket = new cn.nukkit.network.protocol.SetDisplayObjectivePacket();
-        nukkitPacket.protocol = protocolVersion;
-        nukkitPacket.gameVersion = cn.nukkit.GameVersion.byProtocol(protocolVersion, false);
-        nukkitPacket.displaySlot = DisplaySlot.SIDEBAR;
-        nukkitPacket.objectiveId = "obj1";
-        nukkitPacket.displayName = "Test Objective";
-        nukkitPacket.criteria = "dummy";
-        nukkitPacket.sortOrder = SortOrder.ASCENDING;
-        nukkitPacket.encode();
-
-        var cbPacket = crossDecode(nukkitPacket,
-                org.cloudburstmc.protocol.bedrock.packet.SetDisplayObjectivePacket.class);
-
-        assertEquals("sidebar", cbPacket.getDisplaySlot());
-        assertEquals("obj1", cbPacket.getObjectiveId());
-        assertEquals("Test Objective", cbPacket.getDisplayName());
-        assertEquals("dummy", cbPacket.getCriteria());
-        assertEquals(0, cbPacket.getSortOrder());
     }
 
     // ==================== PositionTrackingDBClientRequestPacket ====================

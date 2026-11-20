@@ -240,7 +240,7 @@ public class EntityAreaEffectCloud extends Entity {
         if (this.namedTag.contains("ReapplicationDelay")) {
             this.reapplicationDelay = this.namedTag.getInt("ReapplicationDelay");
         } else {
-            this.reapplicationDelay = 0;
+            this.reapplicationDelay = 40;
         }
 
         if (this.namedTag.contains("InitialRadius")) {
@@ -434,9 +434,9 @@ public class EntityAreaEffectCloud extends Entity {
                         }
                         if (entity instanceof EntitySmite) {
                             if (owner != null) {
-                                entity.attack(new EntityDamageByEntityEvent(owner, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                                entity.attack(new EntityDamageByEntityEvent(owner, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())).setInstantPotionDamage());
                             } else {
-                                entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                                entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())).setInstantPotionDamage());
                             }
                         } else {
                             entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
@@ -449,9 +449,9 @@ public class EntityAreaEffectCloud extends Entity {
                         if (entity instanceof EntitySmite) {
                             entity.heal(new EntityRegainHealthEvent(entity, 0.5f * (4 << effect.getAmplifier()), EntityRegainHealthEvent.CAUSE_MAGIC));
                         } else if (owner != null) {
-                            entity.attack(new EntityDamageByEntityEvent(owner, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                            entity.attack(new EntityDamageByEntityEvent(owner, entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())).setInstantPotionDamage());
                         } else {
-                            entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())));
+                            entity.attack(new EntityDamageEvent(entity, EntityDamageEvent.DamageCause.MAGIC, 0.5f * (6 << effect.getAmplifier())).setInstantPotionDamage());
                         }
                         break;
                     case Effect.SATURATION:

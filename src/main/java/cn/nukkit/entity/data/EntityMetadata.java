@@ -18,6 +18,7 @@ import java.util.TreeMap;
 public class EntityMetadata {
 
     private Int2ObjectMap<EntityData> map;
+    private EntityData nameTag;
 
     public EntityMetadata() {
         this.map = new Int2ObjectOpenHashMap<>();
@@ -25,6 +26,7 @@ public class EntityMetadata {
 
     private EntityMetadata(Int2ObjectMap<EntityData> map) {
         this.map = map;
+        this.nameTag = map.get(Entity.DATA_NAMETAG);
     }
 
     public EntityData get(int id) {
@@ -56,11 +58,18 @@ public class EntityMetadata {
                 longData.dataVersions = convertExtendedFlagsToDataVersions(longData.getData());
             }
         }
-        this.map.put(data.getId(), data);
+        int id = data.getId();
+        this.map.put(id, data);
+        if (id == Entity.DATA_NAMETAG) {
+            this.nameTag = data;
+        }
         return this;
     }
 
     public EntityData remove(int id) {
+        if (id == Entity.DATA_NAMETAG) {
+            this.nameTag = null;
+        }
         return this.map.remove(id);
     }
 
@@ -93,6 +102,16 @@ public class EntityMetadata {
     }
 
     public String getString(int id) {
+        if (getClass() == EntityMetadata.class) {
+            // Cache the entry, not its mutable payload: plugins can edit StringEntityData directly.
+            EntityData value = id == Entity.DATA_NAMETAG ? this.nameTag : this.map.get(id);
+            if (value == null) {
+                return "";
+            }
+            if (value.getClass() == StringEntityData.class) {
+                return (String) value.setId(id).getData();
+            }
+        }
         return (String) this.getOrDefault(id, new StringEntityData(id, "")).getData();
     }
 

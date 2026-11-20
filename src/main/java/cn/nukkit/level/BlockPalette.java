@@ -42,6 +42,8 @@ public class BlockPalette {
             .build();
 
     private volatile boolean locked;
+    private volatile long networkVersion;
+    private volatile boolean networkMappingReady;
 
     @Deprecated
     public BlockPalette(int protocol) {
@@ -174,7 +176,13 @@ public class BlockPalette {
         return Int2IntMaps.unmodifiable(this.legacyToRuntimeId);
     }
 
-    public void clearStates() {
+    /** Generation of the completed network mapping; an in-progress rebuild cannot be cached. */
+    public long getNetworkVersion() {
+        return this.locked && this.networkMappingReady ? this.networkVersion : -1;
+    }
+
+    public synchronized void clearStates() {
+        this.networkMappingReady = false;
         this.locked = false;
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
@@ -183,7 +191,49 @@ public class BlockPalette {
         this.legacyToRuntimeIdCache.invalidateAll();
     }
 
-    public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
+    public synchronized void remapRuntimeIds(Int2IntMap runtimeIdMapping, int vanillaStateCount) {
+        if (vanillaStateCount < 0) {
+            throw new IllegalArgumentException("Vanilla state count must be nonnegative");
+        }
+        Int2IntOpenHashMap remappedLegacyToRuntime = new Int2IntOpenHashMap(this.legacyToRuntimeId.size());
+        for (Int2IntMap.Entry entry : this.legacyToRuntimeId.int2IntEntrySet()) {
+            int runtimeId = entry.getIntValue();
+            if (runtimeId >= 0 && runtimeId < vanillaStateCount) {
+                remappedLegacyToRuntime.put(entry.getIntKey(), remapRuntimeId(runtimeIdMapping, runtimeId));
+            }
+        }
+        Int2IntOpenHashMap remappedRuntimeToLegacy = new Int2IntOpenHashMap(this.runtimeIdToLegacy.size());
+        for (Int2IntMap.Entry entry : this.runtimeIdToLegacy.int2IntEntrySet()) {
+            if (entry.getIntKey() < 0 || entry.getIntKey() >= vanillaStateCount) {
+                continue;
+            }
+            int replacement = remapRuntimeId(runtimeIdMapping, entry.getIntKey());
+            if (remappedRuntimeToLegacy.containsKey(replacement)) {
+                throw new IllegalArgumentException("Duplicate replacement for runtime ID " + replacement
+                        + " in palette for " + this.gameVersion + " (protocol " + this.protocol + ")");
+            }
+            remappedRuntimeToLegacy.put(replacement, entry.getIntValue());
+        }
+
+        this.networkMappingReady = false;
+        this.locked = false;
+        this.legacyToRuntimeId.clear();
+        this.legacyToRuntimeId.putAll(remappedLegacyToRuntime);
+        this.runtimeIdToLegacy.clear();
+        this.runtimeIdToLegacy.putAll(remappedRuntimeToLegacy);
+        this.legacyToRuntimeIdCache.invalidateAll();
+    }
+
+    private int remapRuntimeId(Int2IntMap mapping, int runtimeId) {
+        int replacement = mapping.getOrDefault(runtimeId, -1);
+        if (replacement < 0) {
+            throw new IllegalArgumentException("Missing replacement for runtime ID " + runtimeId
+                    + " in palette for " + this.gameVersion + " (protocol " + this.protocol + ")");
+        }
+        return replacement;
+    }
+
+    public synchronized void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
         if (this.locked) {
             throw new IllegalStateException("Block palette is already locked!");
         }
@@ -198,7 +248,40 @@ public class BlockPalette {
         this.legacyToHashId.putIfAbsent(legacyId, stateHash);
     }
 
-    public void lock() {
+    /**
+     * 老调色板只有一个骷髅头方块，头型存在方块实体里；为拆分后的头方块补充出站别名。
+     * <p>
+     * Older palettes have a single skull block carrying the head type in its block entity; add outgoing aliases for split heads.
+     * Aliases only fill forward lookups; native states keep their canonical reverse mappings.
+     */
+    private void registerLegacySkullAliases() {
+        int[] heads = {BlockID.WITHER_SKELETON_SKULL, BlockID.ZOMBIE_HEAD,
+                BlockID.PLAYER_HEAD, BlockID.CREEPER_HEAD, BlockID.DRAGON_HEAD,
+                BlockID.PIGLIN_HEAD};
+        for (int meta = 0; meta < 6; meta++) {
+            int skull = BlockID.SKULL_BLOCK << Block.DATA_BITS | meta;
+            int runtimeId = this.legacyToRuntimeId.get(skull);
+            if (runtimeId == -1) {
+                continue;
+            }
+            for (int head : heads) {
+                int fullId = head << Block.DATA_BITS | meta;
+                if (!this.legacyToRuntimeId.containsKey(fullId)) {
+                    this.legacyToRuntimeId.put(fullId, runtimeId);
+                    if (this.legacyToHashId.containsKey(skull)) {
+                        this.legacyToHashId.putIfAbsent(fullId, this.legacyToHashId.get(skull));
+                    }
+                }
+            }
+        }
+        this.legacyToRuntimeIdCache.invalidateAll();
+    }
+
+    public synchronized void lock() {
+        this.networkMappingReady = false;
+        if (!this.locked) {
+            this.registerLegacySkullAliases();
+        }
         this.locked = true;
         this.trim();
     }
@@ -206,11 +289,15 @@ public class BlockPalette {
     /**
      * Shrinks the internal fastutil maps after bulk registration to release unused capacity.
      */
-    public void trim() {
+    public synchronized void trim() {
+        // Direct public trims also rehash live mappings. Publish only after every native map completes.
+        this.networkMappingReady = false;
         this.legacyToRuntimeId.trim();
         this.runtimeIdToLegacy.trim();
         this.stateHashToLegacy.trim();
         this.legacyToHashId.trim();
+        this.networkVersion++;
+        this.networkMappingReady = true;
     }
 
     public int getRuntimeId(int id) {

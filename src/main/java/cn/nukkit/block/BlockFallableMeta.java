@@ -18,7 +18,6 @@ public abstract class BlockFallableMeta extends BlockSolidMeta {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (!this.getLevel().randomTickingEnabled()) return type;
             Block down = this.down();
             if (this.canFallInto(down)) {
                 BlockFallEvent event = new BlockFallEvent(this);
@@ -35,10 +34,7 @@ public abstract class BlockFallableMeta extends BlockSolidMeta {
     }
 
     protected boolean canFallInto(Block block) {
-        return block.getId() == AIR
-                || block instanceof BlockLiquid
-                || block instanceof BlockFire
-                || block instanceof BlockBubbleColumn && block.getLevelBlockAtLayer(1) instanceof BlockLiquid;
+        return BlockFallable.isFallThrough(this, block);
     }
 
     protected EntityFallingBlock createFallingEntity(CompoundTag customNbt) {
