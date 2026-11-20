@@ -57,6 +57,8 @@ class PlayerExperiencePickupGateTest {
         Item shield = Item.get(Item.SHIELD, 10, 1);
         shield.addEnchantment(Enchantment.get(Enchantment.ID_MENDING));
         when(f.offhand.getItem(0)).thenReturn(shield);
+        // Upstream spends Mending XP only after the inventory accepts the repaired item.
+        when(f.offhand.setItem(0, shield)).thenReturn(true);
         assertTrue(f.player.pickupEntity(f.orb, true));
         verify(f.orb).close();
         verify(f.offhand).setItem(0, shield);
@@ -84,6 +86,8 @@ class PlayerExperiencePickupGateTest {
         Item shield = Item.get(Item.SHIELD, 10, 1);
         shield.addEnchantment(Enchantment.get(Enchantment.ID_MENDING));
         when(f.offhand.getItem(0)).thenReturn(shield);
+        // Upstream spends Mending XP only after the inventory accepts the repaired item.
+        when(f.offhand.setItem(0, shield)).thenReturn(true);
         assertTrue(f.player.pickupEntity(f.orb, true));
         assertEquals(4, shield.getDamage());
         verify(f.plugins, never()).callEvent(any(InventoryPickupExperienceEvent.class));
