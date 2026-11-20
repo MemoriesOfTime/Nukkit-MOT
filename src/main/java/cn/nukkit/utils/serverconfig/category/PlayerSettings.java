@@ -12,6 +12,10 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class PlayerSettings extends OkaeriConfig {
 
+    @Comment("Enable player movement collision checks. Disable to restore legacy movement acceptance")
+    @CustomKey("movement-collision-check")
+    private boolean movementCollisionCheck = true;
+
     @Comment("Save player data to disk")
     @CustomKey("save-player-data")
     private boolean savePlayerData = true;

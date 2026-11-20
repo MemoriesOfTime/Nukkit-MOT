@@ -21,6 +21,10 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
     private static final List<String> FLOAT_OPERATIONS = Arrays.asList("override", "alpha_blend", "add", "subtract", "multiply", "minimum", "maximum");
     private static final List<String> COLOR_OPERATIONS = Arrays.asList("override", "alpha_blend", "add", "subtract", "multiply");
 
+    private static final int ATTRIBUTE_PAYLOAD_CONSTANT = 0;
+    private static final int ATTRIBUTE_PAYLOAD_TRANSITION = 1;
+    private static final int ATTRIBUTE_PAYLOAD_NOISE_TRANSITION = 2;
+
     public AttributeLayerSyncPayload data;
 
     @Override
@@ -77,12 +81,12 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
     private void writeUpdateAttributeLayers(UpdateAttributeLayersData data) {
         this.putArray(data.attributeLayers, (layer) -> {
             this.putString(layer.layerName);
-            if (this.protocol >= ProtocolInfo.v1_26_30) {
+            if (this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_60) {
                 this.putOptionalNull(layer.noiseName, this::putString);
             }
             this.putVarInt(layer.dimension);
             writeAttributeLayerSettings(layer.settings);
-            this.putArray(layer.attributes, this::writeEnvironmentAttribute);
+            this.putArray(layer.attributes, attr -> this.writeEnvironmentAttribute(attr, layer.noiseName));
         });
     }
 
@@ -90,7 +94,9 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         List<AttributeLayerData> layers = new ArrayList<>();
         this.getArray(layers, (s) -> {
             String name = s.getString();
-            String noiseName = this.protocol >= ProtocolInfo.v1_26_30 ? s.getOptional(null, (s2) -> s2.getString()) : null;
+            String noiseName = this.protocol >= ProtocolInfo.v1_26_30 && this.protocol < ProtocolInfo.v1_26_60
+                    ? s.getOptional(null, (s2) -> s2.getString())
+                    : null;
             int dim = s.getVarInt();
             AttributeLayerSettings settings = readAttributeLayerSettings();
             List<EnvironmentAttributeData> attrs = new ArrayList<>();
@@ -116,7 +122,7 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
     private void writeUpdateEnvironmentAttributes(UpdateEnvironmentAttributesData data) {
         this.putString(data.layerName);
         this.putVarInt(data.dimension);
-        this.putArray(data.attributes, this::writeEnvironmentAttribute);
+        this.putArray(data.attributes, attr -> this.writeEnvironmentAttribute(attr, null));
     }
 
     private UpdateEnvironmentAttributesData readUpdateEnvironmentAttributes() {
@@ -190,7 +196,11 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         throw new IllegalArgumentException("Unknown Weight type: " + type);
     }
 
-    private void writeEnvironmentAttribute(EnvironmentAttributeData e) {
+    private void writeEnvironmentAttribute(EnvironmentAttributeData e, String layerNoiseFallback) {
+        if (this.protocol >= ProtocolInfo.v1_26_60) {
+            this.writeEnvironmentAttributeV2225(e, layerNoiseFallback);
+            return;
+        }
         this.putString(e.attributeName);
         this.putOptionalNull(e.from, this::writeAttributeData);
         writeAttributeData(e.attribute);
@@ -212,7 +222,41 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         }
     }
 
+    private void writeEnvironmentAttributeV2225(EnvironmentAttributeData e, String layerNoiseFallback) {
+        this.putString(e.attributeName);
+        if (e.attribute != null) {
+            this.putUnsignedVarInt(ATTRIBUTE_PAYLOAD_CONSTANT);
+            this.writeAttributeData(e.attribute);
+            return;
+        }
+        if (e.from == null || e.to == null) {
+            throw new IllegalArgumentException("Environment attribute needs a constant value or from+to: " + e.attributeName);
+        }
+        boolean noise = e.noiseTransition;
+        this.putUnsignedVarInt(noise ? ATTRIBUTE_PAYLOAD_NOISE_TRANSITION : ATTRIBUTE_PAYLOAD_TRANSITION);
+        this.writeAttributeData(e.from);
+        this.writeAttributeData(e.to);
+        this.putUnsignedVarInt(e.totalTransitionTicks);
+        this.putUnsignedVarInt(e.currentTransitionTicks);
+        this.putUnsignedVarInt(e.easing != null ? e.easing.ordinal() : EnvironmentAttributeData.CameraEase.LINEAR.ordinal());
+        this.putString(e.clockName != null ? e.clockName : "");
+        if (noise) {
+            this.putUnsignedVarInt(e.localTransitionTicks);
+            // 属性未设置噪声名时沿用图层值，便于旧数据迁移
+            String noiseName = e.noiseName != null ? e.noiseName : layerNoiseFallback;
+            this.putString(noiseName != null ? noiseName : "");
+            EnvironmentAttributeData.NoiseAlignment na = e.noiseAlignment != null
+                    ? e.noiseAlignment
+                    : new EnvironmentAttributeData.NoiseAlignment(EnvironmentAttributeData.NoiseAlignment.Type.MIN_LOCAL_TRANSITION_END, 0);
+            this.putByte((byte) na.type().ordinal());
+            this.putUnsignedVarInt(na.value());
+        }
+    }
+
     private EnvironmentAttributeData readEnvironmentAttribute() {
+        if (this.protocol >= ProtocolInfo.v1_26_60) {
+            return this.readEnvironmentAttributeV2225();
+        }
         String name = this.getString();
         AttributeData from = this.getOptional(null, (s) -> readAttributeData());
         AttributeData attribute = readAttributeData();
@@ -223,9 +267,51 @@ public class ClientboundAttributeLayerSyncPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_26_30) {
             int localTransitionTicks = this.getLInt();
             boolean noiseTransition = this.getBoolean();
-            return new EnvironmentAttributeData(name, from, attribute, to, currentTicks, totalTicks, easing, localTransitionTicks, noiseTransition);
+            EnvironmentAttributeData data = new EnvironmentAttributeData(name, from, attribute, to, currentTicks, totalTicks, easing, localTransitionTicks, noiseTransition);
+            if (this.protocol >= ProtocolInfo.v1_26_50_27) {
+                // 尾部噪声对齐，与写侧对称
+                data.noiseAlignment = new EnvironmentAttributeData.NoiseAlignment(
+                        EnvironmentAttributeData.NoiseAlignment.Type.byOrdinal(this.getByte() & 0xff),
+                        (int) this.getUnsignedVarInt());
+            }
+            return data;
         }
         return new EnvironmentAttributeData(name, from, attribute, to, currentTicks, totalTicks, easing);
+    }
+
+    private EnvironmentAttributeData readEnvironmentAttributeV2225() {
+        String name = this.getString();
+        int variant = (int) this.getUnsignedVarInt();
+        switch (variant) {
+            case ATTRIBUTE_PAYLOAD_CONSTANT: {
+                AttributeData attribute = this.readAttributeData();
+                return new EnvironmentAttributeData(name, null, attribute, null, 0, 0, EnvironmentAttributeData.CameraEase.LINEAR);
+            }
+            case ATTRIBUTE_PAYLOAD_TRANSITION:
+            case ATTRIBUTE_PAYLOAD_NOISE_TRANSITION: {
+                boolean noise = variant == ATTRIBUTE_PAYLOAD_NOISE_TRANSITION;
+                AttributeData from = this.readAttributeData();
+                AttributeData to = this.readAttributeData();
+                int totalTicks = (int) this.getUnsignedVarInt();
+                int currentTicks = (int) this.getUnsignedVarInt();
+                EnvironmentAttributeData.CameraEase easing =
+                        EnvironmentAttributeData.CameraEase.byOrdinal((int) this.getUnsignedVarInt());
+                String clockName = this.getString();
+                EnvironmentAttributeData data = new EnvironmentAttributeData(name, from, null, to,
+                        currentTicks, totalTicks, easing, 0, noise);
+                data.clockName = clockName;
+                if (noise) {
+                    data.localTransitionTicks = (int) this.getUnsignedVarInt();
+                    data.noiseName = this.getString();
+                    data.noiseAlignment = new EnvironmentAttributeData.NoiseAlignment(
+                            EnvironmentAttributeData.NoiseAlignment.Type.byOrdinal(this.getByte() & 0xff),
+                            (int) this.getUnsignedVarInt());
+                }
+                return data;
+            }
+            default:
+                throw new IllegalArgumentException("Unknown environment attribute payload variant " + variant + " for " + name);
+        }
     }
 
     private void writeAttributeData(AttributeData data) {

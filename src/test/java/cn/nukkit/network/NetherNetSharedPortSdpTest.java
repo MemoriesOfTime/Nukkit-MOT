@@ -149,4 +149,72 @@ class NetherNetSharedPortSdpTest {
         assertTrue(addresses.stream().noneMatch(address -> address instanceof java.net.Inet6Address),
                 "IPv6 stays out while the IPv6 listener is disabled");
     }
+
+    @Test
+    void appendsResolvedAddressesBeforeEndOfCandidates() throws Exception {
+        List<InetAddress> addresses = List.of(address("8.8.8.8"), address("2606:4700:4700::1111"));
+        String out = NetherNetSharedPortSdp.appendCandidates(ANSWER, addresses, false,
+                NetherNetSharedPortSdp.PortSource.SHARED);
+
+        assertTrue(out.contains(" 8.8.8.8 19134 typ host"), out);
+        assertFalse(out.contains("2606:4700"), "IPv6 stays out when the caller has no IPv6 media");
+        assertTrue(out.indexOf("8.8.8.8 19134") < out.indexOf("a=end-of-candidates"));
+        assertTrue(out.contains("127.0.0.1 19134 typ host"), "appending removes nothing");
+    }
+
+    @Test
+    void skipsAnswersWithoutAHostCandidate() throws Exception {
+        String noHost = "v=0\r\nm=application 19134 UDP/DTLS/SCTP webrtc-datachannel\r\na=ice-ufrag:EkS2\r\n";
+        assertEquals(noHost, NetherNetSharedPortSdp.appendCandidates(noHost, List.of(address("8.8.8.8")),
+                false, NetherNetSharedPortSdp.PortSource.SHARED),
+                "no media port to publish on");
+    }
+
+    @Test
+    void appendsEachFamilyOnItsOwnPort() throws Exception {
+        String answer = "v=0\r\n"
+                + "m=application 19134 UDP/DTLS/SCTP webrtc-datachannel\r\n"
+                + "a=candidate:1 1 UDP 2114977791 192.168.1.5 19134 typ host\r\n"
+                + "a=candidate:2 1 UDP 2114977791 2001:db8::5 19135 typ host\r\n"
+                + "a=end-of-candidates\r\n";
+        String out = NetherNetSharedPortSdp.appendCandidates(answer,
+                List.of(address("8.8.8.8"), address("2606:4700:4700::1111")), true,
+                NetherNetSharedPortSdp.PortSource.PER_FAMILY);
+        assertTrue(out.contains("8.8.8.8 19134 typ host"), out);
+        assertTrue(out.contains("2606:4700:4700:0:0:0:0:1111 19135 typ host"), out);
+    }
+
+    @Test
+    void skipsAFamilyTheAnswerGatheredNothingFor() throws Exception {
+        String answer = "v=0\r\n"
+                + "m=application 19134 UDP/DTLS/SCTP webrtc-datachannel\r\n"
+                + "a=candidate:1 1 UDP 2114977791 192.168.1.5 19134 typ host\r\n"
+                + "a=end-of-candidates\r\n";
+        String out = NetherNetSharedPortSdp.appendCandidates(answer,
+                List.of(address("8.8.8.8"), address("2606:4700:4700::1111")), true,
+                NetherNetSharedPortSdp.PortSource.PER_FAMILY);
+        assertTrue(out.contains("8.8.8.8 19134 typ host"), out);
+        assertFalse(out.contains("2606:4700"), "no IPv6 socket gathered, so no IPv6 candidate: " + out);
+    }
+
+    @Test
+    void appendedCandidatesKeepUniqueFoundationsAndPrioritiesThroughTheRewrite() throws Exception {
+        String appended = NetherNetSharedPortSdp.appendCandidates(ANSWER, List.of(address("8.8.8.8")),
+                false, NetherNetSharedPortSdp.PortSource.SHARED);
+        long appendedPriorities = appended.lines().filter(line -> line.startsWith("a=candidate:"))
+                .map(line -> line.split(" ")[3]).distinct().count();
+        assertEquals(2, appendedPriorities, "the appended candidate avoids the existing host priority");
+
+        String out = NetherNetSharedPortSdp.rewriteAnswer(appended, 19134,
+                List.of(address("192.168.1.5")), new NetherNetSharedPortSdp.ExternalPorts(19132, -1));
+
+        assertTrue(out.contains("8.8.8.8 19132 typ host"), "the domain candidate follows the external port: " + out);
+        assertTrue(out.contains("192.168.1.5 19132 typ host"));
+        long foundations = out.lines().filter(line -> line.startsWith("a=candidate:"))
+                .map(line -> line.split(" ")[0]).distinct().count();
+        long priorities = out.lines().filter(line -> line.startsWith("a=candidate:"))
+                .map(line -> line.split(" ")[3]).distinct().count();
+        assertEquals(2, foundations, "the two sets never share a foundation");
+        assertEquals(2, priorities, "the synthesized candidate also avoids the appended priority");
+    }
 }

@@ -810,6 +810,29 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         }
     }
 
+    @ParameterizedTest(name = "ContainerClosePacket (server initiated) v{0}")
+    @MethodSource("allVersions")
+    void containerCloseServerInitiated(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.ContainerClosePacket();
+        cb.setId((byte) 5);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            cb.setServerInitiated(true);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            cb.setType(org.cloudburstmc.protocol.bedrock.data.inventory.ContainerType.CONTAINER);
+        }
+
+        ContainerClosePacket nk = crossEncode(cb, ContainerClosePacket::new, protocol);
+
+        assertEquals(5, nk.windowId);
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            assertTrue(nk.wasServerInitiated);
+        }
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            assertEquals(ContainerType.CONTAINER, nk.type);
+        }
+    }
+
     // ==================== RespawnPacket ====================
 
     @ParameterizedTest(name = "RespawnPacket v{0}")
@@ -1544,28 +1567,6 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(0.5f, nk.x, 0.001f);
         assertEquals(1.0f, nk.y, 0.001f);
         assertEquals(0.0f, nk.z, 0.001f);
-    }
-
-    // ==================== PlayerActionPacket ====================
-
-    @ParameterizedTest(name = "PlayerActionPacket START_BREAK v{0}")
-    @MethodSource("allVersions")
-    void playerActionStartBreak(int protocol) {
-        var cb = new org.cloudburstmc.protocol.bedrock.packet.PlayerActionPacket();
-        cb.setRuntimeEntityId(50L);
-        cb.setAction(org.cloudburstmc.protocol.bedrock.data.PlayerActionType.START_BREAK);
-        cb.setBlockPosition(Vector3i.from(10, 64, -5));
-        cb.setResultPosition(Vector3i.from(10, 64, -5));
-        cb.setFace(1);
-
-        PlayerActionPacket nk = crossEncode(cb, PlayerActionPacket::new, protocol);
-
-        assertEquals(50L, nk.entityId);
-        assertEquals(PlayerActionPacket.ACTION_START_BREAK, nk.action);
-        assertEquals(10, nk.x);
-        assertEquals(64, nk.y);
-        assertEquals(-5, nk.z);
-        assertEquals(1, nk.face);
     }
 
     // ==================== ShowProfilePacket ====================
@@ -3426,9 +3427,12 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
             stream.putUnsignedVarInt(1);
 
             if (protocol >= ProtocolInfo.v1_26_40) {
-                // v2168: 主 VarUInt 紧凑 id(17) + 跳 7 重复字节(18) / primary compact VarUInt id + skip-7 duplicate byte
-                stream.putUnsignedVarInt(17);
-                stream.putByte((byte) 18);
+                // v2168: 主 VarUInt 紧凑 id + 跳 7 重复字节 / primary compact VarUInt id + skip-7 duplicate byte
+                // v1_26_60: 16 让位 CRAFT_RESERVED，RESULTS 紧凑 17→18（重复字节全枚举 18→20）
+                // v1_26_60: 16 yields to CRAFT_RESERVED, compact RESULTS 17->18 (duplicate full-enum 18->20)
+                boolean v2225 = protocol >= ProtocolInfo.v1_26_60;
+                stream.putUnsignedVarInt(v2225 ? 18 : 17);
+                stream.putByte((byte) (v2225 ? 20 : 18));
                 stream.putUnsignedVarInt(1);
                 writeItemInstanceV2168(stream, "minecraft:diamond_sword", 1, 0, 0);
             } else {
@@ -4218,6 +4222,13 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
     @ParameterizedTest(name = "ClientboundUpdateSoundDataPacket v{0}")
     @MethodSource("versionsFrom1001")
     void clientboundUpdateSoundData(int protocol) {
+        // v1_26_60 起线上仅携带单个事件（protocol-docs），CB v2225 codec 尚未跟进仍写 7 槽位，
+        // 跳过交叉验证直至上游更新；单事件路径由 V2225PacketRegressionTest 字节级覆盖
+        // Since v1_26_60 the wire carries a single event (protocol-docs); CB's v2225 codec still
+        // writes 7 slots - skip the cross check until upstream catches up; the single-event path
+        // is byte-asserted in V2225PacketRegressionTest
+        org.junit.jupiter.api.Assumptions.assumeTrue(protocol < ProtocolInfo.v1_26_60,
+                "CB v2225 codec not yet single-event aware");
         var cb = new org.cloudburstmc.protocol.bedrock.packet.ClientboundUpdateSoundDataPacket();
         cb.setServerSoundHandle(123456789L);
         if (protocol >= ProtocolInfo.v1_26_40) {

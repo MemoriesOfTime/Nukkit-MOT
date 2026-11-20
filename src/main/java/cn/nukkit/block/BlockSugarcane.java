@@ -111,6 +111,8 @@ public class BlockSugarcane extends BlockFlowable {
                                 this.getLevel().setBlock(b, ev.getNewState(), false);
                             }
                             break;
+                        } else if (b.getId() != SUGARCANE_BLOCK) {
+                            break;
                         }
                     }
                     this.setDamage(0);

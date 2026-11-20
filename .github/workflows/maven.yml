@@ -34,29 +34,49 @@ jobs:
     - name: Get Short SHA
       id: vars
       run: echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-    - name: Format ChangeLog
-      id: get-changelog
-      if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
-      env:
-        CHANGELOG: ${{ github.event.commits[0].message }}
-      run: |
-        escaped=${CHANGELOG//$'\n'/\\n}
-        printf 'changelog=%s\n' "$escaped" >> "$GITHUB_OUTPUT"
     - name: Get Time
       id: time
       if: github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
-      run: printf 'time=%s\n' "$(TZ=Asia/Shanghai date '+%Y/%m/%d-%H:%M:%S')" >> "$GITHUB_OUTPUT"
-    # 推送到minebbs    
-    - name: Update MineBBS infomation
-      uses: fjogeleit/http-request-action@v2
-      continue-on-error: true
+      run: printf 'time=%s\n' "$(TZ=Asia/Shanghai git show -s --date=format-local:'%Y/%m/%d-%H:%M:%S' --format=%cd HEAD)" >> "$GITHUB_OUTPUT"
+    # 推送到minebbs；第三方服务任何故障只标记本步骤，不影响 CI 结果
+    # Push to MineBBS; third-party outages must only mark this step, never fail the job
+    - name: Update MineBBS information
       if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
-      with:
-        url: 'https://api.minebbs.com/api/openapi/v1/resources/5934/update'
-        method: 'POST'
-        customHeaders: '{"Authorization": "Bearer ${{ secrets.MINEBBS_API_KEY }}"}'
-        contentType: 'application/json'
-        data: '{"title": "${{ github.ref_name }}-${{ steps.vars.outputs.sha_short }}", "description": "${{ steps.get-changelog.outputs.changelog }}", "new_version": "${{ steps.time.outputs.time }}", "file_url": "https://motci.cn/job/Nukkit-MOT/"}'
-        escapeData: 'true'
-        preventFailureOnNoResponse: 'true'
-        ignoreStatusCodes: '400,404,401,403,500,502,503,504'
+      continue-on-error: true
+      env:
+        MINEBBS_API_KEY: ${{ secrets.MINEBBS_API_KEY }}
+        MINEBBS_RESOURCE_ID: '5934'
+        MINEBBS_FILE_URL: 'https://motci.cn/job/Nukkit-MOT/'
+        MINEBBS_VERSION: ${{ steps.time.outputs.time }}
+        MINEBBS_TITLE: ${{ github.ref_name }}-${{ steps.vars.outputs.sha_short }}
+        IDEMPOTENCY_BASE: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        base='https://open.minebbs.com/api/openapi/v1'
+        changelog=$(git log -1 --pretty=%B)
+
+        # API 恒返回 HTTP 200，真实结果在响应体 status 字段（2000 = 成功），必须读信封判断
+        # The API always answers HTTP 200; the real result lives in the body status field (2000 = OK)
+        post() {
+          local name="$1" path="$2" body="$3" resp status
+          if ! resp=$(curl -sS --fail-with-body --max-time 60 --retry 2 --retry-delay 5 \
+              -X POST "$base$path" \
+              -H "Authorization: Bearer $MINEBBS_API_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Idempotency-Key: $IDEMPOTENCY_BASE-$name" \
+              --data "$body"); then
+            echo "::error::MineBBS $name request failed (transport or HTTP error)"
+            exit 1
+          fi
+          status=$(jq -r '.status // 0' <<<"$resp" 2>/dev/null) || status=0
+          if [ "$status" != 2000 ]; then
+            echo "::error::MineBBS $name failed: status=$status resp=$(tr '\n' ' ' <<<"$resp" | head -c 300)"
+            exit 1
+          fi
+          echo "MineBBS $name OK: $(jq -c '.data // {}' <<<"$resp")"
+        }
+
+        post "version" "/resources/$MINEBBS_RESOURCE_ID/versions" \
+          "$(jq -cn --arg v "$MINEBBS_VERSION" --arg f "$MINEBBS_FILE_URL" '{version_string: $v, file_url: $f}')"
+        post "update" "/resources/$MINEBBS_RESOURCE_ID/updates" \
+          "$(jq -cn --arg t "$MINEBBS_TITLE" --arg m "$changelog" '{title: $t, message: $m}')"
