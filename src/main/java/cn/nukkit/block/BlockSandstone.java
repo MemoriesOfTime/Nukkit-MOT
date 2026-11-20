@@ -38,16 +38,16 @@ public class BlockSandstone extends BlockSolidMeta {
         return 0.8;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Sandstone",
+            "Chiseled Sandstone",
+            "Smooth Sandstone",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Sandstone",
-                "Chiseled Sandstone",
-                "Smooth Sandstone",
-                ""
-        };
-
-        return names[this.getDamage() & 0x03];
+        return NAMES[this.getDamage() & 0x03];
     }
 
     @Override

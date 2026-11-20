@@ -57,8 +57,7 @@ public class InventorySlotPacket extends DataPacket {
             this.putUnsignedVarInt(this.inventoryId);
             this.putUnsignedVarInt(this.slot);
             if (this.protocol >= ProtocolInfo.v1_21_30) {
-                this.putByte((byte) this.containerNameData.getContainer().getId(this.gameVersion));
-                this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
+                this.writeFullContainerName(this.containerNameData);
                 if (this.protocol >= ProtocolInfo.v1_21_40) {
                     this.putSlot(gameVersion, this.storageItem);
                 } else {

@@ -226,5 +226,9 @@ public enum DisconnectFailReason {
      * @since v2192
      */
     UNSUPPORTED_TRANSPORT,
+    /**
+     * @since v2225
+     */
+    SUB_CLIENT_LOGIN_NOT_BOUND,
 }
 

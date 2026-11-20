@@ -6,7 +6,16 @@ import cn.nukkit.item.ItemTool;
 /**
  * Created by PetteriM1
  */
-public class BlockStructureBlock extends BlockSolid {
+public class BlockStructureBlock extends BlockSolidMeta {
+
+    public BlockStructureBlock() {
+        this(0);
+    }
+
+    public BlockStructureBlock(int meta) {
+        super(meta);
+    }
+
 
     @Override
     public int getId() {

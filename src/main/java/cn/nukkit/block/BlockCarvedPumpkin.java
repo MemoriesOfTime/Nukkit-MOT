@@ -7,6 +7,15 @@ import javax.annotation.Nonnull;
 
 public class BlockCarvedPumpkin extends BlockPumpkin {
 
+    public BlockCarvedPumpkin() {
+        this(0);
+    }
+
+    public BlockCarvedPumpkin(int meta) {
+        super(meta);
+    }
+
+
     @Override
     public int getId() {
         return CARVED_PUMPKIN;
