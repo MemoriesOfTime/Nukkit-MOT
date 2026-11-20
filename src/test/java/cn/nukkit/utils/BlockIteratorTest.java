@@ -24,6 +24,11 @@ public class BlockIteratorTest {
     @BeforeAll
     public void setUp() {
         MockServer.init();
+        // 其他测试类可能把共享 MockServer 的默认世界换成裸 mock（getBlock 返回 null），
+        // 且运行顺序不确定；重置回 MockServer 自带的带 getBlock 桩的默认世界
+        // Other test classes may replace the shared MockServer's default level with a bare mock
+        // (getBlock returns null) and the run order is not guaranteed; restore the stub level
+        MockServer.reset();
         level = Server.getInstance() != null ? Server.getInstance().getDefaultLevel() : null;
     }
 

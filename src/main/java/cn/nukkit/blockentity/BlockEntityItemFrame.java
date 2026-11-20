@@ -68,7 +68,8 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
 
     public Item getItem() {
         if (item_ == null) {
-            CompoundTag NBTTag = this.namedTag.getCompound("Item");
+            // Item decoding owns its tag: setNamedTag/getNamedTag normalize compound names.
+            CompoundTag NBTTag = this.namedTag.getCompound("Item").copy();
             item_ = NBTIO.getItemHelper(NBTTag);
         }
         return item_;
@@ -116,7 +117,8 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
         CompoundTag itemOriginal = namedTag.getCompound("Item");
 
         CompoundTag tag = new CompoundTag()
-                .putString("id", BlockEntity.ITEM_FRAME)
+                .putString("id", this instanceof BlockEntityItemFrameGlow
+                        ? BlockEntity.GLOW_ITEM_FRAME : BlockEntity.ITEM_FRAME)
                 .putInt("x", (int) this.x)
                 .putInt("y", (int) this.y)
                 .putInt("z", (int) this.z);

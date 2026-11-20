@@ -60,7 +60,8 @@ public class LevelDBChunk extends BaseChunk {
         this.storageSaveX = chunkX;
         this.storageSaveZ = chunkZ;
 
-        this.dimensionData = provider == null ? DimensionData.LEGACY_DIMENSION : provider.getLevel().getDimensionData();
+        Level levelTemp = provider == null ? null : provider.getLevel();
+        this.dimensionData = levelTemp == null ? DimensionData.LEGACY_DIMENSION : levelTemp.getDimensionData();
         int minSectionY = this.dimensionData.getMinSectionY();
         int maxSectionY = this.dimensionData.getMaxSectionY();
         this.sections = new ChunkSection[this.dimensionData.getHeight() >> 4];
@@ -155,6 +156,12 @@ public class LevelDBChunk extends BaseChunk {
     @Override
     public int getSectionOffset() {
         return this.dimensionData.getSectionOffset();
+    }
+
+    /** Whether the dimension captured by this chunk has a fixed section offset. */
+    public boolean hasStableSectionOffset() {
+        return this.dimensionData.getClass() == DimensionData.class
+                || this.dimensionData == DimensionData.LEGACY_DIMENSION;
     }
 
     public void setState(@NotNull ChunkState state) {
@@ -687,6 +694,9 @@ public class LevelDBChunk extends BaseChunk {
     @Override
     public LevelDBChunk cloneForChunkSending() {
         LevelDBChunk chunk = (LevelDBChunk) super.cloneForChunkSending();
+        if (this.biomes != null) {
+            chunk.biomes = this.biomes.clone();
+        }
 
         for (int i = 0; i < chunk.sections.length; i++) {
             ChunkSection section = chunk.sections[i];
@@ -751,11 +761,13 @@ public class LevelDBChunk extends BaseChunk {
 
     @Override
     protected void setInternalSection(float fY, ChunkSection section) {
-        super.setInternalSection(fY, section);
-        this.subChunksDirty = true;
         if (section instanceof LevelDBChunkSection) {
             ((LevelDBChunkSection) section).setParent(this);
         }
+        // Readers may write as soon as the section slot is visible. Its dirty
+        // callback must already know the owning chunk before publication.
+        super.setInternalSection(fY, section);
+        this.subChunksDirty = true;
     }
 
     @Override

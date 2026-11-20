@@ -29,20 +29,20 @@ public class BlockSlabStone3 extends BlockSlab {
         return STONE_SLAB3;
     }
 
+    private static final String[] NAMES = new String[]{
+            "End Stone Brick",
+            "Smooth Red Sandstone",
+            "Polished Andesite",
+            "Andesite",
+            "Diorite",
+            "Polished Diorite",
+            "Granite",
+            "Polisehd Granite"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "End Stone Brick",
-                "Smooth Red Sandstone",
-                "Polished Andesite",
-                "Andesite",
-                "Diorite",
-                "Polished Diorite",
-                "Granite",
-                "Polisehd Granite"
-        };
-
-        return ((this.getDamage() & 0x08) > 0 ? "Upper " : "") + names[this.getDamage() & 0x07] + " Slab";
+        return ((this.getDamage() & 0x08) > 0 ? "Upper " : "") + NAMES[this.getDamage() & 0x07] + " Slab";
     }
 
     @Override
@@ -68,6 +68,18 @@ public class BlockSlabStone3 extends BlockSlab {
     @Override
     public Item toItem() {
         return new ItemBlock(this, this.getDamage() & 0x07);
+    }
+
+    @Override
+    public double getHardness() {
+        switch (this.getDamage() & 0x07) {
+            case END_STONE_BRICKS:
+                return 3;
+            case SMOOTH_RED_SANDSTONE:
+                return 2;
+            default:
+                return 1.5;
+        }
     }
 
     @Override

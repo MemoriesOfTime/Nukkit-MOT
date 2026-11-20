@@ -16,6 +16,13 @@ public class BlockMud extends BlockSolid {
         return MUD;
     }
 
+    // Vanilla mud collision is 14/16 high, like soul sand. A full cube here left the
+    // server's floor 1/8 above the client's and corrected players standing on mud.
+    @Override
+    public double getMaxY() {
+        return this.y + 1 - 0.125;
+    }
+
     @Override
     public double getHardness() {
         return 0.5;

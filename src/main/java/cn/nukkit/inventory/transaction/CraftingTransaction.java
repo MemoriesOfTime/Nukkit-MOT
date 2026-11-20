@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
 import cn.nukkit.inventory.transaction.action.CraftingTransferMaterialAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
@@ -35,6 +36,8 @@ public class CraftingTransaction extends InventoryTransaction {
     private Recipe transactionRecipe;
 
     protected int craftingType;
+
+    private boolean repairItemRecipe;
 
     public CraftingTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions, false);
@@ -106,11 +109,13 @@ public class CraftingTransaction extends InventoryTransaction {
 
     @Override
     public boolean canExecute() {
+        this.repairItemRecipe = false;
         Recipe recipe;
         recipe = source.getServer().getCraftingManager().matchRecipe(this.inputs, this.primaryOutput, this.secondaryOutputs);
         if (recipe == null) {
             MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {
+                this.repairItemRecipe = multiRecipe instanceof RepairItemRecipe;
                 recipe = multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList());
                 // Multi-recipe output is rebuilt authoritatively by the server, overriding the client NBT (#798).
                 applyAuthoritativeOutput(recipe.getResult());
@@ -137,9 +142,13 @@ public class CraftingTransaction extends InventoryTransaction {
     protected boolean callExecuteEvent() {
         CraftItemEvent ev;
         Item originalOutput = this.primaryOutput == null ? null : this.primaryOutput.clone();
+        boolean preserveRepairMetadata = this.repairItemRecipe;
+        List<Item> originalInputs = preserveRepairMetadata
+                ? this.inputs.stream().map(Item::clone).toList() : List.of();
 
         this.source.getServer().getPluginManager().callEvent(ev = new CraftItemEvent(this));
-        if (ev.isCancelled()) {
+        if (ev.isCancelled() || preserveRepairMetadata
+                && !RepairItemRecipe.preservesInputMetadata(this.primaryOutput, originalInputs)) {
             return false;
         }
         Item rewritten = applyEventOutputToActions(originalOutput, this.primaryOutput);
@@ -180,23 +189,30 @@ public class CraftingTransaction extends InventoryTransaction {
     @Override
     public boolean execute() {
         if (super.execute()) {
-            switch (this.primaryOutput.getId()) {
-                case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
-                case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
-                case Item.FURNACE -> source.awardAchievement("buildFurnace");
-                case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
-                case Item.BREAD -> source.awardAchievement("makeBread");
-                case Item.CAKE -> source.awardAchievement("bakeCake");
-                case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
-                    Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
-                case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
-                case Item.DIAMOND -> source.awardAchievement("diamond");
-            }
-
+            awardCraftingAchievement(source, this.primaryOutput);
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * 仅在合成成功结算后调用，供事务与旧版独立结算路径共享成就规则。
+     * Shares achievement rules between transaction and legacy paths after successful settlement.
+     */
+    public static void awardCraftingAchievement(Player source, Item result) {
+        switch (result.getId()) {
+            case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
+            case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
+            case Item.FURNACE -> source.awardAchievement("buildFurnace");
+            case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
+            case Item.BREAD -> source.awardAchievement("makeBread");
+            case Item.CAKE -> source.awardAchievement("bakeCake");
+            case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
+                Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+            case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
+            case Item.DIAMOND -> source.awardAchievement("diamond");
+        }
     }
 
     @Override

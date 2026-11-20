@@ -21,7 +21,7 @@ public class BlockPlanks extends BlockSolidMeta {
     }
 
     public BlockPlanks(int meta) {
-        super(meta % 6);
+        super(meta);
     }
 
     @Override
@@ -49,18 +49,19 @@ public class BlockPlanks extends BlockSolidMeta {
         return 20;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Oak Wood Planks",
+            "Spruce Wood Planks",
+            "Birch Wood Planks",
+            "Jungle Wood Planks",
+            "Acacia Wood Planks",
+            "Dark Oak Wood Planks",
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Oak Wood Planks",
-                "Spruce Wood Planks",
-                "Birch Wood Planks",
-                "Jungle Wood Planks",
-                "Acacia Wood Planks",
-                "Dark Oak Wood Planks",
-        };
-
-        return names[this.getDamage() & 0x07];
+        // palette carries junk stateless metas 6/7; normalize like the old % 6 ctor did
+        return NAMES[this.getDamage() % 6];
     }
 
     @Override

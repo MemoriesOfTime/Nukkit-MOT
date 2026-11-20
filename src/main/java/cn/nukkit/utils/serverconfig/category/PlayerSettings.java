@@ -12,6 +12,10 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class PlayerSettings extends OkaeriConfig {
 
+    @Comment("Enable player movement collision checks. Disable to restore legacy movement acceptance")
+    @CustomKey("movement-collision-check")
+    private boolean movementCollisionCheck = true;
+
     @Comment("Fire cancellable XP pickup before consuming the orb or Mending; false restores legacy pickup")
     @CustomKey("experience-pickup-event")
     private boolean experiencePickupEvent = true;

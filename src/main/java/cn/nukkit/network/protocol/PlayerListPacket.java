@@ -17,6 +17,8 @@ public class PlayerListPacket extends DataPacket {
     public static final byte TYPE_ADD = 0;
     public static final byte TYPE_REMOVE = 1;
 
+    public static final int BUILD_PLATFORM_UNKNOWN = -1;
+
     public byte type;
     public Entry[] entries = new Entry[0];
 
@@ -39,6 +41,9 @@ public class PlayerListPacket extends DataPacket {
                         this.putEntityUniqueId(entry.entityId);
                         this.putString(entry.name);
                         this.putString(entry.xboxUserId);
+                        if (protocol >= ProtocolInfo.v1_26_60) {
+                            this.putString(entry.skin != null ? entry.skin.getPlayFabId() : "");
+                        }
                         this.putString(entry.platformChatId);
                         this.putLInt(entry.buildPlatform);
                         this.putSkin(this.gameVersion, entry.skin);
@@ -139,7 +144,7 @@ public class PlayerListPacket extends DataPacket {
         public Skin skin;
         public String xboxUserId = "";
         public String platformChatId = "";
-        public int buildPlatform = 1;
+        public int buildPlatform = BUILD_PLATFORM_UNKNOWN;
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;

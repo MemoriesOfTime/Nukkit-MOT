@@ -250,6 +250,7 @@ public class EntityItem extends Entity {
                             if (newAmount > this.item.getMaxStackSize()) {
                                 continue;
                             }
+                            this.age = Math.min(this.age, entity.age);
                             closeItem.setCount(0);
                             entity.close();
                             this.item.setCount(newAmount);
@@ -258,6 +259,9 @@ public class EntityItem extends Entity {
                             packet.data = newAmount;
                             packet.event = EntityEventPacket.MERGE_ITEMS;
                             Server.broadcastPacket(this.getViewers().values(), packet);
+                            if (this.item.getCount() >= this.item.getMaxStackSize()) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -273,16 +277,13 @@ public class EntityItem extends Entity {
 
             double friction = 1 - this.getDrag();
 
-            Block block = this.getLevel().getBlock(this.getFloorX(), (int) Math.floor(this.y - 1), this.getFloorZ());
-            if ((this.onGround || block instanceof BlockLiquid)
-                    && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
-                double frictionFactor;
-                if (block instanceof BlockLiquid) {
-                    frictionFactor = 0.8;
-                } else {
-                    frictionFactor = block.getFrictionFactor();
+            // A resting stack cannot use horizontal floor friction. Avoid reading and cloning
+            // its floor block until there is horizontal motion, including while floating.
+            if (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001) {
+                Block block = this.getLevel().getBlock(this.getFloorX(), (int) Math.floor(this.y - 1), this.getFloorZ());
+                if (this.onGround || block instanceof BlockLiquid) {
+                    friction *= block instanceof BlockLiquid ? 0.8 : block.getFrictionFactor();
                 }
-                friction *= frictionFactor;
             }
 
             this.motionX *= friction;

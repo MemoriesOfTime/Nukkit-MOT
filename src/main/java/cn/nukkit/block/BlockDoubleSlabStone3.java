@@ -41,7 +41,11 @@ public class BlockDoubleSlabStone3 extends BlockDoubleSlabStone {
 
     @Override
     public double getHardness() {
-        return 2;
+        return switch (this.getDamage() & 0x07) {
+            case END_STONE_BRICKS -> 3;
+            case SMOOTH_RED_SANDSTONE -> 2;
+            default -> 1.5;
+        };
     }
 
     @Override
@@ -49,19 +53,20 @@ public class BlockDoubleSlabStone3 extends BlockDoubleSlabStone {
         return ItemTool.TYPE_PICKAXE;
     }
 
+    private static final String[] NAMES = new String[]{
+            "End Stone Brick",
+            "Smooth Red Sandstone",
+            "Polished Andesite",
+            "Andesite",
+            "Diorite",
+            "Polished Diorite",
+            "Granite",
+            "Polisehd Granite"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "End Stone Brick",
-                "Smooth Red Sandstone",
-                "Polished Andesite",
-                "Andesite",
-                "Diorite",
-                "Polished Diorite",
-                "Granite",
-                "Polisehd Granite"
-        };
-        return "Double " + names[this.getDamage() & 0x07] + " Slab";
+        return "Double " + NAMES[this.getDamage() & 0x07] + " Slab";
     }
 
     @Override

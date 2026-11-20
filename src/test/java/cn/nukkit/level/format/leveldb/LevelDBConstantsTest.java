@@ -47,6 +47,18 @@ public class LevelDBConstantsTest {
     }
 
     @Test
+    public void testWriteBufferSizeTiers() {
+        // 1GB / 2GB / 6GB 三道档线。/ The 1GB, 2GB and 6GB tier boundaries.
+        assertEquals(2, LevelDBProvider.writeBufferSizeMb(512L * 1024 * 1024), "below 1GB");
+        assertEquals(4, LevelDBProvider.writeBufferSizeMb(1024L * 1024 * 1024), "at the 1GB boundary");
+        assertEquals(4, LevelDBProvider.writeBufferSizeMb(2L * 1024 * 1024 * 1024), "at the 2GB boundary");
+        assertEquals(8, LevelDBProvider.writeBufferSizeMb(2L * 1024 * 1024 * 1024 + 1), "just above 2GB");
+        assertEquals(8, LevelDBProvider.writeBufferSizeMb(6L * 1024 * 1024 * 1024), "at the 6GB boundary");
+        assertEquals(16, LevelDBProvider.writeBufferSizeMb(6L * 1024 * 1024 * 1024 + 1), "just above 6GB");
+        assertEquals(16, LevelDBProvider.writeBufferSizeMb(64L * 1024 * 1024 * 1024), "large machine");
+    }
+
+    @Test
     public void testUpdaterOutputVersionMatchesPalette() {
         int version1_21_0 = (0 << 8) | (21 << 16) | (1 << 24);
 

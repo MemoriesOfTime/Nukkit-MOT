@@ -34,7 +34,7 @@ public class ItemHoneyBottle extends ItemEdible {
     @Override
     public boolean onUse(Player player, int ticksUsed) {
         if (ticksUsed < 10) return false;
-        super.onUse(player, ticksUsed);
+        if (!super.onUse(player, ticksUsed)) return false;
 
         if (player.hasEffect(Effect.POISON)) {
             player.removeEffect(Effect.POISON, EntityPotionEffectEvent.Cause.FOOD);

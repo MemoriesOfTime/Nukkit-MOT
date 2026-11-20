@@ -12,6 +12,7 @@ import java.util.List;
 public class MapInfoRequestPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.MAP_INFO_REQUEST_PACKET;
+    private static final int MAX_MAP_PIXELS = 128 * 128;
 
     public long mapId;
 
@@ -34,6 +35,9 @@ public class MapInfoRequestPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_19_20) {
             // since v544: uint32 length + N x (uint32 pixel + uint16 index), all little-endian, no compression
             int count = this.getLInt();
+            if (count < 0 || count > MAX_MAP_PIXELS) {
+                throw new IllegalArgumentException("Invalid map pixel count: " + count);
+            }
             for (int i = 0; i < count; i++) {
                 MapPixel pixel = new MapPixel();
                 pixel.pixel = this.getLInt();
