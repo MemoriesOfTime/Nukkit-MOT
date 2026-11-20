@@ -1890,8 +1890,8 @@ public class Level implements ChunkManager, Metadatable {
         for (var iterator = centres.iterator(); iterator.hasNext();) {
             long centre = iterator.nextLong();
             int chunkX = getHashX(centre), chunkZ = getHashZ(centre);
-            for (int dx = -range; dx < range; ++dx) {
-                for (int dz = -range; dz < range; ++dz) {
+            for (int dx = -range; dx <= range; ++dx) {
+                for (int dz = -range; dz <= range; ++dz) {
                     this.blockEntityTickingChunks.add(chunkHash(chunkX + dx, chunkZ + dz));
                 }
             }

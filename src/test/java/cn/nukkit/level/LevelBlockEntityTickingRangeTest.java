@@ -50,8 +50,8 @@ class LevelBlockEntityTickingRangeTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"-3,-3,1", "2,2,1", "3,0,0", "0,3,0", "-4,0,0", "0,-4,0"})
-    void usesExactHalfOpenRandomTickBoundary(int x, int z, int expected) throws Exception {
+    @CsvSource({"-3,-3,1", "3,3,1", "-3,0,1", "3,0,1", "0,-3,1", "0,3,1", "-4,0,0", "4,0,0", "0,-4,0", "0,4,0"})
+    void ticksBothInclusiveChunkRangeBoundaries(int x, int z, int expected) throws Exception {
         Fixture f = new Fixture(3, 40);
         f.loader(0, 0);
         CountingBlockEntity be = f.entity(x, z);
@@ -67,10 +67,11 @@ class LevelBlockEntityTickingRangeTest {
         CountingBlockEntity outside = f.entity(4, 0);
         f.level.tickBlockEntities();
         assertEquals(1, inside.updates);
-        assertEquals(0, outside.updates);
+        assertEquals(1, outside.updates);
         f.loader(100, 100); // two loaders -> 19 candidates -> range 3
         f.level.tickBlockEntities();
-        assertEquals(1, inside.updates);
+        assertEquals(2, inside.updates);
+        assertEquals(1, outside.updates);
         Fixture capped = new Fixture(1, 400);
         capped.loader(0, 0);
         CountingBlockEntity edge = capped.entity(-1, -1);
@@ -212,7 +213,7 @@ class LevelBlockEntityTickingRangeTest {
     }
 
     @Test
-    void stationaryLoadersReuseCoverageAndChangedInputsMatchLegacyUnion() throws Exception {
+    void stationaryLoadersReuseCoverageAndChangedInputsUseInclusiveUnion() throws Exception {
         Fixture f = new Fixture(8, 40);
         ChunkLoader first = f.loader(0, 0);
         f.loader(0, 0); // Duplicate centres still affect effective radius through loader count.
@@ -236,13 +237,13 @@ class LevelBlockEntityTickingRangeTest {
         f.level.tickBlockEntities();
         LongOpenHashSet expected = new LongOpenHashSet();
         for (int x : new int[]{-1, 0})
-            for (int dx = -3; dx < 3; dx++) for (int dz = -3; dz < 3; dz++)
+            for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++)
                 expected.add(Level.chunkHash(x + dx, dz));
         assertEquals(expected, coverage);
         f.loaders.remove(2); // Budget-dependent radius grows from 3 to 4.
         f.level.tickBlockEntities();
         expected.clear();
-        for (int dx = -4; dx < 4; dx++) for (int dz = -4; dz < 4; dz++)
+        for (int dx = -4; dx <= 4; dx++) for (int dz = -4; dz <= 4; dz++)
             expected.add(Level.chunkHash(-1 + dx, dz));
         assertEquals(expected, coverage);
         set(f.level, "chunksPerTicks", 0);
