@@ -86,6 +86,7 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(player != null ? player.getDirection().getHorizontalIndex() : 0);
+        this.updateInWall(block);
         this.getLevel().setBlock(block, this, true, true);
 
         return true;
@@ -157,7 +158,7 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
             }
         }
 
-        this.setDamage(direction | ((~this.getDamage()) & OPEN_BIT));
+        this.setDamage(direction | (this.getDamage() & IN_WALL_BIT) | ((~this.getDamage()) & OPEN_BIT));
         this.level.setBlock(this, this, false, true);
         // 玩家手动 toggle 时记录 override，避免红石随后把它"对齐"回去 (issue #782)
         if (player != null) {
@@ -178,8 +179,48 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
         return (this.getDamage() & OPEN_BIT) > 0;
     }
 
+    /**
+     * 按门两侧（朝向轴垂直方向）的墙重算 in_wall_bit。
+     * <p>
+     * Recomputes in_wall_bit from walls beside the gate (perpendicular to its facing axis).
+     *
+     * @return 是否发生变化 / whether the meta changed
+     */
+    public boolean updateInWall() {
+        return this.updateInWall(this);
+    }
+
+    /**
+     * 用指定位置重算 in_wall_bit（place 时自身坐标尚未写入）。
+     * <p>
+     * Recomputes in_wall_bit from the given position (own coordinates are not set yet on place).
+     */
+    public boolean updateInWall(@NotNull Block at) {
+        boolean inWall = false;
+        BlockFace facing = this.getBlockFace();
+        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
+            if (side.getAxis() != facing.getAxis() && at.getSide(side) instanceof BlockWall) {
+                inWall = true;
+                break;
+            }
+        }
+        int meta = (this.getDamage() & ~IN_WALL_BIT) | (inWall ? IN_WALL_BIT : 0);
+        if (meta == this.getDamage()) {
+            return false;
+        }
+        this.setDamage(meta);
+        return true;
+    }
+
     @Override
     public int onUpdate(int type) {
+        if (type == Level.BLOCK_UPDATE_NORMAL) {
+            if (this.updateInWall()) {
+                this.getLevel().setBlock(this, this, true);
+            }
+            return type;
+        }
+
         if (type == Level.BLOCK_UPDATE_REDSTONE) {
             // 玩家手动操作过的栅栏门不被红石强制对齐 (issue #782)
             boolean powered = RedstoneToggleHelper.isPowered(this.level, this.getLocation());

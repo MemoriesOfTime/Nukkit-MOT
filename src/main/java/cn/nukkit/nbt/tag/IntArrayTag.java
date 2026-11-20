@@ -2,7 +2,6 @@ package cn.nukkit.nbt.tag;
 
 import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.stream.NBTOutputStream;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -26,27 +25,12 @@ public class IntArrayTag extends Tag {
 
     @Override
     void write(NBTOutputStream dos) throws IOException {
-        dos.writeInt(data.length);
-        for (int aData : data) {
-            dos.writeInt(aData);
-        }
+        dos.writeIntArray(data);
     }
 
     @Override
     void load(NBTInputStream dis, int nested) throws IOException {
-        int length = dis.readInt();
-        if (dis.isReadSafely() && length > 64) {
-            IntArrayList list = new IntArrayList(64);
-            for (int i = 0; i < length; i++) {
-                list.add(dis.readInt());
-            }
-            data = list.toIntArray();
-        } else {
-            data = new int[length];
-            for (int i = 0; i < length; i++) {
-                data[i] = dis.readInt();
-            }
-        }
+        data = dis.readIntArray(dis.readInt());
     }
 
     public int[] getData() {

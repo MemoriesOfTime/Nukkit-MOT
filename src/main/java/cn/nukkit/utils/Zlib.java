@@ -63,6 +63,20 @@ public abstract class Zlib {
         return provider.deflateRaw(data, level);
     }
 
+    /** Compress a thread-confined batch synchronously; the returned bytes remain independently owned. */
+    public static byte[] deflateRaw(BinaryStream data, int level) throws Exception {
+        if (data.getClass() == BinaryStream.class && provider instanceof ZlibThreadLocal local) {
+            byte[] buffer = data.getBufferUnsafe();
+            int length = data.getCount();
+            if (buffer != null && length >= 0 && length <= buffer.length) {
+                return local.deflateRaw(buffer, length, level);
+            }
+        }
+        // Preserve custom accessors, padding/errors and codecs that may retain or mutate input.
+        // Resolve the provider after getBuffer(): a custom accessor may change it.
+        return deflateRaw(data.getBuffer(), level);
+    }
+
     public static byte[] deflateRaw(byte[][] data, int level) throws Exception {
         return provider.deflateRaw(data, level);
     }

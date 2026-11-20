@@ -10,6 +10,8 @@ import cn.nukkit.utils.LevelException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * Created on 2015/12/6 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
@@ -102,6 +104,30 @@ public abstract class BlockThin extends BlockTransparentMeta {
         return item;
     }
 
+    /** Post and arms instead of one stretched box; see {@link CrossCollisionShape}. */
+    private AxisAlignedBB[] collisionParts() {
+        AxisAlignedBB bounds = this.getBoundingBox();
+        if (bounds == null) {
+            return new AxisAlignedBB[0];
+        }
+        return CrossCollisionShape.parts(bounds, this.x + 0.5, this.z + 0.5, CrossCollisionShape.PANE_POST, CrossCollisionShape.PANE_ARM);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return CrossCollisionShape.collides(this.collisionParts(), bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? CrossCollisionShape.collides(this.collisionParts(), bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        CrossCollisionShape.addColliding(this.collisionParts(), bb, collidingBoxes);
+    }
+
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
         double f = 0.4375;
@@ -113,24 +139,20 @@ public abstract class BlockThin extends BlockTransparentMeta {
             boolean flag1 = this.canConnect(this.south());
             boolean flag2 = this.canConnect(this.west());
             boolean flag3 = this.canConnect(this.east());
-            if ((!flag2 || !flag3) && (flag2 || flag3 || flag || flag1)) {
-                if (flag2) {
-                    f = 0;
-                } else if (flag3) {
-                    f1 = 1;
-                }
-            } else {
+            if (flag2 && flag3) {
                 f = 0;
                 f1 = 1;
+            } else if (flag2) {
+                f = 0;
+            } else if (flag3) {
+                f1 = 1;
             }
-            if ((!flag || !flag1) && (flag2 || flag3 || flag || flag1)) {
-                if (flag) {
-                    f2 = 0;
-                } else if (flag1) {
-                    f3 = 1;
-                }
-            } else {
+            if (flag && flag1) {
                 f2 = 0;
+                f3 = 1;
+            } else if (flag) {
+                f2 = 0;
+            } else if (flag1) {
                 f3 = 1;
             }
         } catch (LevelException ignore) {}
@@ -144,11 +166,36 @@ public abstract class BlockThin extends BlockTransparentMeta {
         );
     }
 
+    /**
+     * 邻居朝向本方块的一面是否与玻璃板/铁栏相连。
+     * <p>
+     * Whether the neighbour's face towards this pane/bar connects.
+     *
+     * @param block        相邻方块 / the neighbouring block
+     * @param neighborFace 邻居朝向本方块的那一面 / the neighbour's face touching this block
+     */
+    public boolean canConnect(Block block, BlockFace neighborFace) {
+        return block instanceof BlockThin
+                || block instanceof BlockWall
+                || ConnectionSupport.providesFullSupport(block, neighborFace);
+    }
+
+    /**
+     * 旧布尔入口：内部重算仍经此虚调用，保留既有插件覆写；默认按坐标推断邻居朝向本方块的面。
+     * <p>
+     * Legacy boolean entry: internal recomputation dispatches through it so existing plugin
+     * overrides keep working; by default it infers the neighbour's face towards this block.
+     */
     public boolean canConnect(Block block) {
-        return block instanceof BlockWall
-                || block.isSolid()
-                || block.getId() == this.getId()
-                || block.getId() == GLASS_PANE
-                || block.getId() == GLASS;
+        BlockFace neighborFace = ConnectionSupport.faceFromNeighbor(this, block);
+        if (neighborFace != null) {
+            return this.canConnect(block, neighborFace);
+        }
+        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
+            if (this.canConnect(block, side)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

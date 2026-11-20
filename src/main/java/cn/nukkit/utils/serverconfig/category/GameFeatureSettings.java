@@ -27,6 +27,10 @@ public class GameFeatureSettings extends OkaeriConfig {
     @CustomKey("explosion-break-blocks")
     private boolean explosionBreakBlocks = true;
 
+    @Comment("Maximum blocks moved by one piston (1-64; invalid values use 12)")
+    @CustomKey("piston-push-limit")
+    private int pistonPushLimit = 12;
+
     @Comment("Allow spawners to drop when broken")
     @CustomKey("drop-spawners")
     private boolean dropSpawners = true;

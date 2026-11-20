@@ -20,6 +20,7 @@ public class TextPacket extends DataPacket {
     private static final int MAX_XUID_CHARS = 64;
     private static final int MAX_PLATFORM_CHAT_ID_CHARS = 256;
     private static final int MAX_PARAMETERS = 4;
+    private static final int MAX_NETEASE_PARAMETERS = 12;
 
     @Override
     public byte pid() {
@@ -113,6 +114,9 @@ public class TextPacket extends DataPacket {
                     this.type = (byte) getByte();
                     this.source = this.getString(MAX_SOURCE_CHARS);
                     this.message = this.getString(MAX_MESSAGE_CHARS);
+                    if (this.gameVersion.isNetEase()) {
+                        this.readNetEaseParameters();
+                    }
                     break;
                 case 2: // MessageAndParams
                     for (int i = 0; i < 3; i++) {
@@ -188,8 +192,11 @@ public class TextPacket extends DataPacket {
         }
 
         if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_16_100_51
+                && this.protocol < ProtocolInfo.v1_21_130
                 && !Server.getInstance().useWaterdog) { // 临时兼容WDPE
-            if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
+            if (this.type == TYPE_CHAT) {
+                this.readNetEaseParameters();
+            } else if (this.type == TYPE_POPUP) {
                 this.unknownNE = this.getString();
             }
         }
@@ -268,7 +275,7 @@ public class TextPacket extends DataPacket {
                     if (this.message.isEmpty()) {
                         this.message = " ";
                     }
-                    this.putString(this.message);
+                    this.putString(this.gameVersion.isNetEase() ? this.netEaseClampedMessage(this.message) : this.message);
                     break;
 
                 case TYPE_CHAT:
@@ -280,7 +287,10 @@ public class TextPacket extends DataPacket {
                     this.putString("announcement");
                     this.putByte(this.type);
                     this.putString(this.source);
-                    this.putString(this.message);
+                    this.putString(this.gameVersion.isNetEase() ? this.netEaseClampedMessage(this.message) : this.message);
+                    if (this.gameVersion.isNetEase()) {
+                        this.writeNetEaseParameters();
+                    }
                     break;
 
                 case TYPE_TRANSLATION:
@@ -327,7 +337,7 @@ public class TextPacket extends DataPacket {
                 case TYPE_OBJECT:
                 case TYPE_OBJECT_WHISPER:
                 case TYPE_OBJECT_ANNOUNCEMENT:
-                    this.putString(this.message);
+                    this.putString(this.gameVersion.isNetEase() ? this.netEaseClampedMessage(this.message) : this.message);
                     break;
 
                 case TYPE_TRANSLATION:
@@ -350,10 +360,48 @@ public class TextPacket extends DataPacket {
             }
         }
 
-        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_16_100_51) {
-            if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
+        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_16_100_51
+                && this.protocol < ProtocolInfo.v1_21_130) {
+            if (this.type == TYPE_CHAT) {
+                this.writeNetEaseParameters();
+            } else if (this.type == TYPE_POPUP) {
                 this.putString(this.unknownNE);
             }
         }
+    }
+
+    @OnlyNetEase
+    private void readNetEaseParameters() {
+        int count = (int) this.getUnsignedVarInt();
+        if (count > MAX_NETEASE_PARAMETERS) {
+            throw new IllegalArgumentException("Parameter List maxItems is " + MAX_NETEASE_PARAMETERS);
+        }
+        this.parameters = new String[count];
+        for (int i = 0; i < this.parameters.length; i++) {
+            this.parameters[i] = this.getString(MAX_MESSAGE_CHARS);
+        }
+    }
+
+    @OnlyNetEase
+    private void writeNetEaseParameters() {
+        this.putUnsignedVarInt(this.parameters.length);
+        for (String parameter : this.parameters) {
+            this.putString(parameter);
+        }
+    }
+
+    /**
+     * 网易客户端在名字+消息达到 512 字符时触发 PacketViolationWarning 断连，截断消息规避。
+     * <p>
+     * NetEase clients raise a PacketViolationWarning and disconnect once the name plus
+     * message reaches 512 chars; the message is trimmed to fit.
+     */
+    @OnlyNetEase
+    private String netEaseClampedMessage(String message) {
+        int nameLength = Math.min(this.source.length(), 511);
+        if (nameLength + message.length() >= 512) {
+            return message.substring(0, 511 - nameLength);
+        }
+        return message;
     }
 }

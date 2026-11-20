@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
  */
 public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable, BlockEntityHolder<BlockEntityPistonArm> {
 
+    private static final BlockFace[] POWER_SCAN_FACES = BlockFace.values();
+
     public boolean sticky = false;
 
     public BlockPistonBase() {
@@ -129,10 +131,10 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         }
 
         BlockEntity blockEntity = this.level.getBlockEntity(this);
-        if (blockEntity instanceof BlockEntityPistonArm arm) {
+        if (blockEntity instanceof BlockEntityPistonArm arm && arm.state % 2 == 0) {
             boolean powered = this.isPowered();
 
-            if (arm.state % 2 == 0 && arm.powered != powered) {
+            if (arm.powered != powered) {
                 if (this.checkState(powered)) {
                     arm.powered = powered;
                     if (arm.chunk != null) {
@@ -173,7 +175,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
     private boolean isPowered() {
         BlockFace face = this.getBlockFace();
 
-        for (BlockFace side : BlockFace.values()) {
+        for (BlockFace side : POWER_SCAN_FACES) {
             if (side == face) {
                 continue;
             }
@@ -311,6 +313,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         private final Block blockToMove;
         private final BlockFace moveDirection;
         private final boolean extending;
+        private final int pushLimit;
 
         private final List<Block> toMove = new ArrayList<>();
         private final List<Block> toDestroy = new ArrayList<>();
@@ -318,6 +321,8 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         public BlocksCalculator(boolean extending) {
             this.pistonPos = getLocation();
             this.extending = extending;
+            int configuredLimit = level.getServer().getServerConfig().gameFeatureSettings().pistonPushLimit();
+            this.pushLimit = configuredLimit >= 1 && configuredLimit <= 64 ? configuredLimit : 12;
 
             BlockFace face = getBlockFace();
             if (!extending) {
@@ -389,7 +394,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 return true;
             }
 
-            if (this.toMove.size() >= 12) {
+            if (this.toMove.size() >= this.pushLimit) {
                 return false;
             }
 
@@ -405,16 +410,22 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                     break;
                 }
 
+                if (this.toMove.contains(block)) {
+                    break;
+                }
+
                 if (block.breaksWhenMoved() && block.sticksToPiston()) {
                     this.toDestroy.add(block);
                     break;
                 }
 
-                if (++count + this.toMove.size() > 12) {
+                // The origin is already in toMove; count only new rear blocks.
+                if (this.toMove.size() + sticked.size() >= this.pushLimit) {
                     return false;
                 }
 
                 sticked.add(block);
+                ++count;
             }
 
             int stickedCount = sticked.size();
@@ -456,7 +467,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                     return true;
                 }
 
-                if (this.toMove.size() >= 12) {
+                if (this.toMove.size() >= this.pushLimit) {
                     return false;
                 }
 

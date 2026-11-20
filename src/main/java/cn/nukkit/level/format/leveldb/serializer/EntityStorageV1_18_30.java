@@ -6,6 +6,9 @@ import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
@@ -16,9 +19,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Reads and writes Bedrock's modern actor storage introduced in protocol 503 (MCBE 1.18.30).
@@ -66,7 +67,7 @@ final class EntityStorageV1_18_30 implements EntityStorage {
         byte[] digpKey = getDigpKey(chunk.getX(), chunk.getZ(), dimension);
 
         try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
-            Set<Long> writtenStorageKeys = new HashSet<>();
+            LongOpenHashSet writtenStorageKeys = null;
             for (Entity entity : chunk.getEntities().values()) {
                 if (!EntityNbtAdapter.isSavable(entity)) {
                     continue;
@@ -77,6 +78,9 @@ final class EntityStorageV1_18_30 implements EntityStorage {
 
                 long uniqueEntityId = entity.namedTag.getLong("UniqueID");
                 byte[] storageKey = generateStorageKeyForEntity(uniqueEntityId);
+                if (writtenStorageKeys == null) {
+                    writtenStorageKeys = new LongOpenHashSet(1);
+                }
                 writtenStorageKeys.add(storageKeyToLong(storageKey));
                 EntityStorage.writeBytes(storageKey, stream);
                 writeBatch.put(getActorKey(storageKey), EntityStorage.writeNbt(entity.namedTag));
@@ -87,6 +91,9 @@ final class EntityStorageV1_18_30 implements EntityStorage {
                 for (LevelDBChunk.PreservedEntityActor preservedActor : preservedActors) {
                     byte[] storageKey = preservedActor.getStorageKey();
                     long key = storageKeyToLong(storageKey);
+                    if (writtenStorageKeys == null) {
+                        writtenStorageKeys = new LongOpenHashSet(1);
+                    }
                     if (writtenStorageKeys.add(key)) {
                         EntityStorage.writeBytes(storageKey, stream);
                         writeBatch.put(getActorKey(storageKey), preservedActor.getRawNbt());
@@ -100,8 +107,16 @@ final class EntityStorageV1_18_30 implements EntityStorage {
             } else {
                 writeBatch.put(digpKey, value);
             }
-            Set<Long> retained = Set.copyOf(writtenStorageKeys);
-            // Capture only coordinates and immutable IDs; worker must never inspect live entities.
+            LongSet retained;
+            if (writtenStorageKeys == null) {
+                retained = LongSets.emptySet();
+            } else if (writtenStorageKeys.size() == 1) {
+                retained = LongSets.singleton(writtenStorageKeys.iterator().nextLong());
+            } else {
+                retained = writtenStorageKeys;
+            }
+            // Capture only coordinates and privately owned IDs, never mutated after this point.
+            // Worker must never inspect live entities.
             return (database, batch) -> deleteStaleActors(database, batch, chunkX, chunkZ, dimension, retained);
         } catch (IOException e) {
             throw new RuntimeException("Can not create out stream", e);
@@ -111,7 +126,7 @@ final class EntityStorageV1_18_30 implements EntityStorage {
     @Override
     public void deleteEntities(@Nullable DB sourceDb, WriteBatch writeBatch, LevelDBChunk chunk) {
         int dimension = chunk.getProvider().getLevel().getDimension();
-        deleteStaleActors(sourceDb, writeBatch, chunk.getX(), chunk.getZ(), dimension, Set.of());
+        deleteStaleActors(sourceDb, writeBatch, chunk.getX(), chunk.getZ(), dimension, LongSets.emptySet());
         writeBatch.delete(getDigpKey(chunk.getX(), chunk.getZ(), dimension));
     }
 
@@ -148,7 +163,7 @@ final class EntityStorageV1_18_30 implements EntityStorage {
         return result;
     }
 
-    private void deleteStaleActors(@Nullable DB sourceDb, WriteBatch writeBatch, int chunkX, int chunkZ, int dimension, Set<Long> retainedKeys) {
+    private void deleteStaleActors(@Nullable DB sourceDb, WriteBatch writeBatch, int chunkX, int chunkZ, int dimension, LongSet retainedKeys) {
         if (sourceDb == null) {
             return;
         }

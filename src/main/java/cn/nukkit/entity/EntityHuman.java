@@ -136,6 +136,9 @@ public class EntityHuman extends EntityHumanType {
                 if (skinTag.contains("PlayFabId")) {
                     newSkin.setPlayFabId(skinTag.getString("PlayFabId"));
                 }
+                if (skinTag.contains("ProfileHash")) {
+                    newSkin.setProfileHash(skinTag.getString("ProfileHash"));
+                }
                 if (skinTag.contains("Data")) {
                     byte[] data = skinTag.getByteArray("Data");
                     if (skinTag.contains("SkinImageWidth") && skinTag.contains("SkinImageHeight")) {
@@ -214,6 +217,9 @@ public class EntityHuman extends EntityHumanType {
                 if (skinTag.contains("IsTrustedSkin")) {
                     newSkin.setTrusted(skinTag.getBoolean("IsTrustedSkin"));
                 }
+                if (skinTag.contains("SkinUDID")) {
+                    newSkin.setUdid(skinTag.getString("SkinUDID"));
+                }
                 this.setSkin(newSkin);
             }
 
@@ -256,6 +262,7 @@ public class EntityHuman extends EntityHumanType {
                     .putBoolean("CapeOnClassicSkin", this.getSkin().isCapeOnClassic())
                     .putString("ArmSize", this.getSkin().getArmSize())
                     .putString("SkinColor", this.getSkin().getSkinColor())
+                    .putString("ProfileHash", this.getSkin().getProfileHash())
                     .putBoolean("IsTrustedSkin", this.getSkin().isTrusted());
 
             List<SkinAnimation> animations = this.getSkin().getAnimations();
@@ -304,6 +311,10 @@ public class EntityHuman extends EntityHumanType {
                 skinTag.putString("PlayFabId", this.getSkin().getPlayFabId());
             }
 
+            if (!this.getSkin().getUdid().isEmpty()) {
+                skinTag.putString("SkinUDID", this.getSkin().getUdid());
+            }
+
             this.namedTag.putCompound("Skin", skinTag);
         }
     }
@@ -322,18 +333,27 @@ public class EntityHuman extends EntityHumanType {
                 throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
             }
 
-            boolean retainNpcListEntry = !(this instanceof Player)
+            boolean netEaseSkinHandshake = !(this instanceof Player)
                     && PlayerEntitySkinSender.requiresRetainedEntry(player);
+            boolean postSpawnSkinHandshake = !(this instanceof Player)
+                    && PlayerEntitySkinSender.requiresPostSpawnSkin(player, this.getSkin());
+            boolean retainNpcListEntry = netEaseSkinHandshake || postSpawnSkinHandshake;
             if (this instanceof Player) {
                 if (!player.sentSkins.contains(this.uuid)) {
                     this.server.updatePlayerListData(
                             new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
                             new Player[]{player});
                 }
-            } else if (retainNpcListEntry) {
+            } else if (netEaseSkinHandshake) {
                 if (!PlayerEntitySkinSender.sendInitialSkinIfAbsent(
                         player, this.uuid, this.getId(), this.getName(), this.getSkin(), "",
                         this::getSkin)) {
+                    this.hasSpawned.remove(player.getLoaderId());
+                    return;
+                }
+            } else if (postSpawnSkinHandshake) {
+                if (!PlayerEntitySkinSender.registerPostSpawnSkinIfAbsent(
+                        player, this.uuid, this.getId(), this.getName(), "", this::getSkin)) {
                     this.hasSpawned.remove(player.getLoaderId());
                     return;
                 }
@@ -361,6 +381,10 @@ public class EntityHuman extends EntityHumanType {
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
+            if (postSpawnSkinHandshake) {
+                PlayerEntitySkinSender.sendSkinAfterSpawn(player, this.uuid, this.getSkin());
+            }
+
             if (playerInventory != null) {
                 if (this instanceof Player) {
                     playerInventory.sendArmorContents(player);
@@ -379,7 +403,7 @@ public class EntityHuman extends EntityHumanType {
                 player.dataPacket(pkk);
             }
 
-            // V860 分支由 PlayerEntitySkinSender 延迟移除，其余非 Player 实体立即移除。
+            // Retained handshake entries are removed by PlayerEntitySkinSender after the skin settles.
             if (!(this instanceof Player) && !retainNpcListEntry) {
                 this.server.removePlayerListData(this.uuid, player);
             }
@@ -389,7 +413,6 @@ public class EntityHuman extends EntityHumanType {
     @Override
     public void despawnFrom(Player player) {
         boolean removeRetainedNpcEntry = !(this instanceof Player)
-                && PlayerEntitySkinSender.requiresRetainedEntry(player)
                 && this.hasSpawned.containsKey(player.getLoaderId());
         super.despawnFrom(player);
         if (removeRetainedNpcEntry) {

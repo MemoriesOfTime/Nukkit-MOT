@@ -25,7 +25,16 @@ import java.util.concurrent.ThreadLocalRandom;
  * Created on 2015/12/8 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
-public class BlockTNT extends BlockSolid {
+public class BlockTNT extends BlockSolidMeta {
+
+    public BlockTNT() {
+        this(0);
+    }
+
+    public BlockTNT(int meta) {
+        super(meta);
+    }
+
 
     @Override
     public String getName() {

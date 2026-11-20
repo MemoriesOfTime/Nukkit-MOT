@@ -86,7 +86,7 @@ public class BossEventPacket extends DataPacket {
                         }
                         this.healthPercent = this.getLFloat();
                     case TYPE_UPDATE_PROPERTIES:
-                        this.darkenScreen = (short) this.getShort();
+                        this.darkenScreen = (short) this.getLShort();
                     case TYPE_TEXTURE:
                         this.color = (int) this.getUnsignedVarInt();
                         this.overlay = (int) this.getUnsignedVarInt();
@@ -138,7 +138,7 @@ public class BossEventPacket extends DataPacket {
                         }
                         this.putLFloat(this.healthPercent);
                     case TYPE_UPDATE_PROPERTIES:
-                        this.putShort(this.darkenScreen);
+                        this.putLShort(this.darkenScreen);
                     case TYPE_TEXTURE:
                         this.putUnsignedVarInt(this.color);
                         this.putUnsignedVarInt(this.overlay);

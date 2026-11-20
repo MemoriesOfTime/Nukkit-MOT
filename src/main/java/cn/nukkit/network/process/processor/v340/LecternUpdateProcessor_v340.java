@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.v340;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockLectern;
@@ -55,7 +56,7 @@ public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpda
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_10_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_10_0;
     }
 }

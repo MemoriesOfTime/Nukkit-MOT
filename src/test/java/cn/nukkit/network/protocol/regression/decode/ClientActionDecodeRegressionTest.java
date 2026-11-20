@@ -207,6 +207,25 @@ public class ClientActionDecodeRegressionTest extends AbstractPacketRegressionTe
         assertEquals(12345678L, nk.mapId);
     }
 
+    @ParameterizedTest(name = "MapInfoRequestPacket PIXELS v{0}")
+    @MethodSource("versionsFrom544")
+    void mapInfoRequestPixels(int protocol) {
+        var cb = new org.cloudburstmc.protocol.bedrock.packet.MapInfoRequestPacket();
+        cb.setUniqueMapId(42L);
+        // high-bit pixel value: int32 LE vs BE differ; small values would not
+        cb.getPixels().add(new org.cloudburstmc.protocol.bedrock.data.map.MapPixel(0xC0FFEE11, 7));
+        cb.getPixels().add(new org.cloudburstmc.protocol.bedrock.data.map.MapPixel(0x00AA5533, 300));
+
+        MapInfoRequestPacket nk = crossEncode(cb, MapInfoRequestPacket::new, protocol);
+
+        assertEquals(42L, nk.mapId);
+        assertEquals(2, nk.pixels.size());
+        assertEquals(0xC0FFEE11, nk.pixels.get(0).pixel);
+        assertEquals(7, nk.pixels.get(0).index);
+        assertEquals(0x00AA5533, nk.pixels.get(1).pixel);
+        assertEquals(300, nk.pixels.get(1).index);
+    }
+
     // ==================== CraftingEventPacket ====================
 
     @ParameterizedTest(name = "CraftingEventPacket v{0}")
@@ -223,7 +242,8 @@ public class ClientActionDecodeRegressionTest extends AbstractPacketRegressionTe
         CraftingEventPacket nk = crossEncode(cb, CraftingEventPacket::new, protocol);
 
         assertEquals(1, nk.windowId);
-        assertEquals(2, nk.type);
+        // CraftingType.CRAFTING is ordinal 1 on a zigzag varint wire
+        assertEquals(CraftingEventPacket.TYPE_SHAPED, nk.type);
         assertEquals(recipeId, nk.id);
         assertEquals(1, nk.input.length);
         assertEquals(1, nk.output.length);

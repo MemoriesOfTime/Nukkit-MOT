@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.Server;
@@ -28,6 +29,12 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
         Skin skin = pk.skin;
         Player player = playerHandle.player;
 
+        // 上传包不携带归属字段，只继承服务端当前账号，客户端对象自带的 udid 不可采信
+        // Skin uploads carry no ownership; inherit only the server-side current owner,
+        // never a udid supplied on the client object
+        Skin previousSkin = player.getSkin();
+        skin.setUdid(previousSkin != null ? previousSkin.getUdid() : "");
+
         if (!skin.isValid()) {
             player.getServer().getLogger().warning(playerHandle.getUsername() + ": PlayerSkinPacket with invalid skin");
             player.close("", "disconnectionScreen.invalidSkin");
@@ -42,7 +49,7 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
         player.getServer().getPluginManager().callEvent(playerChangeSkinEvent);
         if (!playerChangeSkinEvent.isCancelled()) {
             player.lastSkinChange = System.currentTimeMillis();
-            player.setSkin(skin.isPersona() && !player.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+            player.setSkin(skin.isPersona() && !player.getServer().personaSkins ? skin.getDefaultSkin() : skin);
         }
     }
 
@@ -57,7 +64,7 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_1_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_1_0;
     }
 }

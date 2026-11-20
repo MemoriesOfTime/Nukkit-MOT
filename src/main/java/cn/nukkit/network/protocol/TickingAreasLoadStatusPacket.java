@@ -6,7 +6,7 @@ import lombok.ToString;
 public class TickingAreasLoadStatusPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.TICKING_AREAS_LOAD_STATUS_PACKET;
-    boolean waitingForPreload;
+    public boolean waitingForPreload;
 
     @Override
     public byte pid() {
@@ -20,6 +20,7 @@ public class TickingAreasLoadStatusPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putBoolean(this.waitingForPreload);
     }
 }

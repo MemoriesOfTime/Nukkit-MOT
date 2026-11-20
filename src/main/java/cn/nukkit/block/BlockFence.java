@@ -12,6 +12,8 @@ import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * Created on 2015/12/7 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
@@ -72,19 +74,44 @@ public class BlockFence extends BlockTransparentMeta {
         return ItemTool.TYPE_AXE;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Oak Fence",
+            "Spruce Fence",
+            "Birch Fence",
+            "Jungle Fence",
+            "Acacia Fence",
+            "Dark Oak Fence",
+            "",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Oak Fence",
-                "Spruce Fence",
-                "Birch Fence",
-                "Jungle Fence",
-                "Acacia Fence",
-                "Dark Oak Fence",
-                "",
-                ""
-        };
-        return names[this.getDamage() & 0x07];
+        return NAMES[this.getDamage() & 0x07];
+    }
+
+    /** Post and arms instead of one stretched box; see {@link CrossCollisionShape}. */
+    private AxisAlignedBB[] collisionParts() {
+        AxisAlignedBB bounds = this.getBoundingBox();
+        if (bounds == null) {
+            return new AxisAlignedBB[0];
+        }
+        return CrossCollisionShape.parts(bounds, this.x + 0.5, this.z + 0.5, CrossCollisionShape.FENCE_POST, CrossCollisionShape.FENCE_ARM);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return CrossCollisionShape.collides(this.collisionParts(), bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? CrossCollisionShape.collides(this.collisionParts(), bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        CrossCollisionShape.addColliding(this.collisionParts(), bb, collidingBoxes);
     }
 
     @Override
@@ -117,8 +144,47 @@ public class BlockFence extends BlockTransparentMeta {
         return 20;
     }
 
+    /**
+     * 邻居朝向本方块的一面是否与栅栏相连。
+     * <p>
+     * Whether the neighbour's face towards this fence connects.
+     *
+     * @param block        相邻方块 / the neighbouring block
+     * @param neighborFace 邻居朝向本方块的那一面 / the neighbour's face touching this block
+     */
+    public boolean canConnect(Block block, BlockFace neighborFace) {
+        if (block instanceof BlockFence fence) {
+            // 木栅栏与下界砖栅栏互不连接 / wooden and nether brick fences do not connect
+            return (this instanceof BlockFenceNetherBrick) == (fence instanceof BlockFenceNetherBrick);
+        }
+        if (block instanceof BlockFenceGate gate) {
+            // 只在门板轴向（与门朝向垂直的轴）连接 / connect along the gate panel axis
+            return gate.getBlockFace().getAxis() != neighborFace.getAxis();
+        }
+        if (block instanceof BlockBorder) {
+            // 原版边界方块只有栅栏不连 / vanilla border blocks refuse fence connections
+            return false;
+        }
+        return ConnectionSupport.providesFullSupport(block, neighborFace);
+    }
+
+    /**
+     * 旧布尔入口：内部重算仍经此虚调用，保留既有插件覆写；默认按坐标推断邻居朝向本方块的面。
+     * <p>
+     * Legacy boolean entry: internal recomputation dispatches through it so existing plugin
+     * overrides keep working; by default it infers the neighbour's face towards this block.
+     */
     public boolean canConnect(Block block) {
-        return (block instanceof BlockFence || block instanceof BlockFenceGate) || block.isSolid() && !block.isTransparent();
+        BlockFace neighborFace = ConnectionSupport.faceFromNeighbor(this, block);
+        if (neighborFace != null) {
+            return this.canConnect(block, neighborFace);
+        }
+        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
+            if (this.canConnect(block, side)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isConnectedTo(BlockFace face) {

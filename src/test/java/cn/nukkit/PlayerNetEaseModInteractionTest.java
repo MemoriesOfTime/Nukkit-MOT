@@ -113,8 +113,11 @@ class PlayerNetEaseModInteractionTest {
     @Test
     void pyRpcPacketIsHandledByDataPacketProcessor() {
         new Network(MockServer.get());
+        DataPacketManager.registerDefaultProcessors();
 
-        assertTrue(DataPacketManager.canProcess(630, PyRpcPacket.class));
+        // PyRpc 为网易专属包：仅网易 GameVersion 可解析，标准同协议号不可
+        assertTrue(DataPacketManager.canProcess(GameVersion.V1_20_50_NETEASE, PyRpcPacket.class));
+        assertFalse(DataPacketManager.canProcess(GameVersion.V1_20_50, PyRpcPacket.class));
     }
 
     @Test

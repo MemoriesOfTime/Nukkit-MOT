@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
@@ -23,7 +24,7 @@ public class RequestChunkRadiusProcessor extends DataPacketProcessor<RequestChun
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RequestChunkRadiusPacket pk) {
         Player player = playerHandle.player;
         ChunkRadiusUpdatedPacket chunkRadiusUpdatePacket = new ChunkRadiusUpdatedPacket();
-        playerHandle.setChunkRadius(Math.max(3, Math.min(pk.radius, player.getViewDistance())));
+        playerHandle.setChunkRadius(Math.max(3, Math.min(pk.radius, player.getMaximumViewDistance())));
         chunkRadiusUpdatePacket.radius = playerHandle.getChunkRadius();
         player.dataPacket(chunkRadiusUpdatePacket);
     }
@@ -39,7 +40,7 @@ public class RequestChunkRadiusProcessor extends DataPacketProcessor<RequestChun
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_1_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_1_0;
     }
 }

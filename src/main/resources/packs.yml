@@ -8,8 +8,14 @@
 #        falling back to server-side chunk transfer on failure.
 #   key: 资源包加密密钥。留空表示不加密。
 #        The encryption key for this pack. Leave empty for no encryption.
+#   priority: 资源包在栈中的优先级（整数，默认 0）。优先级高的资源包位于栈的上层，
+#        覆盖下层资源包的同名内容；优先级相同的按加载顺序（文件名）排列。
+#        The stack priority of this pack (a whole number, 0 by default). A pack with a higher
+#        priority is placed higher in the stack and overrides what the packs below it define;
+#        packs of equal priority keep their load order (by file name).
 #
 #示例 / Example:
 #"00000000-0000-0000-0000-000000000000":
 #  cdn: "https://cdn.example.com/00000000-0000-0000-0000-000000000000/0.0.1.mcpack"
 #  key: "0123456789abcdefGHIJKLMNOPQRSTUV"
+#  priority: 10

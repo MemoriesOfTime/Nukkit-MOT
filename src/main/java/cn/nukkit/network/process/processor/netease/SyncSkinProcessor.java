@@ -35,6 +35,11 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
         Player player = playerHandle.player;
         Skin skin = pk.skin;
 
+        // 条目轮 2 由客户端提供，不能作为归属来源；只继承服务端当前账号
+        // Round 2 of a SyncSkin entry is client-supplied; inherit only the server-side current owner
+        Skin previousSkin = player.getSkin();
+        skin.setUdid(previousSkin != null ? previousSkin.getUdid() : "");
+
         if (!skin.isValid()) {
             // 软丢弃而非断开：线格式异常不应踢掉换肤玩家
             player.getServer().getLogger().warning(playerHandle.getUsername() + ": SyncSkinPacket with invalid skin, ignored");
@@ -50,7 +55,7 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
 
         if (!playerChangeSkinEvent.isCancelled()) {
             player.lastSkinChange = System.currentTimeMillis();
-            player.setSkin(skin.isPersona() && !player.getServer().personaSkins ? Skin.NO_PERSONA_SKIN : skin);
+            player.setSkin(skin.isPersona() && !player.getServer().personaSkins ? skin.getDefaultSkin() : skin);
         }
     }
 
@@ -65,8 +70,7 @@ public class SyncSkinProcessor extends DataPacketProcessor<SyncSkinPacket> {
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol == GameVersion.V1_21_124_NETEASE.getProtocol()
-                || protocol == GameVersion.V1_21_93_NETEASE.getProtocol();
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.isNetEase() && gameVersion.getProtocol() >= GameVersion.V1_21_93_NETEASE.getProtocol();
     }
 }

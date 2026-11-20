@@ -1,14 +1,22 @@
 package cn.nukkit;
 
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.event.player.PlayerAsyncPreLoginEvent;
 import cn.nukkit.inventory.PlayerOffhandInventory;
-import cn.nukkit.network.process.processor.common.PlayerSkinProcessor;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.process.processor.common.PlayerSkinProcessor;
+import cn.nukkit.network.process.processor.netease.SyncSkinProcessor;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.SyncSkinPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
+import cn.nukkit.utils.ClientChainData;
 import cn.nukkit.utils.LoginChainData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
@@ -67,6 +75,244 @@ class PlayerSkinLifecycleTest {
         subject.setSkin(visible);
 
         assertSame(visible, subject.getSkin());
+    }
+
+    /**
+     * 客户端换肤条目不能改写服务端已建立的账号归属。
+     * <p>
+     * A client skin-sync entry must not replace the server-established owner.
+     */
+    @Test
+    void netEaseSyncSkinRejectsEntryUdid() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+        subject.getSkin().setUdid("123456789");
+
+        SyncSkinPacket packet = new SyncSkinPacket();
+        packet.skin = validSkin("synced-skin");
+        SyncSkinPacket.SyncSkinEntry entry = new SyncSkinPacket.SyncSkinEntry();
+        entry.uuid = subject.getUniqueId();
+        entry.string1 = "987654321";
+        packet.addEntry(entry);
+
+        SyncSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+        assertEquals("synced-skin", subject.getSkin().getSkinId());
+    }
+
+    @Test
+    void netEaseSyncSkinDoesNotAcceptEntryUdidWithoutServerOwner() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+
+        SyncSkinPacket packet = new SyncSkinPacket();
+        packet.skin = validSkin("synced-skin");
+        SyncSkinPacket.SyncSkinEntry entry = new SyncSkinPacket.SyncSkinEntry();
+        entry.uuid = subject.getUniqueId();
+        entry.string1 = "987654321";
+        packet.addEntry(entry);
+
+        SyncSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertEquals("", subject.getSkin().getUdid());
+    }
+
+    /**
+     * 条目未携带 udid 时，换肤前的归属账号必须保留。
+     * <p>
+     * When the entry carries no udid, the previous owning account must be preserved.
+     */
+    @Test
+    void netEaseSyncSkinKeepsPriorUdidWhenEntryOmitsIt() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+        subject.getSkin().setUdid("123456789");
+
+        SyncSkinPacket packet = new SyncSkinPacket();
+        packet.skin = validSkin("synced-skin");
+
+        SyncSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+    }
+
+    /**
+     * 换肤上传包不带归属字段时，必须保留换肤前的账号 uid。
+     * <p>
+     * A skin upload carries no ownership field; the previous account uid must be kept.
+     */
+    @Test
+    void netEaseSkinUploadKeepsPriorUdid() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+        subject.getSkin().setUdid("123456789");
+
+        PlayerSkinPacket packet = new PlayerSkinPacket();
+        packet.skin = validSkin("uploaded-skin");
+
+        PlayerSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+    }
+
+    /**
+     * 异步预登录插件替换皮肤时，未声明的归属必须沿用当前账号。
+     * <p>
+     * When an async pre-login plugin replaces the skin, an omitted owner must inherit the current account.
+     */
+    @Test
+    void asyncPreLoginSkinReplacementKeepsOwner() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+        subject.getSkin().setUdid("123456789");
+        PlayerAsyncPreLoginEvent event = new PlayerAsyncPreLoginEvent(subject.getName(), subject.getUniqueId(),
+                subject.getLoginChainData(), subject.getSkin(), "127.0.0.1", 19132);
+        Skin replacement = validSkin("plugin-skin");
+        event.setSkin(replacement);
+
+        subject.setSkin(event.getSkin());
+
+        assertSame(replacement, subject.getSkin());
+        assertEquals("123456789", subject.getSkin().getUdid());
+    }
+
+    /**
+     * 替换为共享默认皮肤时不能把账号归属写进共享实例。
+     * <p>
+     * Replacing with the shared default must not write the account owner into the shared instance.
+     */
+    @Test
+    void sharedDefaultReplacementKeepsOwnerInIsolatedSkin() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+        subject.getSkin().setUdid("123456789");
+
+        subject.setSkin(Skin.NO_PERSONA_SKIN);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+        assertNotSame(Skin.NO_PERSONA_SKIN, subject.getSkin());
+        assertEquals("", Skin.NO_PERSONA_SKIN.getUdid());
+    }
+
+    @Test
+    void netEaseTransparentSkinUploadKeepsOwnerThroughNextUpload() {
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+        subject.getSkin().setUdid("123456789");
+        PlayerSkinPacket packet = skinUpload(subject, fullyTransparentSkin("transparent-change"));
+
+        PlayerSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+        assertFalse(subject.getSkin().isFullyTransparent());
+        assertNotSame(Skin.NO_PERSONA_SKIN, subject.getSkin());
+        assertEquals("", Skin.NO_PERSONA_SKIN.getUdid());
+        assertEquals("123456789", subject.saveAndGetNbt().getCompound("Skin").getString("SkinUDID"));
+
+        PlayerSkinPacket next = skinUpload(subject, validSkin("next-skin"));
+        PlayerSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), next);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+        assertEquals("next-skin", subject.getSkin().getSkinId());
+    }
+
+    @Test
+    void netEaseDisabledPersonaSkinUploadKeepsPriorUdid() {
+        this.server.personaSkins = false;
+        RecordingPlayer subject = newPlayer(GameVersion.V1_21_124_NETEASE, "old-skin");
+        subject.getSkin().setUdid("123456789");
+        PlayerSkinPacket packet = skinUpload(subject, skinRequiringFallback(true));
+
+        PlayerSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+        assertFalse(subject.getSkin().isPersona());
+        assertNotSame(Skin.NO_PERSONA_SKIN, subject.getSkin());
+        assertEquals("", Skin.NO_PERSONA_SKIN.getUdid());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "V1_21_93_NETEASE, false", "V1_21_93_NETEASE, true",
+            "V1_21_124_NETEASE, false", "V1_21_124_NETEASE, true",
+            "V1_21_130_NETEASE, false", "V1_21_130_NETEASE, true"
+    })
+    void netEaseLoginFallbackKeepsChainUdid(GameVersion gameVersion, boolean persona) {
+        this.server.personaSkins = false;
+        RecordingPlayer subject = newPlayer(gameVersion, "old-skin");
+        subject.spawned = false;
+        ClientChainData verified = mock(ClientChainData.class);
+        when(verified.getUsername()).thenReturn("SkinOwner");
+        when(verified.getGameVersion()).thenReturn(gameVersion.toString());
+        when(verified.isXboxAuthed()).thenReturn(true);
+        when(verified.getClientUUID("SkinOwner")).thenReturn(subject.getUniqueId());
+        when(verified.getNetEaseUID()).thenReturn(123456789L);
+
+        subject.continueVerifiedLogin(skinRequiringFallback(persona), verified);
+
+        assertTrue(subject.preLoginProcessed);
+        assertEquals("123456789", subject.getSkin().getUdid());
+        assertEquals(Skin.NO_PERSONA_SKIN.getContentFingerprint(), subject.getSkin().getContentFingerprint());
+        assertNotSame(Skin.NO_PERSONA_SKIN, subject.getSkin());
+        assertEquals("", Skin.NO_PERSONA_SKIN.getUdid());
+        assertEquals("123456789", subject.saveAndGetNbt().getCompound("Skin").getString("SkinUDID"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "V1_21_93_NETEASE, false, true", "V1_21_93_NETEASE, true, true",
+            "V1_21_124_NETEASE, false, true", "V1_21_124_NETEASE, true, true",
+            "V1_21_130_NETEASE, false, true", "V1_21_130_NETEASE, true, true",
+            "V1_21_93_NETEASE, false, false", "V1_21_93_NETEASE, true, false",
+            "V1_21_124_NETEASE, false, false", "V1_21_124_NETEASE, true, false",
+            "V1_21_130_NETEASE, false, false", "V1_21_130_NETEASE, true, false"
+    })
+    void netEaseSyncFallbackKeepsUdid(GameVersion gameVersion, boolean persona, boolean entryHasUdid) {
+        this.server.personaSkins = false;
+        RecordingPlayer subject = newPlayer(gameVersion, "old-skin");
+        subject.getSkin().setUdid("123456789");
+        RecordingPlayer viewer = newPlayer(GameVersion.V1_21_124_NETEASE, "viewer-skin");
+        registerViewer(subject, viewer);
+        SyncSkinPacket packet = new SyncSkinPacket();
+        packet.protocol = gameVersion.getProtocol();
+        packet.gameVersion = gameVersion;
+        packet.skin = skinRequiringFallback(persona);
+        if (entryHasUdid) {
+            SyncSkinPacket.SyncSkinEntry entry = new SyncSkinPacket.SyncSkinEntry();
+            entry.uuid = subject.getUniqueId();
+            entry.string1 = "987654321";
+            packet.addEntry(entry);
+        }
+
+        SyncSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+
+        assertEquals("123456789", subject.getSkin().getUdid());
+        assertEquals(Skin.NO_PERSONA_SKIN.getContentFingerprint(), subject.getSkin().getContentFingerprint());
+        PlayerSkinPacket update = assertInstanceOf(PlayerSkinPacket.class, viewer.sentPackets.get(0));
+        assertEquals("123456789", update.skin.getUdid());
+        assertEquals("123456789", subject.saveAndGetNbt().getCompound("Skin").getString("SkinUDID"));
+        assertEquals("", Skin.NO_PERSONA_SKIN.getUdid());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void netEaseFallbackOwnersAreIsolated(boolean persona) {
+        this.server.personaSkins = false;
+        RecordingPlayer first = newPlayer(GameVersion.V1_21_124_NETEASE, "first-skin");
+        first.getSkin().setUdid("123456789");
+        RecordingPlayer second = newPlayer(GameVersion.V1_21_124_NETEASE, "second-skin");
+        second.getSkin().setUdid("987654321");
+        for (RecordingPlayer subject : List.of(first, second)) {
+            PlayerSkinPacket packet = skinUpload(subject, skinRequiringFallback(persona));
+            PlayerSkinProcessor.INSTANCE.handle(new PlayerHandle(subject), packet);
+        }
+
+        assertEquals("123456789", first.getSkin().getUdid());
+        assertEquals("987654321", second.getSkin().getUdid());
+        assertNotSame(first.getSkin(), second.getSkin());
+        first.getSkin().setUdid("111111111");
+        assertEquals("987654321", second.getSkin().getUdid());
+        assertEquals("", Skin.NO_PERSONA_SKIN.getUdid());
+
+        RecordingPlayer unowned = newPlayer(GameVersion.V1_21_124_NETEASE, "unowned-skin");
+        PlayerSkinPacket packet = skinUpload(unowned, skinRequiringFallback(persona));
+        PlayerSkinProcessor.INSTANCE.handle(new PlayerHandle(unowned), packet);
+        assertSame(Skin.NO_PERSONA_SKIN, unowned.getSkin());
+        assertEquals("", unowned.getSkin().getUdid());
     }
 
     @Test
@@ -563,6 +809,21 @@ class PlayerSkinLifecycleTest {
         return skin;
     }
 
+    private static Skin skinRequiringFallback(boolean persona) {
+        Skin skin = persona ? validSkin("persona-change") : fullyTransparentSkin("transparent-change");
+        skin.setPersona(persona);
+        return skin;
+    }
+
+    private static PlayerSkinPacket skinUpload(Player player, Skin skin) {
+        PlayerSkinPacket packet = new PlayerSkinPacket();
+        packet.protocol = player.protocol;
+        packet.gameVersion = player.getGameVersion();
+        packet.uuid = player.getUniqueId();
+        packet.skin = skin;
+        return packet;
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<UUID, Player> installPlayerList(Server server) {
         try {
@@ -579,6 +840,7 @@ class PlayerSkinLifecycleTest {
     private static final class RecordingPlayer extends Player {
 
         private final List<DataPacket> sentPackets = new ArrayList<>();
+        private boolean preLoginProcessed;
 
         private RecordingPlayer(SourceInterface source) {
             super(source, 1L, new InetSocketAddress("127.0.0.1", 19132));
@@ -591,11 +853,22 @@ class PlayerSkinLifecycleTest {
             this.displayName = "Original Name";
             this.loginChainData = mock(LoginChainData.class);
             when(this.loginChainData.getXUID()).thenReturn("");
+            this.namedTag = new CompoundTag();
             // 网络构造路径不会执行 initEntity，spawnTo 需要的副手背包在此补齐。
             // The network constructor skips initEntity; spawnTo needs the offhand inventory.
             this.offhandInventory = new PlayerOffhandInventory(this);
             super.setSkin(skin);
             this.spawned = true;
+        }
+
+        private CompoundTag saveAndGetNbt() {
+            this.saveNBT();
+            return this.namedTag;
+        }
+
+        @Override
+        protected void processPreLogin() {
+            this.preLoginProcessed = true;
         }
 
         @Override

@@ -1,6 +1,7 @@
 package cn.nukkit.network.process.processor.common;
 
 import cn.nukkit.AdventureSettings;
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.event.player.PlayerKickEvent;
@@ -54,7 +55,7 @@ public class AdventureSettingsProcessor extends DataPacketProcessor<AdventureSet
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_1_0 && protocol < ProtocolInfo.v1_19_30_23;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_1_0 && gameVersion.getProtocol() < ProtocolInfo.v1_19_30_23;
     }
 }

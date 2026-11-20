@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.common;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.entity.item.EntityBoat;
@@ -43,8 +44,8 @@ public class MoveEntityAbsoluteProcessor extends DataPacketProcessor<MoveEntityA
     }
 
     @Override
-    public boolean isSupported(int protocol) {
+    public boolean isSupported(GameVersion gameVersion) {
         //1.20.60开始使用AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE
-        return protocol >= ProtocolInfo.v1_1_0 && protocol < ProtocolInfo.v1_20_60;
+        return gameVersion.getProtocol() >= ProtocolInfo.v1_1_0 && gameVersion.getProtocol() < ProtocolInfo.v1_20_60;
     }
 }

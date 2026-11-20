@@ -12,14 +12,17 @@ import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.particle.SmokeParticle;
 import cn.nukkit.level.vibration.VibrationEvent;
 import cn.nukkit.level.vibration.VibrationType;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -83,6 +86,46 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
     @Override
     public boolean canBeActivated() {
         return true;
+    }
+
+    private AxisAlignedBB[] recalculateCollisionBoxes() {
+        double rim = 2d / 16d;
+        double bottom = 5d / 16d;
+        return new AxisAlignedBB[]{
+                new SimpleAxisAlignedBB(x, y, z, x + 1d, y + bottom, z + 1d),
+                new SimpleAxisAlignedBB(x, y, z, x + rim, y + 1d, z + 1d),
+                new SimpleAxisAlignedBB(x + 1d - rim, y, z, x + 1d, y + 1d, z + 1d),
+                new SimpleAxisAlignedBB(x, y, z, x + 1d, y + 1d, z + rim),
+                new SimpleAxisAlignedBB(x, y, z + 1d - rim, x + 1d, y + 1d, z + 1d)
+        };
+    }
+
+    private boolean collidesWithCauldron(AxisAlignedBB bb) {
+        for (AxisAlignedBB collisionBox : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(collisionBox)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb) {
+        return collidesWithCauldron(bb);
+    }
+
+    @Override
+    public boolean collidesWithBB(AxisAlignedBB bb, boolean collisionBB) {
+        return collisionBB ? collidesWithCauldron(bb) : super.collidesWithBB(bb, false);
+    }
+
+    @Override
+    public void addCollisionBoxesToList(AxisAlignedBB bb, List<AxisAlignedBB> collidingBoxes) {
+        for (AxisAlignedBB collisionBox : recalculateCollisionBoxes()) {
+            if (bb.intersectsWith(collisionBox)) {
+                collidingBoxes.add(collisionBox);
+            }
+        }
     }
 
     public boolean isFull() {

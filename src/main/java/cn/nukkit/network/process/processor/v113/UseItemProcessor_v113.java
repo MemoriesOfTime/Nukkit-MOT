@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.v113;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
@@ -111,8 +112,15 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacket_v11
                 return;
             }
 
-            if (item instanceof ProjectileItem) {
-                item.onClickAir(player, aimPos);
+            // 旧客户端没有事务流：即时使用要在这里分派并回写库存，按住类物品仍走 setUsingItem。
+            // Legacy clients have no transaction stream: dispatch the instant use and commit the stack here;
+            // hold-to-use items keep the setUsingItem path.
+            if (item instanceof ProjectileItem || !item.canRelease()) {
+                if (item.onClickAir(player, aimPos) && (player.isSurvival() || player.isAdventure())
+                        && (item.getId() == 0 || player.getInventory().getItemInHandFast().getId() == item.getId())) {
+                    player.getInventory().setItemInHand(item);
+                    player.getInventory().sendHeldItem(player.hasSpawned.values());
+                }
             }
 
             player.setUsingItem(true);
@@ -130,7 +138,7 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacket_v11
     }
 
     @Override
-    public boolean isSupported(int protocol) {
-        return protocol < ProtocolInfo.v1_2_0;
+    public boolean isSupported(GameVersion gameVersion) {
+        return gameVersion.getProtocol() < ProtocolInfo.v1_2_0;
     }
 }
