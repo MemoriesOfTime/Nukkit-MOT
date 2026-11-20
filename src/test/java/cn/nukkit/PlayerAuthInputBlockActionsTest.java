@@ -28,6 +28,7 @@ import org.cloudburstmc.protocol.bedrock.data.ClientPlayMode;
 import org.cloudburstmc.protocol.bedrock.data.InputInteractionModel;
 import org.cloudburstmc.protocol.bedrock.data.InputMode;
 import org.cloudburstmc.protocol.bedrock.data.PlayerAuthInputData;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -124,6 +125,21 @@ class PlayerAuthInputBlockActionsTest extends AbstractPacketRegressionTest {
         assertEquals(List.of("break:1", "break:2", "start:3"), harness.trace,
                 "snapshot mutations must not change replay or trigger lossy legacy-map fallback");
         harness.assertRestoredLayers(List.of());
+    }
+
+    @Test void emptyActionsReuseImmutableResult() {
+        var packet=new PlayerAuthInputPacket();
+        assertSame(packet.getDecodedBlockActions(),packet.getDecodedBlockActions());
+        assertSame(Player.orderBlockActions(List.of()),Player.orderBlockActions(List.of()));
+        assertThrows(UnsupportedOperationException.class,()->Player.orderBlockActions(List.of()).add(
+                new PlayerBlockActionData(PlayerActionType.START_DESTROY_BLOCK,new BlockVector3(),1)));
+    }
+    @Test void legacyMapActionsRemainAvailableForFallback() {
+        var packet=new PlayerAuthInputPacket();
+        var action=new PlayerBlockActionData(PlayerActionType.START_DESTROY_BLOCK,new BlockVector3(),1);
+        packet.getBlockActionData().put(action.getAction(),action);
+        assertTrue(packet.getDecodedBlockActions().isEmpty());
+        assertEquals(List.of(action),Player.orderBlockActions(packet.getBlockActionData().values()));
     }
 
     private static Stream<Arguments> legacyMapEdits() {

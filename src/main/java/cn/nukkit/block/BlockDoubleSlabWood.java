@@ -39,19 +39,20 @@ public class BlockDoubleSlabWood extends BlockSolidMeta {
         return ItemTool.TYPE_AXE;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Oak",
+            "Spruce",
+            "Birch",
+            "Jungle",
+            "Acacia",
+            "Dark Oak",
+            "",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Oak",
-                "Spruce",
-                "Birch",
-                "Jungle",
-                "Acacia",
-                "Dark Oak",
-                "",
-                ""
-        };
-        return "Double " + names[this.getDamage() & 0x07] + " Slab";
+        return "Double " + NAMES[this.getDamage() & 0x07] + " Slab";
     }
 
     @Override

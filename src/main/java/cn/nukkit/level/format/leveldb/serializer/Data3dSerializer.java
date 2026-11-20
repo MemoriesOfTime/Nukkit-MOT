@@ -8,6 +8,7 @@ import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.Utils;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
@@ -19,7 +20,7 @@ public class Data3dSerializer {
     public static void serialize(WriteBatch db, LevelDBChunk chunk) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
 
-        ByteBuf buffer  = Unpooled.buffer();
+        ByteBuf buffer  = PooledByteBufAllocator.DEFAULT.heapBuffer();
         try {
             short[] heightMap = chunk.getHeightMapArray();
             for (int height : heightMap) {

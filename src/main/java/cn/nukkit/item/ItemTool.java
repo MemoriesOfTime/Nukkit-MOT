@@ -39,7 +39,7 @@ public abstract class ItemTool extends Item implements ItemDurable {
     public static final int DURABILITY_BOW = 385;
     public static final int DURABILITY_CROSSBOW = 385;
     public static final int DURABILITY_TRIDENT = 251;
-    public static final int DURABILITY_FISHING_ROD = 65;
+    public static final int DURABILITY_FISHING_ROD = 385;
     public static final int DURABILITY_CARROT_ON_A_STICK = 25;
     public static final int DURABILITY_WARPED_FUNGUS_ON_A_STICK = 100;
     public static final int DURABILITY_SHIELD = 337;

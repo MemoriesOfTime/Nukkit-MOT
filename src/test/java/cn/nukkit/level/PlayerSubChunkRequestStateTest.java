@@ -22,6 +22,44 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class PlayerSubChunkRequestStateTest {
 
+    @Test
+    void failedSectionIsNotDeliveredByItsSuccessfulNeighbor() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(1, 2);
+        state.onColumnSent(column, 100, true);
+        state.addOutstandingOffsets(column, 2);
+        state.releaseOutstandingOffsets(column, 1, -4);
+        state.completeOutstandingOffsets(column, 1, 4);
+        assertFalse(state.isColumnDataReady(column, 101, 200));
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1, 0);
+        assertFalse(state.isColumnDataReady(column, 102, 200), "another absolute section cannot clear -4");
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1, -4);
+        assertTrue(state.isColumnDataReady(column, 103, 200));
+    }
+
+    @Test
+    void replacementShellAndLifecycleResetRetireMissingSectionReceipts() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        long column = Level.chunkHash(1, 2);
+        state.onColumnSent(column, 100, true);
+        Object first = state.columnReceipt(column);
+        state.addOutstandingOffsets(column, 1);
+        state.releaseOutstandingOffsets(column, 1, -4);
+        state.onColumnSent(column, 110, true);
+        assertNotSame(first, state.columnReceipt(column));
+        state.addOutstandingOffsets(column, 1);
+        state.completeOutstandingOffsets(column, 1, 4);
+        assertTrue(state.isColumnDataReady(column, 111, 200));
+        state.forgetColumn(column);
+        assertNull(state.columnReceipt(column));
+        state.onColumnSent(column, 120, true);
+        state.clear();
+        assertNull(state.columnReceipt(column));
+        assertTrue(state.isColumnDataReady(column, 121, 200));
+    }
+
     private static SubChunkRequestPacket request(int offsets) {
         SubChunkRequestPacket pk = new SubChunkRequestPacket();
         pk.dimension = 0;
@@ -148,8 +186,7 @@ public class PlayerSubChunkRequestStateTest {
         for (int i = 0; i < 256; i++) {
             assertTrue(state.tryDefer(request(1)));
         }
-        // 超限丢弃新请求，客户端会重新请求 / over the cap the new request is dropped
-        // (the client re-requests)
+        // over the cap the new request is refused
         assertFalse(state.tryDefer(request(1)));
         assertEquals(256, state.deferredPacketCount());
     }
@@ -276,6 +313,38 @@ public class PlayerSubChunkRequestStateTest {
         state.clear();
         assertEquals(0, state.deferredMissHashCount());
         assertTrue(state.tryDeferMissBatch(new long[]{1}), "clear resets the backlog");
+    }
+
+    @Test
+    public void rejectedBacklogIsCappedAndClearResets() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        assertTrue(state.tryReject(request(65536)));
+        assertFalse(state.tryReject(request(1)), "over the offset cap the request is refused");
+
+        state.clear();
+        assertFalse(state.hasRejected());
+        for (int i = 0; i < 256; i++) {
+            assertTrue(state.tryReject(request(1)));
+        }
+        assertFalse(state.tryReject(request(1)), "over the packet cap the request is refused");
+    }
+
+    @Test
+    public void rejectedResidualReturnsToTheHead() {
+        PlayerSubChunkRequestState state = new PlayerSubChunkRequestState();
+        SubChunkRequestPacket first = request(2);
+        SubChunkRequestPacket second = request(1);
+        assertTrue(state.tryReject(first));
+        assertTrue(state.tryReject(second));
+
+        assertSame(first, state.pollRejected());
+        SubChunkRequestPacket residual = request(1);
+        state.pushRejectedFront(residual);
+
+        assertSame(residual, state.pollRejected());
+        assertSame(second, state.pollRejected());
+        assertNull(state.pollRejected());
+        assertTrue(state.tryReject(request(65536)), "polling returns the offsets to the cap");
     }
 
     @Test

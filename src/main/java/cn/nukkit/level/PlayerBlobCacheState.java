@@ -129,6 +129,9 @@ public class PlayerBlobCacheState {
      * release here too.
      */
     public void resolve(long hash) {
+        if (!this.pending.contains(hash)) {
+            return;
+        }
         boolean inAnyTransaction = false;
         for (Transaction tx : this.transactions) {
             if (tx.hashes.remove(hash)) {

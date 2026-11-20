@@ -58,12 +58,12 @@ class RandomTickBatchTest {
         assertTrue(section.mayHaveRandomTickBlocks());
         CountingLock reads = countReads(section);
         new LevelFixture(section, 1).tick();
-        assertEquals(1, reads.acquisitions, "one attempt retains the original single-read path");
-        assertEquals(1, reads.releases);
+        assertEquals(0, reads.acquisitions, "the single read is a lock-free section read");
+        assertEquals(0, reads.releases);
         reads.acquisitions = reads.releases = 0;
         new LevelFixture(section, 17).tick();
-        assertEquals(2, reads.acquisitions, "sixteen batched reads plus the final ordinary read");
-        assertEquals(2, reads.releases);
+        assertEquals(1, reads.acquisitions, "sixteen batched reads plus one lock-free ordinary read");
+        assertEquals(1, reads.releases);
         assertEquals(0, reads.held);
     }
 
@@ -159,8 +159,9 @@ class RandomTickBatchTest {
             assertTrue(point[2] >= -48 && point[2] < -32);
         }
         verify(callback, times(3)).onUpdate(Level.BLOCK_UPDATE_RANDOM);
-        assertEquals(3, reads.acquisitions, "each active block is returned before another sample is read");
-        assertEquals(3, reads.releases);
+        assertEquals(2, reads.acquisitions,
+                "the first two active blocks end a batch each; the third comes from the lock-free ordinary read");
+        assertEquals(2, reads.releases);
     }
 
     @Test

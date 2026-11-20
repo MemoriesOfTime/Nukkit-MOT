@@ -189,23 +189,30 @@ public class CraftingTransaction extends InventoryTransaction {
     @Override
     public boolean execute() {
         if (super.execute()) {
-            switch (this.primaryOutput.getId()) {
-                case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
-                case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
-                case Item.FURNACE -> source.awardAchievement("buildFurnace");
-                case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
-                case Item.BREAD -> source.awardAchievement("makeBread");
-                case Item.CAKE -> source.awardAchievement("bakeCake");
-                case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
-                    Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
-                case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
-                case Item.DIAMOND -> source.awardAchievement("diamond");
-            }
-
+            awardCraftingAchievement(source, this.primaryOutput);
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * 仅在合成成功结算后调用，供事务与旧版独立结算路径共享成就规则。
+     * Shares achievement rules between transaction and legacy paths after successful settlement.
+     */
+    public static void awardCraftingAchievement(Player source, Item result) {
+        switch (result.getId()) {
+            case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
+            case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
+            case Item.FURNACE -> source.awardAchievement("buildFurnace");
+            case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
+            case Item.BREAD -> source.awardAchievement("makeBread");
+            case Item.CAKE -> source.awardAchievement("bakeCake");
+            case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
+                Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+            case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
+            case Item.DIAMOND -> source.awardAchievement("diamond");
+        }
     }
 
     @Override
