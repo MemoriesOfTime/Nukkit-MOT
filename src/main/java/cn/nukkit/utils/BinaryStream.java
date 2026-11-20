@@ -2866,7 +2866,14 @@ public class BinaryStream {
                 case 1: // DEFAULT
                     String idName = getString();
                     int auxValue = getVarInt();
-                    int itemId = cn.nukkit.item.Item.fromString(idName).getId();
+                    int itemId;
+                    try {
+                        cn.nukkit.item.Item descriptorItem = cn.nukkit.item.Item.fromString(idName);
+                        itemId = descriptorItem == null ? cn.nukkit.item.Item.AIR : descriptorItem.getId();
+                    } catch (NumberFormatException e) {
+                        // Invalid numeric metadata must not abort the entire request batch.
+                        itemId = cn.nukkit.item.Item.AIR;
+                    }
                     descriptor = new DefaultDescriptor(itemId, auxValue);
                     break;
                 case 2: // MOLANG

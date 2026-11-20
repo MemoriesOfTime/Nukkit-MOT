@@ -4406,6 +4406,44 @@ public class MiscDecodeRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(nk.getCount(), nk.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
     }
 
+    @Test
+    void itemStackRequestV2168AutoCraftUnknownAndMalformedIngredientIdentifiersFallBackToAir() {
+        ItemStackRequestPacket packet = decodeRawItemStackRequestPacket(ProtocolInfo.v1_26_40, stream -> {
+            stream.putUnsignedVarInt(1);   // requests
+            stream.putVarInt(201);          // requestId
+            stream.putUnsignedVarInt(1);   // actions
+            stream.putUnsignedVarInt(11);  // CRAFT_RECIPE_AUTO
+            stream.putByte((byte) 13);      // duplicate type byte
+            stream.putUnsignedVarInt(100); // recipeNetworkId
+            stream.putByte((byte) 1);       // repetitions
+            stream.putUnsignedVarInt(2);   // ingredients
+            stream.putUnsignedVarInt(1);   // DEFAULT descriptor
+            stream.putByte((byte) 1);       // duplicate descriptor type
+            stream.putString("minecraft:unknown_identifier");
+            stream.putVarInt(0);            // aux
+            stream.putLShort(1);            // count
+            stream.putUnsignedVarInt(1);   // DEFAULT descriptor
+            stream.putByte((byte) 1);       // duplicate descriptor type
+            stream.putString("minecraft:stick:32768"); // metadata does not fit in a short
+            stream.putVarInt(0);            // aux
+            stream.putLShort(1);            // count
+            stream.putUnsignedVarInt(0);   // filter strings
+            stream.putLInt(-1);             // no text processing origin
+        });
+
+        var request = packet.getRequests().get(0);
+        var auto = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.itemstack.request.action.AutoCraftRecipeAction.class,
+                request.getActions()[0]);
+        assertEquals(2, auto.getIngredients().size());
+        var unknownDescriptor = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.descriptor.DefaultDescriptor.class,
+                auto.getIngredients().get(0).getDescriptor());
+        assertEquals(cn.nukkit.item.Item.AIR, unknownDescriptor.getItemId());
+        var malformedDescriptor = assertInstanceOf(cn.nukkit.network.protocol.types.inventory.descriptor.DefaultDescriptor.class,
+                auto.getIngredients().get(1).getDescriptor());
+        assertEquals(cn.nukkit.item.Item.AIR, malformedDescriptor.getItemId());
+        assertEquals(packet.getCount(), packet.getOffset(), "ItemStackRequestPacket decode should consume the full payload");
+    }
+
     private ItemStackRequestPacket decodeRawItemStackRequestPacket(int protocol, Consumer<BinaryStream> packetBodyWriter) {
         var packet = new ItemStackRequestPacket();
         packet.protocol = protocol;
