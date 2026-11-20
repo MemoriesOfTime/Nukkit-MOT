@@ -53,6 +53,7 @@ class LevelGeneratorRetentionTest {
         set(level, "server", server);
         set(level, "provider", provider);
         set(level, "providerLock", new ReentrantReadWriteLock());
+        set(level, "pendingChunkLoads", new java.util.concurrent.ConcurrentHashMap<>());
         set(level, "generatorClass", TestGenerator.class);
         set(level, "generators", new WeakHashMap<Thread, Generator>());
         set(level, "dimensionData", new DimensionData(0, -64, 319));

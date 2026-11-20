@@ -53,6 +53,7 @@ public final class ItemStackRequestHandler {
         register(new CraftLoomActionProcessor());
         register(new CraftResultDeprecatedActionProcessor());
         register(new CraftNonImplementedActionProcessor());
+        register(new CraftReservedActionProcessor());
         register(new MineBlockActionProcessor());
         register(new LabTableCombineActionProcessor());
         register(new BeaconPaymentActionProcessor());

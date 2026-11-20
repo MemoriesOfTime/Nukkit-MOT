@@ -56,6 +56,8 @@ public class BlockUpdateEntry implements Comparable<BlockUpdateEntry> {
 
     @Override
     public int hashCode() {
-        return this.pos.hashCode();
+        // Equal coordinates may be represented by Block or Vector3, whose hashes differ.
+        // Use the coordinate hash, independent of the concrete position's override.
+        return ((int) this.pos.x ^ ((int) this.pos.z << 12)) ^ ((int) this.pos.y << 24);
     }
 }

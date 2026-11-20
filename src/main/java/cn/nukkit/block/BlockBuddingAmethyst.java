@@ -38,7 +38,7 @@ public class BlockBuddingAmethyst extends BlockSolid {
         if (type != Level.BLOCK_UPDATE_RANDOM || ThreadLocalRandom.current().nextInt(4) != 0) {
             return type;
         }
-        BlockFace face = BlockFace.values()[ThreadLocalRandom.current().nextInt(BlockFace.values().length)];
+        BlockFace face = BlockFace.random(ThreadLocalRandom.current());
         Block block = this.getSide(face);
         BlockAmethystBud targetBlock = null;
         if (block.getId() == AIR || ((block.getId() == WATER || block.getId() == STILL_WATER) && block.getDamage() == 8)) {

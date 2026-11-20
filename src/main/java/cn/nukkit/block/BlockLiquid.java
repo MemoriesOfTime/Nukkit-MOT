@@ -195,10 +195,39 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                     !this.canFlowInto(this.level.getBlock((int) this.x, (int) this.y + 1, (int) this.z + 1)) ||
                     !this.canFlowInto(this.level.getBlock((int) this.x - 1, (int) this.y + 1, (int) this.z)) ||
                     !this.canFlowInto(this.level.getBlock((int) this.x + 1, (int) this.y + 1, (int) this.z))) {
-                vector = vector.normalize().add(0, -6, 0);
+                // This exact Vector3 remains private until the final flow cache assignment.
+                // Keep normalize() divisions and its positive-zero fallback before adding gravity.
+                double fallingLengthSquared = vector.lengthSquared();
+                if (fallingLengthSquared > 0) {
+                    double fallingLength = Math.sqrt(fallingLengthSquared);
+                    vector.x /= fallingLength;
+                    vector.y /= fallingLength;
+                    vector.z /= fallingLength;
+                } else {
+                    vector.x = 0;
+                    vector.y = 0;
+                    vector.z = 0;
+                }
+                // Keep add() arithmetic, including signed zero, without its temporary vector.
+                vector.x += 0;
+                vector.y += -6;
+                vector.z += 0;
             }
         }
-        return this.flowVector = vector.normalize();
+        // This exact Vector3 is private to this calculation until the final cache assignment.
+        // Preserve normalize() arithmetic and its positive-zero result for zero/NaN length.
+        double lengthSquared = vector.lengthSquared();
+        if (lengthSquared > 0) {
+            double length = Math.sqrt(lengthSquared);
+            vector.x /= length;
+            vector.y /= length;
+            vector.z /= length;
+        } else {
+            vector.x = 0;
+            vector.y = 0;
+            vector.z = 0;
+        }
+        return this.flowVector = vector;
     }
 
     @Override

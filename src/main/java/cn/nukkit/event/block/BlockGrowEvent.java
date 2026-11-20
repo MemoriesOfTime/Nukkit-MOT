@@ -17,6 +17,7 @@ public class BlockGrowEvent extends BlockEvent implements Cancellable {
     }
 
     private final Block newState;
+    private final Block source;
 
     /**
      * Called on block grow.
@@ -24,8 +25,23 @@ public class BlockGrowEvent extends BlockEvent implements Cancellable {
      * @param newState New state of the affected block.
      */
     public BlockGrowEvent(Block block, Block newState) {
+        this(block, null, newState);
+    }
+
+    /**
+     * Called when growth has an explicit source distinct from the affected block.
+     * @param block Block affected by the event; existing target semantics are unchanged.
+     * @param source Actual source of this growth, or null when the caller cannot provide it.
+     * @param newState New state of the affected block.
+     */
+    public BlockGrowEvent(Block block, Block source, Block newState) {
         super(block);
+        this.source = source;
         this.newState = newState;
+    }
+
+    public Block getSource() {
+        return source;
     }
 
     public Block getNewState() {

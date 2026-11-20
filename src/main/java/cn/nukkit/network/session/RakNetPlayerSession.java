@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
 import com.nukkitx.natives.util.Natives;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -99,6 +100,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
     private boolean compressionInitialized;
+    /** 已因缺少压缩前缀断开；置位后不再为每个 batch 记一次失败。 Set once the session closed for a missing prefix, so later batches stay quiet. */
+    private boolean prefixUnavailableClosed;
 
     private SecretKey encryptionKey;
     private Cipher encryptionCipher;
@@ -142,6 +145,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         this.state.getSecurity().setCompressionOut(this.compressionOut);
         this.state.getSecurity().setCompressionInitialized(false);
         this.state.getSecurity().setPrefixedCompression(protocolVersion >= 11);
+        // A rejected RakNet handshake may close before channelInactive can be delivered.
+        // Stop the repeating task on terminal close without changing disconnect timing or reasons.
+        this.channel.closeFuture().addListener(future -> this.tickFuture.cancel(false));
     }
 
     @Override
@@ -364,7 +370,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
         try {
             this.drainDeferredInbound();
-            List<DataPacket> toBatch = new ObjectArrayList<>();
+            List<DataPacket> toBatch = null;
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
                 if (packet instanceof DisconnectPacket) {
@@ -381,18 +387,21 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     }
                     return; // Disconnected
                 } else if (packet instanceof BatchPacket) {
-                    if (!toBatch.isEmpty()) {
+                    if (toBatch != null && !toBatch.isEmpty()) {
                         this.sendPackets(toBatch);
                         toBatch.clear();
                     }
 
                     this.sendPacket(((BatchPacket) packet).payload);
                 } else {
+                    if (toBatch == null) {
+                        toBatch = new ObjectArrayList<>();
+                    }
                     toBatch.add(packet);
                 }
             }
 
-            if (!toBatch.isEmpty()) {
+            if (toBatch != null && !toBatch.isEmpty()) {
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
@@ -484,8 +493,13 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
+        if (ci && !this.compressionOut.supportsPrefix()) {
+            return this.failUnsupportedPrefix();
+        }
 
-        ByteBuf finalPayload = Unpooled.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
+        // 池化直连缓冲：每批次新建 direct ByteBuffer 会在全局 Cleaner 锁上排队，拖慢所有网络事件循环。
+        // Pooled direct buffer: a fresh direct ByteBuffer per batch queues on the global Cleaner lock and stalls every event loop.
+        ByteBuf finalPayload = PooledByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
 
         if (this.encryptionCipher != null) {
@@ -514,6 +528,26 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
 
         return this.channel.writeAndFlush(finalPayload);
+    }
+
+    /**
+     * 协商出的编码写不出 ≥1.20.60 的前缀：客户端 RakNet 版本与游戏版本互相矛盾，继续发只会逐批静默丢包。
+     * <p>The negotiated codec cannot emit the ≥1.20.60 prefix: the client's RakNet version and game version
+     * contradict each other, and every further batch would be dropped silently.
+     */
+    private ChannelFuture failUnsupportedPrefix() {
+        if (!this.prefixUnavailableClosed) {
+            this.prefixUnavailableClosed = true;
+            log.error("Closing session {}: compression {} has no batch prefix but protocol {} requires one (raknetProtocol={})",
+                    this.playerLabel(), this.compressionOut, this.getBedrockProtocol(),
+                    this.state.getProtocol().getRaknetProtocol());
+            this.disconnect("Your client does not support this game version over this connection");
+        }
+        // 批次未写出：必须如实失败，否则 DIRECT_WRITE 监听器会按成功执行回调（如在断连后启用加密并改写登录相位）
+        // The batch was never written: report honest failure, or DIRECT_WRITE listeners run success
+        // callbacks (e.g. enabling encryption after the disconnect and rewriting the login phase)
+        return this.channel.newFailedFuture(
+                new CompressionPrefixUnavailableException(this.compressionOut, this.getBedrockProtocol()));
     }
 
     @Override
