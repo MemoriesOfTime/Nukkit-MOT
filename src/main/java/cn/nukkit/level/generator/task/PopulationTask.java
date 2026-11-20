@@ -15,6 +15,8 @@ public class PopulationTask extends AsyncTask {
 
     private final long seed;
     private final Level level;
+    private final int centerX;
+    private final int centerZ;
     private boolean state;
     private BaseFullChunk centerChunk;
     private boolean isPopulated;
@@ -25,6 +27,8 @@ public class PopulationTask extends AsyncTask {
         this.state = true;
         this.level = level;
         this.centerChunk = chunk;
+        this.centerX = chunk.getX();
+        this.centerZ = chunk.getZ();
         this.seed = level.getSeed();
 
         chunks[4] = chunk;
@@ -42,7 +46,15 @@ public class PopulationTask extends AsyncTask {
 
     @Override
     public void onRun() {
-        syncGen(0);
+        try {
+            syncGen(0);
+        } catch (Throwable failure) {
+            this.state = false;
+            Server server = Server.getInstance();
+            if (server != null) {
+                server.getLogger().error("Population task failed for chunk " + this.centerX + ", " + this.centerZ, failure);
+            }
+        }
     }
 
     private void syncGen(int i) {
@@ -108,12 +120,13 @@ public class PopulationTask extends AsyncTask {
                 if (!isPopulated) {
                     generator.populateChunk(centerChunk.getX(), centerChunk.getZ());
                     centerChunk = manager.getChunk(centerChunk.getX(), centerChunk.getZ());
+                    // Published before the light phase for onCompletion's retry
+                    this.centerChunk = centerChunk;
                     centerChunk.setPopulated();
                     centerChunk.recalculateHeightMap();
                     centerChunk.populateSkyLight();
                     centerChunk.populateBlockLight();
                     centerChunk.setLightPopulated();
-                    this.centerChunk = centerChunk;
                 }
 
                 manager.setChunk(centerChunk.getX(), centerChunk.getZ());
@@ -141,6 +154,14 @@ public class PopulationTask extends AsyncTask {
     public void onCompletion(Server server) {
         if (level != null) {
             if (!this.state) {
+                BaseFullChunk centerChunk = this.centerChunk;
+                // Decorated but unlit: retry light only
+                if (!this.isPopulated && centerChunk != null && centerChunk.isPopulated()
+                        && !centerChunk.isLightPopulated()) {
+                    level.scheduleChunkLightRetry(this.centerX, this.centerZ, centerChunk);
+                    return;
+                }
+                level.abandonChunkPopulation(this.centerX, this.centerZ);
                 return;
             }
 

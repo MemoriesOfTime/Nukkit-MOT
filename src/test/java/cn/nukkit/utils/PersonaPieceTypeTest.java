@@ -14,7 +14,10 @@ class PersonaPieceTypeTest {
 
     @Test
     void ordinalMatchesV2168Protocol() {
-        // 序数必须与 CloudburstMC/pm1e 的枚举顺序一致，否则 v2168 二进制编解码错位
+        // 序数必须与 CloudburstMC/pm1e 的枚举顺序一致，否则 v2168 二进制编解码错位；
+        // v2225 起 EMOTE 后插入 COCO(28)，UNSUPPORTED 顺延为 29
+        // Ordinals must match the CloudburstMC/pm1e order; since v2225 COCO(28) sits after
+        // EMOTE and UNSUPPORTED shifts to 29
         assertEquals(0, PersonaPieceType.UNKNOWN.ordinal());
         assertEquals(1, PersonaPieceType.SKELETON.ordinal());
         assertEquals(2, PersonaPieceType.BODY.ordinal());
@@ -23,8 +26,9 @@ class PersonaPieceTypeTest {
         assertEquals(25, PersonaPieceType.CAPES.ordinal());
         assertEquals(26, PersonaPieceType.CLASSIC_SKIN.ordinal());
         assertEquals(27, PersonaPieceType.EMOTE.ordinal());
-        assertEquals(28, PersonaPieceType.UNSUPPORTED.ordinal());
-        assertEquals(29, PersonaPieceType.values().length, "total constant count");
+        assertEquals(28, PersonaPieceType.COCO.ordinal());
+        assertEquals(29, PersonaPieceType.UNSUPPORTED.ordinal());
+        assertEquals(30, PersonaPieceType.values().length, "total constant count");
     }
 
     @Test
@@ -34,11 +38,13 @@ class PersonaPieceTypeTest {
         assertEquals(PersonaPieceType.EYES, PersonaPieceType.fromName("eyes"));
         assertEquals(PersonaPieceType.HANDS, PersonaPieceType.fromName("hands"));
         assertEquals(PersonaPieceType.CLASSIC_SKIN, PersonaPieceType.fromName("classicskin"));
+        assertEquals(PersonaPieceType.COCO, PersonaPieceType.fromName("coco"));
         // type（persona_ 前缀）格式
         assertEquals(PersonaPieceType.BODY, PersonaPieceType.fromName("persona_body"));
         assertEquals(PersonaPieceType.EYES, PersonaPieceType.fromName("persona_eyes"));
         assertEquals(PersonaPieceType.HANDS, PersonaPieceType.fromName("persona_hand"));
         assertEquals(PersonaPieceType.CLASSIC_SKIN, PersonaPieceType.fromName("persona_classic_skin"));
+        assertEquals(PersonaPieceType.COCO, PersonaPieceType.fromName("persona_coco"));
     }
 
     @Test
@@ -51,9 +57,11 @@ class PersonaPieceTypeTest {
 
     @Test
     void fromOrdinalIsSafeForOutOfRange() {
-        // 越界序数（恶意/损坏数据）必须回退 UNKNOWN，而非抛 ArrayIndexOutOfBoundsException
+        // 越界序数（恶意/损坏数据）必须回退 UNKNOWN，而非抛 ArrayIndexOutOfBoundsException；
+        // v2225 后 UNSUPPORTED=29 在界内
+        // Out-of-range ordinals must fall back to UNKNOWN; since v2225 UNSUPPORTED=29 is in range
         assertEquals(PersonaPieceType.UNKNOWN, PersonaPieceType.fromOrdinal(-1));
-        assertEquals(PersonaPieceType.UNKNOWN, PersonaPieceType.fromOrdinal(29));
+        assertEquals(PersonaPieceType.UNKNOWN, PersonaPieceType.fromOrdinal(30));
         assertEquals(PersonaPieceType.UNKNOWN, PersonaPieceType.fromOrdinal(Integer.MAX_VALUE));
         // 正常序数往返
         for (PersonaPieceType t : PersonaPieceType.values()) {

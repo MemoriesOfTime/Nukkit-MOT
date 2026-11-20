@@ -206,10 +206,12 @@ public class Binary {
                         int display = ((IntEntityData) d).getData();
                         if (display == 0) {
                             entryStream.putVarInt(0);
-                        } else {
+                        } else if (protocol >= ProtocolInfo.v1_2_13) {
                             int legacyId = display & 0xFFFF;
                             int meta = (display >> 16) & 0xFFFF;
                             entryStream.putVarInt(GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, legacyId, meta));
+                        } else {
+                            entryStream.putVarInt(display);
                         }
                     } else {
                         entryStream.putVarInt(((IntEntityData) d).getData());
@@ -343,7 +345,7 @@ public class Binary {
     }
 
     public static boolean readBool(byte b) {
-        return b == 0;
+        return b != 0;
     }
 
     public static byte writeBool(boolean b) {
@@ -351,7 +353,7 @@ public class Binary {
     }
 
     public static int readSignedByte(byte b) {
-        return b & 0xFF;
+        return b;
     }
 
     public static byte writeByte(byte b) {

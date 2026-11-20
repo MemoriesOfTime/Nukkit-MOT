@@ -3,18 +3,18 @@ package cn.nukkit.utils;
 import cn.nukkit.MockServer;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.level.Level;
 import cn.nukkit.level.DimensionData;
-import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
 
 class CollisionStatePairTest {
     @BeforeAll static void init() { MockServer.init(); }
@@ -134,9 +134,48 @@ class CollisionStatePairTest {
         assertEquals(9001, found.getDamage());
     }
 
+    @Test void insideBlockUsesMaterializedIdForCustomFactory() throws Exception {
+        Fixture f = new Fixture(false, false, false);
+        int id = cn.nukkit.block.custom.CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID + 994;
+        java.lang.reflect.Field field = cn.nukkit.block.custom.CustomBlockManager.class.getDeclaredField("legacy2CustomState");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        var states = (it.unimi.dsi.fastutil.ints.Int2ObjectMap<cn.nukkit.block.custom.CustomBlockState>)
+                field.get(cn.nukkit.block.custom.CustomBlockManager.get());
+        int key = id << Block.DATA_BITS;
+        var previous = states.put(key, new cn.nukkit.block.custom.CustomBlockState(
+                "test:pair_lava", key, org.cloudburstmc.nbt.NbtMap.EMPTY, meta -> new CustomLava()));
+        try {
+            f.storage.set(0, BlockStateSnapshot.builder().legacyId(id).legacyData(0).build());
+            assertTrue(f.helper.isInsideBlock(new SimpleAxisAlignedBB(0.1, 0.1, 0.1, 0.9, 0.9, 0.9), Block.LAVA));
+        } finally {
+            if (previous == null) states.remove(key); else states.put(key, previous);
+        }
+    }
+
+    @Test void insideBlockKeepsCustomSectionStateOverride() {
+        Fixture f = new Fixture(false, true, false);
+        doReturn(Block.STONE).when(f.section).getBlockId(0, 0, 0, 0);
+        doReturn(new int[]{Block.LAVA, 0}).when(f.section).getBlockState(0, 0, 0, 0);
+        assertTrue(f.helper.isInsideBlock(new SimpleAxisAlignedBB(0.1, 0.1, 0.1, 0.9, 0.9, 0.9), Block.LAVA));
+    }
+
+    @Test void insideBlockSkipsNonMatchingBuiltinBlocksWithoutMaterializing() {
+        Fixture f = new Fixture(false, false, false);
+        f.storage.set(0, BlockStateSnapshot.builder().legacyId(Block.STONE).legacyData(0).build());
+        assertFalse(f.helper.isInsideBlock(new SimpleAxisAlignedBB(0.1, 0.1, 0.1, 0.9, 0.9, 0.9), Block.LAVA));
+        verify(f.section, never()).getBlockStatePair(anyInt(), anyInt(), anyInt(), anyInt());
+        verify(f.section, never()).getBlockState(anyInt(), anyInt(), anyInt(), anyInt());
+    }
+
     static class CachedStone extends cn.nukkit.block.BlockStone implements cn.nukkit.block.custom.container.BlockContainer {
         @Override public String getIdentifier() { return "test:pair_cached_stone"; }
         @Override public int getNukkitId() { return Block.STONE; }
+    }
+
+    static class CustomLava extends cn.nukkit.block.BlockLava implements cn.nukkit.block.custom.container.BlockContainer {
+        @Override public String getIdentifier() { return "test:pair_lava"; }
+        @Override public int getNukkitId() { return Block.LAVA; }
     }
 
     static class Fixture {

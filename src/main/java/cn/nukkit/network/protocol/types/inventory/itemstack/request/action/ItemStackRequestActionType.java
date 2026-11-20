@@ -25,7 +25,11 @@ public enum ItemStackRequestActionType {
     CRAFT_REPAIR_AND_DISENCHANT(16),
     CRAFT_LOOM(17),
     CRAFT_NON_IMPLEMENTED_DEPRECATED(18),
-    CRAFT_RESULTS_DEPRECATED(19);
+    CRAFT_RESULTS_DEPRECATED(19),
+    /**
+     * @since v2225
+     */
+    CRAFT_RESERVED(20);
 
     private final int id;
 
@@ -52,8 +56,30 @@ public enum ItemStackRequestActionType {
     public static ItemStackRequestActionType fromId(int id, GameVersion gameVersion) {
         int protocol = gameVersion.getProtocol();
         if (protocol >= ProtocolInfo.v1_26_40) {
-            // v2168 紧凑主 ID：移除 PLACE/TAKE_FROM_ITEM_CONTAINER，7 起顺延
-            // v2168 compact primary ids: PLACE/TAKE_FROM_ITEM_CONTAINER removed, ids shift down from 7
+            if (protocol >= ProtocolInfo.v1_26_60) {
+                return switch (id) {
+                    case 0 -> TAKE;
+                    case 1 -> PLACE;
+                    case 2 -> SWAP;
+                    case 3 -> DROP;
+                    case 4 -> DESTROY;
+                    case 5 -> CONSUME;
+                    case 6 -> CREATE;
+                    case 7 -> LAB_TABLE_COMBINE;
+                    case 8 -> BEACON_PAYMENT;
+                    case 9 -> MINE_BLOCK;
+                    case 10 -> CRAFT_RECIPE;
+                    case 11 -> CRAFT_RECIPE_AUTO;
+                    case 12 -> CRAFT_CREATIVE;
+                    case 13 -> CRAFT_RECIPE_OPTIONAL;
+                    case 14 -> CRAFT_REPAIR_AND_DISENCHANT;
+                    case 15 -> CRAFT_LOOM;
+                    case 16 -> CRAFT_RESERVED;
+                    case 17 -> CRAFT_NON_IMPLEMENTED_DEPRECATED;
+                    case 18 -> CRAFT_RESULTS_DEPRECATED;
+                    default -> null;
+                };
+            }
             return switch (id) {
                 case 0 -> TAKE;
                 case 1 -> PLACE;
