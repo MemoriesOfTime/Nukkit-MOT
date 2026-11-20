@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityLiving;
+import cn.nukkit.event.entity.EntityBlockChangeEvent;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import org.junit.jupiter.api.Test;
 import cn.nukkit.item.Item;
@@ -12,6 +13,7 @@ import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Position;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import org.junit.jupiter.api.BeforeAll;
@@ -82,6 +84,62 @@ class FallingBlockOverlapLandingTest {
         verify(victim).attack(argThat(damage -> damage instanceof EntityDamageByBlockEvent
                 && damage.getDamage() == 20));
         assertEquals(1, fixture.placements);
+        assertTrue(fixture.drops.isEmpty());
+    }
+
+    @Test
+    void pointedDripstoneDropsOnceAndImpactUsesLandingPosition() {
+        Fixture fixture = new Fixture(Block.POINTED_DRIPSTONE);
+        fixture.cell.position(new Position(0, 64, 0, fixture.level));
+        EntityLiving victim = mock(EntityLiving.class);
+        when(victim.getBoundingBox()).thenReturn(new SimpleAxisAlignedBB(0, 64, 0, 1, 65, 1));
+        fixture.entities.put(1000L, victim);
+        EntityFallingBlock dripstone = fixture.entity(Block.POINTED_DRIPSTONE, 64);
+        dripstone.highestPosition = 68;
+        when(dripstone.canCollide()).thenReturn(true);
+        when(dripstone.canCollideWith(victim)).thenReturn(true);
+        EntityDamageByBlockEvent[] impact = {null};
+        when(victim.attack(any(EntityDamageByBlockEvent.class))).thenAnswer(call -> {
+            impact[0] = call.getArgument(0);
+            return true;
+        });
+
+        dripstone.onUpdate(1);
+
+        assertNotNull(impact[0]);
+        var location = assertDoesNotThrow(() -> impact[0].getDamager().getLocation());
+        assertSame(fixture.level, location.getLevel());
+        assertEquals(0, location.x);
+        assertEquals(64, location.y);
+        assertEquals(0, location.z);
+        assertEquals(0, fixture.placements);
+        assertEquals(1, fixture.drops.size());
+        assertEquals(Block.get(Block.POINTED_DRIPSTONE).toItem().getId(), fixture.drops.get(0).getId());
+    }
+
+    @Test
+    void cancellingLandingStillSuppressesPointedDripstoneOutput() {
+        Fixture fixture = new Fixture(Block.POINTED_DRIPSTONE);
+        var plugins = Server.getInstance().getPluginManager();
+        doAnswer(call -> {
+            ((EntityBlockChangeEvent) call.getArgument(0)).setCancelled();
+            return null;
+        }).when(plugins).callEvent(any(EntityBlockChangeEvent.class));
+        try {
+            fixture.entity(Block.POINTED_DRIPSTONE, 64).onUpdate(1);
+            assertEquals(0, fixture.placements);
+            assertTrue(fixture.drops.isEmpty());
+        } finally {
+            reset(plugins);
+        }
+    }
+
+    @Test
+    void disabledEntityDropsDoNotPlacePointedDripstone() {
+        Fixture fixture = new Fixture(Block.POINTED_DRIPSTONE);
+        fixture.rules.setGameRule(GameRule.DO_ENTITY_DROPS, false);
+        fixture.entity(Block.POINTED_DRIPSTONE, 64).onUpdate(1);
+        assertEquals(0, fixture.placements);
         assertTrue(fixture.drops.isEmpty());
     }
 
