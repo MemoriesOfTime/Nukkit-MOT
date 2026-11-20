@@ -512,7 +512,8 @@ public class Long2ObjectNonBlockingMap<TypeV>
     // Helper function to spread lousy hashCodes Throws NPE for null Key, on
     // purpose - as the first place to conveniently toss the required NPE for a
     // null Key.
-    private static int hash(long h) {
+    // Package-private so the spread of chunk-hash keys can be checked by tests.
+    static int hash(long h) {
         h ^= (h >>> 20) ^ (h >>> 12);
         h ^= (h >>> 7) ^ (h >>> 4);
         h += h << 7; // smear low bits up high, for hashcodes that only differ by 1
