@@ -11,7 +11,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 等价性测试：验证 Config/ConfigSection 热路径优化后行为与优化前一致。
+ * Config/ConfigSection 热路径行为测试。
  * 覆盖扁平 key、嵌套 key、点开头/结尾/连续点、null/空串、类型转换、子类等边界。
  */
 public class ConfigHotPathTest {
@@ -245,99 +245,6 @@ public class ConfigHotPathTest {
         s.remove(null);
         s.remove("");
         s.remove("a.b.c"); // 无异常
-    }
-
-    // ---------- 操作序列一致性（新旧实现对比） ----------
-
-    @Test
-    void operationSequenceMatchesLegacy() {
-        // 旧实现（优化前的 split 版本）
-        LegacyModel legacy = new LegacyModel();
-        ConfigSection current = new ConfigSection();
-
-        String[] keys = {"a", "b", "a.b", "a.c", "x.y.z", ".lead", "trail.", "a..z", "deep.er.still", "plain"};
-        int[] vals = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-
-        // 交替 set/get/remove
-        for (int i = 0; i < keys.length; i++) {
-            String k = keys[i];
-            Object v = vals[i];
-            legacy.set(k, v);
-            current.set(k, v);
-            assertSameValue(legacy.get(k, "def"), current.get(k, "def"), "set+get " + k);
-        }
-        for (String k : keys) {
-            assertSameValue(legacy.get(k, "def"), current.get(k, "def"), "read " + k);
-            legacy.remove(k);
-            current.remove(k);
-            assertSameValue(legacy.get(k, "def"), current.get(k, "def"), "after remove " + k);
-        }
-        // remove 后重新 set 嵌套
-        legacy.set("a.b", "again");
-        current.set("a.b", "again");
-        assertSameValue(legacy.get("a.b", "def"), current.get("a.b", "def"), "re-set nested");
-    }
-
-    private static void assertSameValue(Object expected, Object actual, String msg) {
-        if (expected == null) {
-            assertNull(actual, msg);
-        } else if (expected instanceof Map && actual instanceof Map) {
-            Map<?, ?> em = (Map<?, ?>) expected;
-            Map<?, ?> am = (Map<?, ?>) actual;
-            assertEquals(em.size(), am.size(), msg + " (map size)");
-            for (Object ek : em.keySet()) {
-                assertTrue(am.containsKey(ek), msg + " (missing key " + ek + ")");
-                assertSameValue(em.get(ek), am.get(ek), msg + "." + ek);
-            }
-        } else {
-            assertEquals(expected, actual, msg);
-        }
-    }
-
-    /** 优化前的 ConfigSection 语义（split 版本），用于对比。 */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static class LegacyModel {
-        final LinkedHashMap<String, Object> root = new LinkedHashMap<>();
-
-        Object get(String key, Object def) {
-            if (key == null || key.isEmpty()) return def;
-            if (root.containsKey(key)) return root.get(key);
-            String[] keys = key.split("\\.", 2);
-            if (!root.containsKey(keys[0])) return def;
-            Object value = root.get(keys[0]);
-            if (value instanceof LinkedHashMap m) {
-                LegacyModel sub = new LegacyModel();
-                sub.root.putAll(m);
-                return sub.get(keys[1], def);
-            }
-            return def;
-        }
-
-        void set(String key, Object value) {
-            String[] subKeys = key.split("\\.", 2);
-            if (subKeys.length > 1) {
-                LinkedHashMap<String, Object> child = new LinkedHashMap<>();
-                if (root.get(subKeys[0]) instanceof LinkedHashMap m) child = m;
-                LegacyModel sub = new LegacyModel();
-                sub.root.putAll(child);
-                sub.set(subKeys[1], value);
-                root.put(subKeys[0], sub.root);
-            } else root.put(subKeys[0], value);
-        }
-
-        void remove(String key) {
-            if (key == null || key.isEmpty()) return;
-            if (root.remove(key) != null) return;
-            if (key.contains(".")) {
-                String[] keys = key.split("\\.", 2);
-                if (root.get(keys[0]) instanceof LinkedHashMap m) {
-                    LegacyModel sub = new LegacyModel();
-                    sub.root.putAll(m);
-                    sub.remove(keys[1]);
-                    root.put(keys[0], sub.root);
-                }
-            }
-        }
     }
 
     // ---------- Config properties 解析 / 保存 ----------

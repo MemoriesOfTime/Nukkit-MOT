@@ -12,6 +12,11 @@ public class BlockRootsCrimson extends BlockRoots {
     }
 
     @Override
+    public boolean canBeReplaced() {
+        return true;
+    }
+
+    @Override
     public String getName() {
         return "Crimson Roots";
     }

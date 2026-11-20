@@ -11,6 +11,44 @@ import static org.junit.jupiter.api.Assertions.*;
 class ThreadCacheRetentionTest {
     private static final int LIMIT = 1024 * 1024;
 
+    @Test
+    void leasedBuffersIsolateReentryAndPreferTheLargerBoundedBuffer() {
+        BinaryStream outer = ThreadCache.acquireBinaryStream();
+        outer.put(new byte[8192]);
+        outer.setOffset(7);
+        byte[] snapshot = outer.getBuffer();
+        BinaryStream inner = ThreadCache.acquireBinaryStream();
+        assertNotSame(outer, inner);
+        inner.putByte(0x55);
+        ThreadCache.releaseBinaryStream(inner);
+        assertEquals(8192, outer.getCount());
+        ThreadCache.releaseBinaryStream(outer);
+
+        BinaryStream reused = ThreadCache.acquireBinaryStream();
+        try {
+            assertSame(outer, reused);
+            assertEquals(0, reused.getCount());
+            assertEquals(0, reused.getOffset());
+            reused.putByte(0x77);
+            assertArrayEquals(new byte[8192], snapshot);
+        } finally { ThreadCache.releaseBinaryStream(reused); }
+    }
+
+    @Test
+    void oversizedLeaseIsDiscardedWithoutEvictingANestedReplacement() {
+        BinaryStream outer = ThreadCache.acquireBinaryStream();
+        outer.put(new byte[2 * LIMIT]);
+        BinaryStream inner = ThreadCache.acquireBinaryStream();
+        inner.putByte(1);
+        ThreadCache.releaseBinaryStream(inner);
+        ThreadCache.releaseBinaryStream(outer);
+        BinaryStream reused = ThreadCache.acquireBinaryStream();
+        try {
+            assertSame(inner, reused);
+            assertTrue(reused.getBufferUnsafe().length <= LIMIT);
+        } finally { ThreadCache.releaseBinaryStream(reused); }
+    }
+
     @AfterEach
     void clear() {
         ThreadCache.fbaos.remove();

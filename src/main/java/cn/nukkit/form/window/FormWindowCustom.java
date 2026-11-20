@@ -84,6 +84,8 @@ public class FormWindowCustom extends FormWindow {
 
     @Override
     public void setResponse(int protocol, String data) {
+        this.response = null;
+        this.closed = false;
         if (data.equals("null")) {
             this.closed = true;
             return;

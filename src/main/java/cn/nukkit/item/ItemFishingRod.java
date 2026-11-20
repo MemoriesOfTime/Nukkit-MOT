@@ -1,9 +1,8 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
-import cn.nukkit.block.Block;
-import cn.nukkit.level.Level;
-import cn.nukkit.math.BlockFace;
+import cn.nukkit.level.Sound;
+import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
 
 public class ItemFishingRod extends ItemTool {
@@ -26,23 +25,15 @@ public class ItemFishingRod extends ItemTool {
     }
 
     @Override
-    public boolean canBeActivated() {
-        return true;
-    }
-
-    @Override
-    public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
-        return this.onClickAir(player, player.getDirectionVector());
-    }
-
-    @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
         if (player.fishing != null) {
-            if (!this.isUnbreakable()) {
-                if (player.fishing.getTarget() > 0) {
-                    this.meta = this.meta + 2;
-                } else {
-                    this.meta++;
+            if (!this.isUnbreakable() && !player.isCreative()) {
+                int damage = player.fishing.getTarget() > 0 ? 2 : 1;
+                this.setDamage(this.getDamage() + damage);
+                if (this.getDamage() >= this.getMaxDurability()) {
+                    this.setCount(0);
+                    player.level.addSoundToViewers(player, Sound.RANDOM_BREAK);
+                    player.level.addParticle(new ItemBreakParticle(player, this));
                 }
             }
 			player.stopFishing(true);

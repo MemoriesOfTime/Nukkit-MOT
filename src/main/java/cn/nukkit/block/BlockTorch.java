@@ -103,6 +103,9 @@ public class BlockTorch extends BlockFlowable implements Faceable {
 
     @Override
     public Item toItem() {
+        if (this.getDamage() == 6 || this.getDamage() == 7) {
+            return new ItemBlock(Block.get(this.getId(), 0), 0);
+        }
         return new ItemBlock(this, 0);
     }
 

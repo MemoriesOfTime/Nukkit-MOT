@@ -37,6 +37,7 @@ public abstract class BlockShelf extends BlockTransparentMeta implements Faceabl
     private static final int TYPE_MASK = 0b0000_0011;
     private static final int POWERED_MASK = 0b0000_0100;
     private static final int DIRECTION_MASK = 0b0001_1000;
+    private static final PoweredShelfType[] SHELF_TYPES = PoweredShelfType.values();
 
     /**
      * A shelf occupies five pixels next to the wall it hangs on, not the whole block: a full
@@ -299,7 +300,7 @@ public abstract class BlockShelf extends BlockTransparentMeta implements Faceabl
     }
 
     public PoweredShelfType getShelfType() {
-        return PoweredShelfType.values()[this.getProperty(TYPE_MASK)];
+        return SHELF_TYPES[this.getProperty(TYPE_MASK)];
     }
 
     public void setShelfType(PoweredShelfType type) {

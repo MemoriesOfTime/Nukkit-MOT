@@ -29,15 +29,16 @@ public class BlockTallGrass extends BlockFlowable {
         return TALL_GRASS;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Grass",
+            "Grass",
+            "Fern",
+            "Fern"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Grass",
-                "Grass",
-                "Fern",
-                "Fern"
-        };
-        return names[this.getDamage() & 0x03];
+        return NAMES[this.getDamage() & 0x03];
     }
 
     @Override
