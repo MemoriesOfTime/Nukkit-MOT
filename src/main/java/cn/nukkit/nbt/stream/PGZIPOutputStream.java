@@ -113,6 +113,17 @@ public class PGZIPOutputStream extends FilterOutputStream {
     // Master thread only
     @Override
     public void write(int b) throws IOException {
+        // Keep bulk overrides observable, and retain the retry path for a full block after failed submission.
+        if (getClass() == PGZIPOutputStream.class
+                && block.in_length >= 0 && block.in_length < block.in.length) {
+            crc.update(b);
+            bytesWritten++;
+            block.in[block.in_length++] = (byte) b;
+            if (block.in_length == block.in.length) {
+                submit();
+            }
+            return;
+        }
         byte[] single = new byte[1];
         single[0] = (byte) (b & 0xFF);
         write(single);

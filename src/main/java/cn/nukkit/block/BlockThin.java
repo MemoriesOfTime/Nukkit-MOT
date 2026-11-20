@@ -166,11 +166,36 @@ public abstract class BlockThin extends BlockTransparentMeta {
         );
     }
 
+    /**
+     * 邻居朝向本方块的一面是否与玻璃板/铁栏相连。
+     * <p>
+     * Whether the neighbour's face towards this pane/bar connects.
+     *
+     * @param block        相邻方块 / the neighbouring block
+     * @param neighborFace 邻居朝向本方块的那一面 / the neighbour's face touching this block
+     */
+    public boolean canConnect(Block block, BlockFace neighborFace) {
+        return block instanceof BlockThin
+                || block instanceof BlockWall
+                || ConnectionSupport.providesFullSupport(block, neighborFace);
+    }
+
+    /**
+     * 旧布尔入口：内部重算仍经此虚调用，保留既有插件覆写；默认按坐标推断邻居朝向本方块的面。
+     * <p>
+     * Legacy boolean entry: internal recomputation dispatches through it so existing plugin
+     * overrides keep working; by default it infers the neighbour's face towards this block.
+     */
     public boolean canConnect(Block block) {
-        return block instanceof BlockWall
-                || block.isSolid()
-                || block.getId() == this.getId()
-                || block.getId() == GLASS_PANE
-                || block.getId() == GLASS;
+        BlockFace neighborFace = ConnectionSupport.faceFromNeighbor(this, block);
+        if (neighborFace != null) {
+            return this.canConnect(block, neighborFace);
+        }
+        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
+            if (this.canConnect(block, side)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -21,7 +21,7 @@ import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Hash;
 import cn.nukkit.utils.Utils;
-import it.unimi.dsi.fastutil.longs.LongArraySet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +52,7 @@ public class WeakExplosion extends Explosion {
 
     @Override
     public boolean explodeA() {
+        if (!hasSafeExplosionNumbers(1300d, 1000d, 0.22499999999999998)) return false;
         if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
             Entity entity = entitySource.entity();
             if (entity instanceof EntityExplosive && entity.isInsideOfWater()) {
@@ -76,6 +77,7 @@ public class WeakExplosion extends Explosion {
                         double pointerY = this.source.y;
                         double pointerZ = this.source.z;
                         for (double blastForce = this.size * (Utils.random.nextInt(700, 1301)) / 1000d; blastForce > 0; blastForce -= 0.22499999999999998) {
+                            double previousBlastForce = blastForce;
                             int x = (int) pointerX;
                             int y = (int) pointerY;
                             int z = (int) pointerZ;
@@ -83,17 +85,33 @@ public class WeakExplosion extends Explosion {
                             vBlock.y = pointerY >= y ? y : y - 1;
                             vBlock.z = pointerZ >= z ? z : z - 1;
                             if (!level.isYInRange(vBlock.y)) {
-                                break;
-                            }
-                            Block block = this.level.getBlock(vBlock);
-                            if (block.getId() != 0 && block.getResistance() < 20) {
-                                blastForce -= (block.getResistance() / 5 + 0.3d) * 0.3d;
-                                if (blastForce > 0) {
-                                    if (!this.affectedBlocks.contains(block)) {
-                                        this.affectedBlocks.add(block);
+                                if (vBlock.y < level.getMinBlockY() && vector.y <= 0
+                                        || vBlock.y > level.getMaxBlockY() && vector.y >= 0) {
+                                    break;
+                                }
+                                // Preserve the ordinary final step and its loop decay, skipping only
+                                // empty samples that cannot read a block or invoke a callback.
+                                long skipped = emptyHeightRaySteps(pointerY, vector.y) - 1L;
+                                double emptyDecay = skipped * (0.22499999999999998);
+                                if (emptyDecay >= blastForce) {
+                                    break;
+                                }
+                                blastForce -= emptyDecay;
+                                pointerX += vector.x * skipped;
+                                pointerY += vector.y * skipped;
+                                pointerZ += vector.z * skipped;
+                            } else {
+                                Block block = this.level.getBlock(vBlock);
+                                if (block.getId() != 0 && block.getResistance() < 20) {
+                                    blastForce -= (block.getResistance() / 5 + 0.3d) * 0.3d;
+                                    if (blastForce > 0) {
+                                        if (!this.affectedBlocks.contains(block)) {
+                                            this.affectedBlocks.add(block);
+                                        }
                                     }
                                 }
                             }
+                            if (!hasSafeRayForce(previousBlastForce, blastForce, 0.22499999999999998)) return false;
                             pointerX += vector.x;
                             pointerY += vector.y;
                             pointerZ += vector.z;
@@ -107,7 +125,8 @@ public class WeakExplosion extends Explosion {
 
     @Override
     public boolean explodeB() {
-        LongArraySet updateBlocks = new LongArraySet();
+        if (!hasSafeExplosionNumbers(1300d, 1000d, 0.22499999999999998)) return false;
+        LongOpenHashSet updateBlocks = null;
         double yield = (1d / this.size) * 100d;
         if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
             Entity exploder = entitySource.entity();
@@ -120,6 +139,8 @@ public class WeakExplosion extends Explosion {
                 this.affectedBlocks = ev.getBlockList();
             }
         }
+
+        if (!hasSafeExplosionNumbers(1300d, 1000d, 0.22499999999999998)) return false;
 
         double explosionSize = this.size * 2d;
         double minX = NukkitMath.floorDouble(this.source.x - explosionSize - 1);
@@ -190,11 +211,14 @@ public class WeakExplosion extends Explosion {
             for (BlockFace side : BlockFace.values()) {
                 Vector3 sideBlock = pos.getSide(side);
                 long index = Hash.hashBlock((int) sideBlock.x, (int) sideBlock.y, (int) sideBlock.z);
-                if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
+                if (!this.affectedBlocks.contains(sideBlock) && (updateBlocks == null || !updateBlocks.contains(index))) {
                     BlockUpdateEvent ev = new BlockUpdateEvent(this.level.getBlock(sideBlock));
                     this.level.getServer().getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
                         ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
+                    }
+                    if (updateBlocks == null) {
+                        updateBlocks = new LongOpenHashSet();
                     }
                     updateBlocks.add(index);
                     this.level.antiXrayOnBlockChange(null, block, 0);

@@ -75,23 +75,38 @@ public class BlockChain extends BlockTransparentMeta {
     }
 
     @Override
+    public boolean isSolid() {
+        return false;
+    }
+
+    @Override
     public double getMinX() {
-        return x + 7 / 16.0;
+        return this.getPillarAxis() == BlockFace.Axis.X ? x : x + 6.5 / 16.0;
     }
 
     @Override
     public double getMaxX() {
-        return x + 9 / 16.0;
+        return this.getPillarAxis() == BlockFace.Axis.X ? x + 1 : x + 9.5 / 16.0;
+    }
+
+    @Override
+    public double getMinY() {
+        return this.getPillarAxis() == BlockFace.Axis.Y ? y : y + 6.5 / 16.0;
+    }
+
+    @Override
+    public double getMaxY() {
+        return this.getPillarAxis() == BlockFace.Axis.Y ? y + 1 : y + 9.5 / 16.0;
     }
 
     @Override
     public double getMinZ() {
-        return z + 7 / 16.0;
+        return this.getPillarAxis() == BlockFace.Axis.Z ? z : z + 6.5 / 16.0;
     }
 
     @Override
     public double getMaxZ() {
-        return z + 9 / 16.0;
+        return this.getPillarAxis() == BlockFace.Axis.Z ? z + 1 : z + 9.5 / 16.0;
     }
 
     @Override

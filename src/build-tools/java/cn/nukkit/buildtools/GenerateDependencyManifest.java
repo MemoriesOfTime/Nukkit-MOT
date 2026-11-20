@@ -8,11 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,9 +24,12 @@ public final class GenerateDependencyManifest {
     private static final List<String> DEFAULT_REPOS = List.of(
             "https://repo1.maven.org/maven2/",
             "https://repo.opencollab.dev/maven-releases/",
+            "https://repo.opencollab.dev/maven-snapshots/",
             "https://repo.okaeri.cloud/releases",
             "https://maven.daporkchop.net/",
-            "https://repo.lanink.cn/repository/maven-public/"
+            "https://repo.lanink.cn/repository/maven-releases/",
+            "https://repo.lanink.cn/repository/maven-snapshots/",
+            "https://repo.lanink.cn/repository/maven-public/" //proxy
     );
 
     /** dependency:list 输出携带的 ANSI 颜色转义 / ANSI escapes carried by dependency:list output */

@@ -53,19 +53,20 @@ public class BlockDoubleSlabStone extends BlockSolidMeta {
         return ItemTool.TIER_WOODEN;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Stone",
+            "Sandstone",
+            "Wooden",
+            "Cobblestone",
+            "Brick",
+            "Stone Brick",
+            "Quartz",
+            "Nether Brick"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Stone",
-                "Sandstone",
-                "Wooden",
-                "Cobblestone",
-                "Brick",
-                "Stone Brick",
-                "Quartz",
-                "Nether Brick"
-        };
-        return "Double " + names[this.getDamage() & 0x07] + " Slab";
+        return "Double " + NAMES[this.getDamage() & 0x07] + " Slab";
     }
 
     @Override
