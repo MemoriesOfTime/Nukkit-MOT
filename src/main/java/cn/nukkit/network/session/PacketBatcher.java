@@ -12,7 +12,8 @@ import java.util.function.Consumer;
 /** Operation-owned scratch storage for the built-in synchronous compression providers. */
 final class PacketBatcher {
     static final int MAX_BATCH_BYTES = 3 * 1024 * 1024;
-    static final int MAX_RETAINED_BYTES = 1024 * 1024;
+    // One idle scratch per thread: retained memory <= thread count * (3 MiB + one varint).
+    static final int MAX_RETAINED_BYTES = MAX_BATCH_BYTES + 5;
     private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
     private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
     private static final ClassValue<Boolean> DIRECT_BUFFER = new ClassValue<>() {
@@ -100,7 +101,7 @@ final class PacketBatcher {
         if (required > MAX_ARRAY_SIZE) throw new OutOfMemoryError("Packet batch is too large");
         byte[] buffer = stream.getBufferUnsafe();
         if (required > buffer.length) {
-            int capacity = (int) Math.max(required, Math.min((long) buffer.length * 2, MAX_ARRAY_SIZE));
+            int capacity = (int) Math.max(required, Math.min((long) buffer.length * 2, MAX_RETAINED_BYTES));
             stream.setBuffer(Arrays.copyOf(buffer, capacity));
             stream.setCount(previousCount);
         }

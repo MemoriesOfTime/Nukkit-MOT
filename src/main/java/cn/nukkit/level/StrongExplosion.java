@@ -21,7 +21,7 @@ import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Hash;
 import cn.nukkit.utils.Utils;
-import it.unimi.dsi.fastutil.longs.LongArraySet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -133,7 +133,7 @@ public class StrongExplosion extends Explosion {
     @Override
     public boolean explodeB() {
         if (!hasSafeExplosionNumbers(1300d, 1000d, 0.22499999999999998)) return false;
-        LongArraySet updateBlocks = new LongArraySet();
+        LongOpenHashSet updateBlocks = null;
         double yield = (1d / this.size) * 100d;
 
         if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
@@ -223,11 +223,14 @@ public class StrongExplosion extends Explosion {
             for (BlockFace side : BlockFace.values()) {
                 Vector3 sideBlock = pos.getSide(side);
                 long index = Hash.hashBlock((int) sideBlock.x, (int) sideBlock.y, (int) sideBlock.z);
-                if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
+                if (!this.affectedBlocks.contains(sideBlock) && (updateBlocks == null || !updateBlocks.contains(index))) {
                     BlockUpdateEvent ev = new BlockUpdateEvent(this.level.getBlock(sideBlock));
                     this.level.getServer().getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
                         ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
+                    }
+                    if (updateBlocks == null) {
+                        updateBlocks = new LongOpenHashSet();
                     }
                     updateBlocks.add(index);
                     this.level.antiXrayOnBlockChange(null, block, 0);

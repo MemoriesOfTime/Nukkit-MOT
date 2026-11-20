@@ -379,6 +379,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         UseItemData itemData = new UseItemData();
         itemData.actionType = v2168Shape ? packet.getVarInt() : (int) packet.getUnsignedVarInt();
         if (packet.protocol >= ProtocolInfo.v1_21_20) {
+            itemData.hasTriggerType = true;
             itemData.triggerType = v2168Shape ? packet.getByte() & 0xff : (int) packet.getUnsignedVarInt();
         }
         itemData.blockPos = packet.getBlockVector3();

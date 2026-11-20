@@ -29,6 +29,9 @@ import cn.nukkit.utils.Utils;
  */
 public class BlockFire extends BlockFlowable {
 
+    // Own the enum-order array without allocating it for every neighbor check.
+    private static final BlockFace[] NEIGHBOR_FACES = BlockFace.values();
+
     public BlockFire() {
         this(0);
     }
@@ -294,7 +297,7 @@ public class BlockFire extends BlockFlowable {
     }
 
     public boolean canNeighborBurn() {
-        for (BlockFace face : BlockFace.values()) {
+        for (BlockFace face : NEIGHBOR_FACES) {
             if (this.getSide(face).getBurnChance() > 0) {
                 return true;
             }

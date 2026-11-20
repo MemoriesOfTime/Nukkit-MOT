@@ -30,6 +30,7 @@ import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessi
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
@@ -70,6 +71,17 @@ public class BinaryStream {
         protected Boolean computeValue(Class<?> type) {
             try {
                 return type.getMethod("put", byte[].class).getDeclaringClass() == BinaryStream.class;
+            } catch (ReflectiveOperationException | SecurityException | LinkageError failure) {
+                return false;
+            }
+        }
+    };
+
+    private static final ClassValue<Boolean> DIRECT_BYTE_READ = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("get", int.class).getDeclaringClass() == BinaryStream.class;
             } catch (ReflectiveOperationException | SecurityException | LinkageError failure) {
                 return false;
             }
@@ -197,6 +209,19 @@ public class BinaryStream {
     }
 
     public long getLong() {
+        if (canReadDirect(8)) {
+            int index = this.offset;
+            long value = ((long) this.buffer[index] << 56) |
+                    ((this.buffer[index + 1] & 0xffL) << 48) |
+                    ((this.buffer[index + 2] & 0xffL) << 40) |
+                    ((this.buffer[index + 3] & 0xffL) << 32) |
+                    ((this.buffer[index + 4] & 0xffL) << 24) |
+                    ((this.buffer[index + 5] & 0xffL) << 16) |
+                    ((this.buffer[index + 6] & 0xffL) << 8) |
+                    (this.buffer[index + 7] & 0xffL);
+            this.offset = index + 8;
+            return value;
+        }
         return Binary.readLong(this.get(8));
     }
 
@@ -205,7 +230,28 @@ public class BinaryStream {
     }
 
     public int getInt() {
+        return readBigEndianInt();
+    }
+
+    private int readBigEndianInt() {
+        if (canReadDirect(4)) {
+            int index = this.offset;
+            int value = (this.buffer[index] << 24) |
+                    ((this.buffer[index + 1] & 0xff) << 16) |
+                    ((this.buffer[index + 2] & 0xff) << 8) |
+                    (this.buffer[index + 3] & 0xff);
+            this.offset = index + 4;
+            return value;
+        }
         return Binary.readInt(this.get(4));
+    }
+
+    private boolean canReadDirect(int width) {
+        // Keep get(int) interception and its original malformed/padded-read behavior.
+        return (getClass() == BinaryStream.class || DIRECT_BYTE_READ.get(getClass()))
+                && this.offset >= 0 && this.count >= width
+                && this.offset <= this.count - width && this.buffer != null
+                && this.offset <= this.buffer.length - width;
     }
 
     public void putInt(int i) {
@@ -213,6 +259,19 @@ public class BinaryStream {
     }
 
     public long getLLong() {
+        if (canReadDirect(8)) {
+            int index = this.offset;
+            long value = ((long) this.buffer[index + 7] << 56) |
+                    ((this.buffer[index + 6] & 0xffL) << 48) |
+                    ((this.buffer[index + 5] & 0xffL) << 40) |
+                    ((this.buffer[index + 4] & 0xffL) << 32) |
+                    ((this.buffer[index + 3] & 0xffL) << 24) |
+                    ((this.buffer[index + 2] & 0xffL) << 16) |
+                    ((this.buffer[index + 1] & 0xffL) << 8) |
+                    (this.buffer[index] & 0xffL);
+            this.offset = index + 8;
+            return value;
+        }
         return Binary.readLLong(this.get(8));
     }
 
@@ -250,6 +309,12 @@ public class BinaryStream {
     }
 
     public int getShort() {
+        if (canReadDirect(2)) {
+            int index = this.offset;
+            int value = ((this.buffer[index] & 0xff) << 8) | (this.buffer[index + 1] & 0xff);
+            this.offset = index + 2;
+            return value;
+        }
         return Binary.readShort(this.get(2));
     }
 
@@ -258,6 +323,12 @@ public class BinaryStream {
     }
 
     public int getLShort() {
+        if (canReadDirect(2)) {
+            int index = this.offset;
+            int value = ((this.buffer[index + 1] & 0xff) << 8) | (this.buffer[index] & 0xff);
+            this.offset = index + 2;
+            return value;
+        }
         return Binary.readLShort(this.get(2));
     }
 
@@ -270,7 +341,8 @@ public class BinaryStream {
     }
 
     public float getFloat(int accuracy) {
-        return Binary.readFloat(this.get(4), accuracy);
+        float value = Float.intBitsToFloat(readBigEndianInt());
+        return accuracy > -1 ? (float) NukkitMath.round(value, accuracy) : value;
     }
 
     public void putFloat(float v) {
@@ -295,6 +367,13 @@ public class BinaryStream {
     }
 
     public int getTriad() {
+        if (canReadDirect(3)) {
+            int index = this.offset;
+            int value = ((this.buffer[index] & 0xff) << 16) |
+                    ((this.buffer[index + 1] & 0xff) << 8) | (this.buffer[index + 2] & 0xff);
+            this.offset = index + 3;
+            return value;
+        }
         return Binary.readTriad(this.get(3));
     }
 
@@ -303,6 +382,13 @@ public class BinaryStream {
     }
 
     public int getLTriad() {
+        if (canReadDirect(3)) {
+            int index = this.offset;
+            int value = ((this.buffer[index + 2] & 0xff) << 16) |
+                    ((this.buffer[index + 1] & 0xff) << 8) | (this.buffer[index] & 0xff);
+            this.offset = index + 3;
+            return value;
+        }
         return Binary.readLTriad(this.get(3));
     }
 
@@ -562,7 +648,14 @@ public class BinaryStream {
     }
 
     private static String intToSkinColor(int argb) {
-        return String.format("#%08X", argb);
+        char[] color = new char[9];
+        color[0] = '#';
+        for (int index = 8; index > 0; index--) {
+            int digit = argb & 0xf;
+            color[index] = (char) (digit < 10 ? '0' + digit : 'A' + digit - 10);
+            argb >>>= 4;
+        }
+        return new String(color);
     }
 
     public SerializedImage getImage() {
@@ -1383,7 +1476,7 @@ public class BinaryStream {
     }
 
     private void putSlotV113(Item item) {
-        if (item == null || item.getId() == Item.AIR) {
+        if (item == null || item.getId() == Item.AIR || !item.isSupportedOn(GameVersion.V1_1_0)) {
             this.putVarInt(0);
             return;
         }
@@ -1459,8 +1552,8 @@ public class BinaryStream {
 
         this.putVarInt(getBlockRuntimeId(gameVersion, item));
 
-        // Invocation-owned heap scratch; only its bytes are copied into the packet.
-        ByteBuf userDataBuf = Unpooled.buffer(64);
+        // Invocation-owned pooled scratch; only its bytes are copied into the packet.
+        ByteBuf userDataBuf = this.newUserDataScratch();
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable) {
                 byte[] nbt = item.getCompoundTag();
@@ -1508,6 +1601,14 @@ public class BinaryStream {
         } finally {
             userDataBuf.release();
         }
+    }
+
+    /**
+     * 物品 user data 的每次调用暂存缓冲；池化复用，子类/测试可覆写观察。
+     * <p>Per-call scratch buffer for item user data; pooled and overridable so tests can observe it.
+     */
+    ByteBuf newUserDataScratch() {
+        return PooledByteBufAllocator.DEFAULT.heapBuffer(64);
     }
 
     /**
@@ -1661,7 +1762,7 @@ public class BinaryStream {
         }
 
         // Keep the same little-endian writer without per-item native allocations.
-        ByteBuf userDataBuf = Unpooled.buffer(64);
+        ByteBuf userDataBuf = this.newUserDataScratch();
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
             if (!instanceItem && isDurable && runtimeEntry != null && !runtimeEntry.isHasDamage()) {
                 byte[] nbt = item.getCompoundTag();
