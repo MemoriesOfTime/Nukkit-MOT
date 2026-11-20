@@ -21,7 +21,7 @@ import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
 import com.nukkitx.natives.util.Natives;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,8 +30,8 @@ import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.message.FormattedMessage;
+import org.cloudburstmc.netty.channel.TransportDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
-import org.cloudburstmc.netty.channel.raknet.RakDisconnectReason;
 import org.cloudburstmc.netty.channel.raknet.packet.RakMessage;
 import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 
@@ -50,6 +50,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private static final ThreadLocal<Sha256> HASH_LOCAL = ThreadLocal.withInitial(Natives.SHA_256);
     private static final ThreadLocal<byte[]> CHECKSUM_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
+    // Separate from the received trailer: verification still needs CHECKSUM_LOCAL after hashing.
+    private static final ThreadLocal<byte[]> CHECKSUM_COUNTER_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
     /** Maximum packet work one player may force onto one server tick. The tail stays queued. */
     static final int MAX_INBOUND_PACKETS_PER_SERVER_TICK = 120;
     /** Maximum decoded payload work one player may force onto one server tick. */
@@ -93,11 +95,13 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private Player player;
     private volatile String disconnectReason = null;
-    private RakDisconnectReason transportDisconnectReason = null;
+    private TransportDisconnectReason transportDisconnectReason = null;
 
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
     private boolean compressionInitialized;
+    /** 已因缺少压缩前缀断开；置位后不再为每个 batch 记一次失败。 Set once the session closed for a missing prefix, so later batches stay quiet. */
+    private boolean prefixUnavailableClosed;
 
     private SecretKey encryptionKey;
     private Cipher encryptionCipher;
@@ -141,6 +145,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         this.state.getSecurity().setCompressionOut(this.compressionOut);
         this.state.getSecurity().setCompressionInitialized(false);
         this.state.getSecurity().setPrefixedCompression(protocolVersion >= 11);
+        // A rejected RakNet handshake may close before channelInactive can be delivered.
+        // Stop the repeating task on terminal close without changing disconnect timing or reasons.
+        this.channel.closeFuture().addListener(future -> this.tickFuture.cancel(false));
     }
 
     @Override
@@ -240,7 +247,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object event) throws Exception {
-        if (event instanceof RakDisconnectReason reason) {
+        if (event instanceof TransportDisconnectReason reason) {
             this.transportDisconnectReason = reason;
         }
         super.userEventTriggered(ctx, event);
@@ -268,6 +275,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             case QUEUE_TOO_LONG -> "transport:queue_too_long";
             case SPLIT_QUEUE_TOO_LONG -> "transport:split_queue_too_long";
             case ORDERING_QUEUE_TOO_LONG -> "transport:ordering_queue_too_long";
+            // 以下三类为共享枚举里 WebRTC 侧新增的值，RakNet 理论不触发，防御性列出
+            // The three below were added to the shared enum for the WebRTC side; RakNet is
+            // not expected to fire them, listed defensively
+            case ABORTED_BY_REMOTE_PEER -> "transport:aborted_by_remote_peer";
+            case CONNECTION_LOST -> "transport:connection_lost";
+            case TRANSPORT_FAILED -> "transport:transport_failed";
         };
     }
 
@@ -357,7 +370,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
         try {
             this.drainDeferredInbound();
-            List<DataPacket> toBatch = new ObjectArrayList<>();
+            List<DataPacket> toBatch = null;
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
                 if (packet instanceof DisconnectPacket) {
@@ -374,18 +387,21 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     }
                     return; // Disconnected
                 } else if (packet instanceof BatchPacket) {
-                    if (!toBatch.isEmpty()) {
+                    if (toBatch != null && !toBatch.isEmpty()) {
                         this.sendPackets(toBatch);
                         toBatch.clear();
                     }
 
                     this.sendPacket(((BatchPacket) packet).payload);
                 } else {
+                    if (toBatch == null) {
+                        toBatch = new ObjectArrayList<>();
+                    }
                     toBatch.add(packet);
                 }
             }
 
-            if (!toBatch.isEmpty()) {
+            if (toBatch != null && !toBatch.isEmpty()) {
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
@@ -424,6 +440,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private void sendPackets(Collection<DataPacket> packets) {
+        if (PacketBatcher.supports(this.compressionOut)) {
+            // Built-in codecs finish reading before returning; sendPacket copies the result into Netty.
+            PacketBatcher.send(packets, batched -> this.sendPackets(batched, true));
+            return;
+        }
         BinaryStream batched = new BinaryStream();
         for (DataPacket packet : packets) {
             if (packet instanceof BatchPacket) {
@@ -444,8 +465,15 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private void sendPackets(BinaryStream batched) {
+        this.sendPackets(batched, false);
+    }
+
+    private void sendPackets(BinaryStream batched, boolean borrowed) {
+        CompressionProvider provider = this.compressionOut;
         try {
-            this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel));
+            int level = Server.getInstance().networkCompressionLevel;
+            this.sendPacket(borrowed ? PacketBatcher.compressBorrowed(provider, batched, level)
+                    : provider.compress(batched, level));
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }
@@ -465,8 +493,13 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private ChannelFuture sendPacket(byte[] compressedPayload) {
         boolean ci = this.shouldUsePrefixedCompression();
+        if (ci && !this.compressionOut.supportsPrefix()) {
+            return this.failUnsupportedPrefix();
+        }
 
-        ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
+        // 池化直连缓冲：每批次新建 direct ByteBuffer 会在全局 Cleaner 锁上排队，拖慢所有网络事件循环。
+        // Pooled direct buffer: a fresh direct ByteBuffer per batch queues on the global Cleaner lock and stalls every event loop.
+        ByteBuf finalPayload = PooledByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
 
         if (this.encryptionCipher != null) {
@@ -495,6 +528,26 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         }
 
         return this.channel.writeAndFlush(finalPayload);
+    }
+
+    /**
+     * 协商出的编码写不出 ≥1.20.60 的前缀：客户端 RakNet 版本与游戏版本互相矛盾，继续发只会逐批静默丢包。
+     * <p>The negotiated codec cannot emit the ≥1.20.60 prefix: the client's RakNet version and game version
+     * contradict each other, and every further batch would be dropped silently.
+     */
+    private ChannelFuture failUnsupportedPrefix() {
+        if (!this.prefixUnavailableClosed) {
+            this.prefixUnavailableClosed = true;
+            log.error("Closing session {}: compression {} has no batch prefix but protocol {} requires one (raknetProtocol={})",
+                    this.playerLabel(), this.compressionOut, this.getBedrockProtocol(),
+                    this.state.getProtocol().getRaknetProtocol());
+            this.disconnect("Your client does not support this game version over this connection");
+        }
+        // 批次未写出：必须如实失败，否则 DIRECT_WRITE 监听器会按成功执行回调（如在断连后启用加密并改写登录相位）
+        // The batch was never written: report honest failure, or DIRECT_WRITE listeners run success
+        // callbacks (e.g. enabling encryption after the disconnect and rewriting the login phase)
+        return this.channel.newFailedFuture(
+                new CompressionPrefixUnavailableException(this.compressionOut, this.getBedrockProtocol()));
     }
 
     @Override
@@ -623,17 +676,19 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     private byte[] calculateChecksum(long count, ByteBuf payload) {
         Sha256 hash = HASH_LOCAL.get();
-        ByteBuf counterBuf = ByteBufAllocator.DEFAULT.directBuffer(8);
+        byte[] counter = CHECKSUM_COUNTER_LOCAL.get();
         try {
-            counterBuf.writeLongLE(count);
+            // Bedrock hashes the packet counter as exactly eight little-endian bytes.
+            for (int i = 0; i < Long.BYTES; i++) {
+                counter[i] = (byte) (count >>> (i * Byte.SIZE));
+            }
             ByteBuffer keyBuffer = ByteBuffer.wrap(this.encryptionKey.getEncoded());
-            hash.update(counterBuf.internalNioBuffer(0, 8));
+            hash.update(counter);
             hash.update(payload.internalNioBuffer(payload.readerIndex(), payload.readableBytes()));
             hash.update(keyBuffer);
             byte[] digested = hash.digest();
             return Arrays.copyOf(digested, 8);
         } finally {
-            counterBuf.release();
             hash.reset();
         }
     }

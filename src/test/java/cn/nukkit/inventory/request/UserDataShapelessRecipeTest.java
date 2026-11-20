@@ -7,6 +7,9 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemDye;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.CraftingDataPacket;
+import cn.nukkit.network.protocol.v113.ProtocolInfo_v113;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,11 +29,21 @@ class UserDataShapelessRecipeTest {
     @BeforeAll
     static void init() {
         MockServer.init();
+        // protocol < 137 的 DataPacket#reset() 需要 v113 包池；只放行要编码的包类，其余回退 id 可暴露映射错配。
+        // DataPacket#reset() needs a v113 pool below protocol 137; only the encoded class gets a real id.
+        MockServer.installLegacyPacketPool(CraftingDataPacket.class, ProtocolInfo_v113.CRAFTING_DATA_PACKET);
     }
 
     @BeforeEach
     void setUp() {
         manager = new CraftingManager();
+    }
+
+    @AfterAll
+    static void cleanup() {
+        // 包池桩挂在共享 mock Server 上，清掉避免泄漏给同一 fork 的后续测试类。
+        // The stub lives on the shared mock Server; reset it for later test classes in the same fork.
+        MockServer.reset();
     }
 
     @Test
