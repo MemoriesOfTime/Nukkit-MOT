@@ -1231,6 +1231,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         String numericIdGroup = matcher.group(4);
+        boolean explicitNamespace = name != null && matcher.group(1) != null;
         if (name != null) {
             String namespaceGroup = matcher.group(1);
             String namespacedId;
@@ -1272,7 +1273,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return get(flattenedEntry[0], meta.orElse(flattenedEntry[1]));
             }
 
-            if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
+            if (namespaceGroup != null && !namespaceGroup.equals("minecraft")) {
                 return Item.AIR_ITEM.clone();
             }
         } else if (numericIdGroup != null) {
@@ -1295,6 +1296,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 id = ItemID.class.getField(name.toUpperCase(Locale.ROOT)).getInt(null);
             } catch (Exception ignore1) {
             }
+        }
+        // An explicit "minecraft:" name reaches this legacy constant fallback only after every
+        // registry missed it. Keep it only when the result has a runtime item mapping; otherwise a
+        // block-only constant (e.g. PALE_OAK_DOOR -> -990) would become an item no client can see.
+        if (explicitNamespace && id != 0
+                && !RuntimeItems.getMapping(ProtocolInfo.CURRENT_PROTOCOL).isRegistered(id, meta.orElse(0))) {
+            return Item.AIR_ITEM.clone();
         }
         return get(id, meta.orElse(0));
     }
