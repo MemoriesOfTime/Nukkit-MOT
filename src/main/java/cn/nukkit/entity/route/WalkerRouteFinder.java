@@ -139,6 +139,9 @@ public class WalkerRouteFinder extends SimpleRouteFinder {
         ArrayList<Node> nodes = new ArrayList<>();
         Node temp = closeList.get(closeList.size() - 1);
         nodes.add(temp);
+        if (temp.getParent() == null) {
+            return nodes;
+        }
         while (!temp.getParent().getVector3().equals(start)) {
             nodes.add(temp = temp.getParent());
         }
