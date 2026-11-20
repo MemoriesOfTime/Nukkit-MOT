@@ -74,18 +74,24 @@ public class ClientboundUpdateSoundDataPacket extends DataPacket {
     public void decode() {
         this.serverSoundHandle = this.getLLong();
         if (this.protocol >= ProtocolInfo.v1_26_40) {
-            this.stop = this.readSoundSlot().type() == SOUND_STOP;
-            SoundSlot slot = this.readSoundSlot();
-            this.volume = slot.type() == SOUND_SET_VOLUME ? slot.first() : null;
-            slot = this.readSoundSlot();
-            this.pitch = slot.type() == SOUND_SET_PITCH ? slot.first() : null;
-            slot = this.readSoundSlot();
-            this.fadeDuration = slot.type() == SOUND_FADE ? slot.first() : 0;
-            this.fadeTargetVolume = slot.type() == SOUND_FADE ? slot.second() : null;
-            slot = this.readSoundSlot();
-            this.seekToSeconds = slot.type() == SOUND_SEEK_TO ? slot.first() : null;
-            this.pause = this.readSoundSlot().type() == SOUND_PAUSE;
-            this.resume = this.readSoundSlot().type() == SOUND_RESUME;
+            int slots = this.protocol >= ProtocolInfo.v1_26_60 ? 1 : 7;
+            for (int i = 0; i < slots; i++) {
+                SoundSlot slot = this.readSoundSlot();
+                switch (slot.type()) {
+                    case SOUND_STOP -> this.stop = true;
+                    case SOUND_SET_VOLUME -> this.volume = slot.first();
+                    case SOUND_SET_PITCH -> this.pitch = slot.first();
+                    case SOUND_FADE -> {
+                        this.fadeDuration = slot.first();
+                        this.fadeTargetVolume = slot.second();
+                    }
+                    case SOUND_SEEK_TO -> this.seekToSeconds = slot.first();
+                    case SOUND_PAUSE -> this.pause = true;
+                    case SOUND_RESUME -> this.resume = true;
+                    default -> {
+                    }
+                }
+            }
         } else {
             this.type = this.getString();
         }
@@ -119,8 +125,12 @@ public class ClientboundUpdateSoundDataPacket extends DataPacket {
                     tag = SOUND_RESUME;
                 }
             }
-            for (int i = 0; i < 7; i++) {
+            int slots = this.protocol >= ProtocolInfo.v1_26_60 ? 1 : 7;
+            for (int i = 0; i < slots; i++) {
                 this.putUnsignedVarInt(tag);
+                if (this.protocol >= ProtocolInfo.v1_26_60) {
+                    this.putByte((byte) tag);
+                }
                 if (first != null) {
                     this.putLFloat(first);
                 }
@@ -135,11 +145,12 @@ public class ClientboundUpdateSoundDataPacket extends DataPacket {
 
     /**
      * 读取一个槽位：类型 uvarint + 按类型的负载；fade 为 duration 在前。
-     * <p>
-     * Reads one slot: type uvarint + type-specific payload; fade carries duration first.
      */
     private SoundSlot readSoundSlot() {
         int type = (int) this.getUnsignedVarInt();
+        if (this.protocol >= ProtocolInfo.v1_26_60) {
+            this.getByte();
+        }
         return switch (type) {
             case SOUND_SET_VOLUME, SOUND_SET_PITCH, SOUND_SEEK_TO -> new SoundSlot(type, this.getLFloat(), 0);
             case SOUND_FADE -> new SoundSlot(type, this.getLFloat(), this.getLFloat());

@@ -25,17 +25,23 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public abstract class BaseFullChunk implements FullChunk, ChunkManager {
+
+    private static final AtomicLongFieldUpdater<BaseFullChunk> MODIFICATION_VERSION_UPDATER =
+            AtomicLongFieldUpdater.newUpdater(BaseFullChunk.class, "modificationVersion");
 
     protected Long2ObjectNonBlockingMap<Entity> entities;
 
@@ -44,6 +50,32 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
 
     protected Long2ObjectNonBlockingMap<BlockEntity> tileList;
+
+    /**
+     * 方块实体的 section 索引（key = 世界 section Y，((int) y) >> 4）：子区块序列化按段取用，
+     * 免去每个子区块全列扫描。懒构建缓存，增删经 {@link #blockEntityRevision} 失效；
+     * clone/转换路径直接 putAll 到全新 chunk，缓存为 null 会整体重建，无失同步步风险。
+     * <p>
+     * Section index of block entities (key = world section Y, ((int) y) >> 4): sub-chunk
+     * serialization reads one section instead of scanning the whole column. Lazily built
+     * and cached, invalidated on add/remove via {@link #blockEntityRevision}; clone and
+     * conversion paths putAll into fresh chunks whose null cache rebuilds wholly, so they
+     * cannot desynchronize.
+     */
+    private transient Int2ObjectOpenHashMap<List<BlockEntity>> blockEntitiesBySection;
+
+    /**
+     * 方块实体增删的失效版本号。写入方必须先完成全部 tiles 写入再自增——读到新 revision
+     * 的并发读者才能保证看到新数据（seqlock 先数据后版本；AtomicInteger 提供 volatile 发布）。
+     * <p>
+     * Invalidation version for block entity add/remove. Writers must finish all tiles
+     * writes before incrementing, so a concurrent reader that observes the new revision
+     * is guaranteed to see the new data (seqlock: data first, then version; the
+     * AtomicInteger provides volatile publication).
+     */
+    private final transient AtomicInteger blockEntityRevision = new AtomicInteger();
+
+    private transient int blockEntitiesBySectionRevision;
 
     /**
      * encoded as:
@@ -99,6 +131,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     private long hash;
 
     protected AtomicLong changes = new AtomicLong();
+    private volatile long modificationVersion;
 
     protected boolean isInit;
 
@@ -215,6 +248,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return pk;
     }
 
+    /** Main-thread lifecycle query: native entity and block-entity initialization has completed. */
+    public boolean isInitialized() {
+        return this.isInit;
+    }
+
     @Override
     public void initChunk() {
         LevelProvider initProviderTemp = this.getProvider();
@@ -261,7 +299,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                             changed = true;
                             continue;
                         }
-                        BlockEntity blockEntity = BlockEntity.createBlockEntity(nbt.getString("id").replaceFirst("BlockEntity", ""), this, nbt);
+                        String id = nbt.getString("id");
+                        int legacyNameIndex = id.indexOf("BlockEntity");
+                        if (legacyNameIndex >= 0) {
+                            // Strip only the first marker, including legacy embedded names.
+                            id = id.substring(0, legacyNameIndex) + id.substring(legacyNameIndex + "BlockEntity".length());
+                        }
+                        BlockEntity blockEntity = BlockEntity.createBlockEntity(id, this, nbt);
                         if (blockEntity == null) {
                             // Valid id and coordinates, but the tile type could not be built
                             // (unregistered/unknown type such as a modded or custom tile, or a
@@ -584,7 +628,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         nextDecrease += 1; // skylight value decreases by one for each block under a block
                                            // that diffuses skylight. The block itself has a value of 15 (if it's a top-most block)
                     } else {
-                        nextDecrease -= Block.getBlockLightFilter(id); // blocks under a light filtering block will have a skylight value
+                        nextDecrease += Block.getBlockLightFilter(id); // blocks under a light filtering block will have a skylight value
                                                             // decreased by the lightFilter value of that block. The block itself
                                                             // has a value of 15 (if it's a top-most block)
                     }
@@ -599,49 +643,49 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         LevelProvider providerTemp = this.getProvider();
         int minY = providerTemp == null ? 0 : providerTemp.getMinBlockY();
         int maxY = providerTemp == null ? 255 : providerTemp.getMaxBlockY();
-
+        IntArrayFIFOQueue pending = new IntArrayFIFOQueue();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = minY; y <= maxY; y++) {
-                    int blockId = this.getBlockId(x, y, z);
-                    int lightLevel = Block.getBlockLight(blockId);
-                    if (lightLevel > 0) {
-                        this.setBlockLight(x, y, z, lightLevel);
+                    int emitted = Block.getBlockLight(this.getBlockId(x, y, z));
+                    if (emitted > 0) {
+                        this.setBlockLight(x, y, z, emitted);
+                    }
+                    if (this.getBlockLight(x, y, z) > 1) {
+                        pending.enqueue(((y - minY) << 8) | (z << 4) | x);
                     }
                 }
             }
         }
+        propagateBlockLight(pending, minY, maxY);
+    }
 
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = minY; y <= maxY; y++) {
-                    int currentLight = this.getBlockLight(x, y, z);
-                    if (currentLight > 1) {
-                        // Propagate to neighbors within chunk
-                        propagateBlockLightToNeighbor(x - 1, y, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x + 1, y, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y - 1, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y + 1, z, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y, z - 1, currentLight, minY, maxY);
-                        propagateBlockLightToNeighbor(x, y, z + 1, currentLight, minY, maxY);
-                    }
-                }
-            }
+    /** Complete the within-chunk wave in every direction, retaining pre-existing boundary light. */
+    protected final void propagateBlockLight(IntArrayFIFOQueue pending, int minY, int maxY) {
+        while (!pending.isEmpty()) {
+            int node = pending.dequeueInt();
+            int x = node & 15;
+            int z = (node >>> 4) & 15;
+            int y = (node >>> 8) + minY;
+            int light = this.getBlockLight(x, y, z);
+            if (light <= 1) continue;
+            propagateBlockLightToNeighbor(x - 1, y, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x + 1, y, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y - 1, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y + 1, z, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y, z - 1, light, minY, maxY, pending);
+            propagateBlockLightToNeighbor(x, y, z + 1, light, minY, maxY, pending);
         }
     }
 
-    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight, int minY, int maxY) {
-        // Check bounds (only within chunk)
-        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) {
-            return;
-        }
-
-        int blockId = this.getBlockId(x, y, z);
-        int lightFilter = Block.getBlockLightFilter(blockId);
-        int newLight = sourceLight - Math.max(1, lightFilter);
-
-        if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {
-            this.setBlockLight(x, y, z, newLight);
+    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight,
+                                               int minY, int maxY, IntArrayFIFOQueue pending) {
+        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) return;
+        int filter = Block.getBlockLightFilter(this.getBlockId(x, y, z));
+        int light = sourceLight - Math.max(1, filter);
+        if (light > 0 && light > this.getBlockLight(x, y, z)) {
+            this.setBlockLight(x, y, z, light);
+            if (light > 1) pending.enqueue(((y - minY) << 8) | (z << 4) | x);
         }
     }
 
@@ -731,6 +775,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             existing.onReplacedWith(blockEntity);
             existing.close();
         }
+        // seqlock：须在全部 tiles 写入后自增 / seqlock: bump after all tiles writes
+        this.blockEntityRevision.incrementAndGet();
         if (this.isInit) {
             this.setChanged();
         }
@@ -748,6 +794,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
             }
 
+            // seqlock：须在全部 tiles 写入后自增 / seqlock: bump after all tiles writes
+            this.blockEntityRevision.incrementAndGet();
             if (this.isInit) {
                 this.setChanged();
             }
@@ -785,6 +833,33 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public Map<Long, BlockEntity> getBlockEntities() {
         return tiles == null ? Collections.emptyMap() : tiles;
+    }
+
+    /**
+     * 取某世界 section 内的方块实体（子区块序列化用），无则返回空列表。section 索引懒
+     * 构建并缓存，增删方块实体后自动重建；revision 在遍历前捕获，并发新增至多延后到
+     * 下一次重建可见。
+     * <p>
+     * Block entities of one world section (sub-chunk serialization); empty list when
+     * none. The section index is lazily built and cached, rebuilt after any
+     * add/remove; the revision is captured before iterating, so a concurrent add is
+     * at worst deferred to the next rebuild.
+     */
+    public List<BlockEntity> getBlockEntitiesOfSection(int worldSectionY) {
+        if (this.tiles == null || this.tiles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        int revision = this.blockEntityRevision.get();
+        if (this.blockEntitiesBySection == null || this.blockEntitiesBySectionRevision != revision) {
+            Int2ObjectOpenHashMap<List<BlockEntity>> index = new Int2ObjectOpenHashMap<>();
+            for (BlockEntity blockEntity : this.tiles.values()) {
+                index.computeIfAbsent((int) blockEntity.y >> 4, k -> new ArrayList<>()).add(blockEntity);
+            }
+            this.blockEntitiesBySection = index;
+            this.blockEntitiesBySectionRevision = revision;
+        }
+        List<BlockEntity> list = this.blockEntitiesBySection.get(worldSectionY);
+        return list == null ? Collections.emptyList() : list;
     }
 
     /**
@@ -959,6 +1034,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return changes.get();
     }
 
+    /** 不随存盘清零的修改版本。<p>Modification version that is not reset by saving. */
+    public long getModificationVersion() {
+        return this.modificationVersion;
+    }
+
     @Override
     public boolean hasChanged() {
         return this.changes.get() != 0;
@@ -967,6 +1047,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setChanged() {
         this.changes.incrementAndGet();
+        MODIFICATION_VERSION_UPDATER.incrementAndGet(this);
         chunkPackets = null;
     }
 

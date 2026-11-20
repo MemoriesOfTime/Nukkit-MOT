@@ -3,6 +3,7 @@ package cn.nukkit.utils.collection.nb;
 import cn.nukkit.api.NonComputationAtomic;
 import it.unimi.dsi.fastutil.ints.AbstractIntSet;
 import it.unimi.dsi.fastutil.ints.IntIterator;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.Serial;
@@ -124,10 +125,10 @@ public class Int2ObjectNonBlockingMap<TypeV>
     }
 
     // --- The Hash Table --------------------
-    private transient CHM _chm;
+    private transient volatile CHM _chm;
     // This next field holds the value for Key 0 - the special key value which
     // is the initial array value, and also means: no-key-inserted-yet.
-    private transient Object _val_1; // Value for Key: NO_KEY
+    private transient volatile Object _val_1; // Value for Key: NO_KEY
 
     // Time since last resize
     private transient long _last_resize_milli;
@@ -446,7 +447,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * Auto-boxing version of {@link #remove(int, Object)}.
      */
     @Override
-    public boolean remove(Object key, Object Val) {
+    public boolean remove(@NonNull Object key, Object Val) {
         return (key instanceof Integer) && remove(((Integer) key).intValue(), Val);
     }
 
@@ -470,7 +471,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * Auto-boxing version of {@link #replace}.
      */
     @Override
-    public TypeV replace(Integer key, TypeV Val) {
+    public TypeV replace(Integer key, @NonNull TypeV Val) {
         return replace(key.intValue(), Val);
     }
 
@@ -486,7 +487,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * Auto-boxing version of {@link #replace}.
      */
     @Override
-    public boolean replace(Integer key, TypeV oldValue, TypeV newValue) {
+    public boolean replace(Integer key, @NonNull TypeV oldValue, @NonNull TypeV newValue) {
         return replace(key.intValue(), oldValue, newValue);
     }
 
@@ -607,6 +608,18 @@ public class Int2ObjectNonBlockingMap<TypeV>
             _slots = new ConcurrentAutoIntTable();
             Arrays.fill(_keys, 0);
             Arrays.fill(_vals, null);
+        }
+
+        /**
+         * 按快照槽位取值，并处理清空换表和扩容迁移。
+         * <p>
+         * Reads a snapshot slot, following table replacement and slot migration.
+         */
+        private Object get_slot(final int idx, final int key) {
+            if (_nbhml._chm != this) return _nbhml.get(key);
+            final Object value = _OHandler.getAcquire(_vals, idx);
+            if (value instanceof Prime) return copy_slot_and_check(idx, key).get_impl(key);
+            return value == TOMBSTONE ? null : value;
         }
 
         // --- get_impl ----------------------------------------------------------
@@ -1104,25 +1117,26 @@ public class Int2ObjectNonBlockingMap<TypeV>
 
 
     // --- Snapshot ------------------------------------------------------------
+    private CHM snapshotTable() {
+        while (true) {
+            CHM topchm = _chm;
+            if (topchm._newchm == null) return topchm;
+            // 迭代开始前完成已有迁移，后续仍可能再次扩容。
+            // Finish an existing copy before iterating; later resizes remain possible.
+            topchm.help_copy_impl(true);
+        }
+    }
+
     // The main class for iterating over the NBHM.  It "snapshots" a clean
     // view of the K/V array.
     private class SnapshotV implements Iterator<TypeV>, Enumeration<TypeV> {
         final CHM _sschm;
 
         public SnapshotV() {
-            CHM topchm;
-            while (true) {           // Verify no table-copy-in-progress
-                topchm = _chm;
-                if (topchm._newchm == null) // No table-copy-in-progress
-                    break;
-                // Table copy in-progress - so we cannot get a clean iteration.  We
-                // must help finish the table copy before we can start iterating.
-                topchm.help_copy_impl(true);
-            }
             // The "linearization point" for the iteration.  Every key in this table
             // will be visited, but keys added later might be skipped or even be
             // added to a following table (also not iterated over).
-            _sschm = topchm;
+            _sschm = snapshotTable();
             // Warm-up the iterator
             _idx = -1;
             next();
@@ -1146,6 +1160,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public TypeV next() {
             // 'next' actually knows what the next value will be - it had to
             // figure that out last go 'round lest 'hasNext' report true and
@@ -1164,9 +1179,10 @@ public class Int2ObjectNonBlockingMap<TypeV>
                 if ((_nextV = get(_nextK)) != null) return _prevV;
             }
             while (_idx < length()) {  // Scan array
-                _nextK = key(_idx++); // Get a key that definitely is in the set (for the moment!)
+                final int slot = _idx++;
+                _nextK = key(slot);
                 if (_nextK != NO_KEY && // Found something?
-                        (_nextV = get(_nextK)) != null)
+                        (_nextV = (TypeV) _sschm.get_slot(slot, _nextK)) != null)
                     break;                // Got it!  _nextK is a valid Key
             }                         // Else keep scanning
             return _prevV;            // Return current value.
@@ -1225,7 +1241,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * to construction.
      */
     @Override
-    public Collection<TypeV> values() {
+    public @NonNull Collection<TypeV> values() {
         return new AbstractCollection<>() {
             @Override
             public void clear() {
@@ -1243,7 +1259,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
             }
 
             @Override
-            public Iterator<TypeV> iterator() {
+            public @NonNull Iterator<TypeV> iterator() {
                 return new SnapshotV();
             }
         };
@@ -1257,13 +1273,36 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * <strong>non-auto-boxing</strong> {@link #nextInt()} function.
      */
     public class IteratorInteger implements Iterator<Integer>, Enumeration<Integer>, IntIterator {
-        private final SnapshotV _ss;
+        private final CHM _sschm;
+        private int _idx = -1;
+        private int _nextK, _prevK;
+        private boolean _hasNext, _canRemove;
 
         /**
          * A new IteratorLong
          */
         public IteratorInteger() {
-            _ss = new SnapshotV();
+            _sschm = snapshotTable();
+            _hasNext = advance();
+        }
+
+        private boolean advance() {
+            if (_idx == -1) {
+                _idx = 0;
+                _nextK = NO_KEY;
+                if (get(NO_KEY) != null) {
+                    return true;
+                }
+            }
+            while (_idx < _sschm._keys.length) {
+                final int slot = _idx++;
+                final int key = _sschm._keys[slot];
+                if (key != NO_KEY && _sschm.get_slot(slot, key) != null) {
+                    _nextK = key;
+                    return true;
+                }
+            }
+            return false;
         }
 
         /**
@@ -1271,7 +1310,9 @@ public class Int2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public void remove() {
-            _ss.removeKey();
+            if (!_canRemove) throw new IllegalStateException();
+            Int2ObjectNonBlockingMap.this.putIfMatch(_prevK, TOMBSTONE, NO_MATCH_OLD);
+            _canRemove = false;
         }
 
         /**
@@ -1279,8 +1320,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public Integer next() {
-            _ss.next();
-            return _ss._prevK;
+            return nextInt();
         }
 
         /**
@@ -1288,8 +1328,11 @@ public class Int2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public int nextInt() {
-            _ss.next();
-            return _ss._prevK;
+            if (!_hasNext) throw new NoSuchElementException();
+            _prevK = _nextK;
+            _canRemove = true;
+            _hasNext = advance();
+            return _prevK;
         }
 
         /**
@@ -1297,7 +1340,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
          */
         @Override
         public boolean hasNext() {
-            return _ss.hasNext();
+            return _hasNext;
         }
 
         /**
@@ -1349,7 +1392,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * to construction.
      */
     @Override
-    public Set<Integer> keySet() {
+    public @NonNull Set<Integer> keySet() {
         return new AbstractIntSet() {
             @Override
             public void clear() {
@@ -1372,7 +1415,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
             }
 
             @Override
-            public IteratorInteger iterator() {
+            public @NonNull IteratorInteger iterator() {
                 return new IteratorInteger();
             }
         };
@@ -1499,7 +1542,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      */
     @Override
     @Deprecated
-    public Set<Entry<Integer, TypeV>> entrySet() {
+    public @NonNull Set<Entry<Integer, TypeV>> entrySet() {
         return new AbstractSet<>() {
             @Override
             public void clear() {
@@ -1525,7 +1568,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
             }
 
             @Override
-            public Iterator<Entry<Integer, TypeV>> iterator() {
+            public @NonNull Iterator<Entry<Integer, TypeV>> iterator() {
                 return new SnapshotESlow();
             }
         };
@@ -1557,7 +1600,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
             }
 
             @Override
-            public Iterator<IntObjectEntry<TypeV>> iterator() {
+            public @NonNull Iterator<IntObjectEntry<TypeV>> iterator() {
                 return new SnapshotE();
             }
         };
@@ -1626,7 +1669,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * It is not possible to atomically compute a value in a ConcurrentMap without locks.
      */
     @Override
-    public TypeV computeIfAbsent(Integer key, Function<? super Integer, ? extends TypeV> mappingFunction) {
+    public TypeV computeIfAbsent(Integer key, @NonNull Function<? super Integer, ? extends TypeV> mappingFunction) {
         return ConcurrentMap.super.computeIfAbsent(key, mappingFunction);
     }
 
@@ -1634,7 +1677,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * It is not possible to atomically compute a value in a ConcurrentMap without locks.
      */
     @Override
-    public TypeV computeIfPresent(Integer key, BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
+    public TypeV computeIfPresent(Integer key, @NonNull BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
         return ConcurrentMap.super.computeIfPresent(key, remappingFunction);
     }
 
@@ -1642,7 +1685,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * It is not possible to atomically compute a value in a ConcurrentMap without locks.
      */
     @Override
-    public TypeV compute(Integer key, BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
+    public TypeV compute(Integer key, @NonNull BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
         return ConcurrentMap.super.compute(key, remappingFunction);
     }
 
@@ -1650,7 +1693,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
      * It is not possible to atomically compute a value in a ConcurrentMap without locks.
      */
     @Override
-    public TypeV merge(Integer key, TypeV value, BiFunction<? super TypeV, ? super TypeV, ? extends TypeV> remappingFunction) {
+    public TypeV merge(Integer key, @NonNull TypeV value, @NonNull BiFunction<? super TypeV, ? super TypeV, ? extends TypeV> remappingFunction) {
         return ConcurrentMap.super.merge(key, value, remappingFunction);
     }
 }  // End Long2ObjectNonBlockingMap class

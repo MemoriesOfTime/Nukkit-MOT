@@ -771,6 +771,8 @@ public class Network {
             .registerPacket(ProtocolInfo.LECTERN_UPDATE_PACKET, LecternUpdatePacket.class)
             .registerPacket(ProtocolInfo.VIDEO_STREAM_CONNECT_PACKET, VideoStreamConnectPacket.class)
             .registerPacket(ProtocolInfo.CLIENT_CACHE_STATUS_PACKET, ClientCacheStatusPacket.class)
+            .registerPacket(ProtocolInfo.CLIENT_CACHE_BLOB_STATUS_PACKET, ClientCacheBlobStatusPacket.class)
+            .registerPacket(ProtocolInfo.CLIENT_CACHE_MISS_RESPONSE_PACKET, ClientCacheMissResponsePacket.class)
             .registerPacket(ProtocolInfo.MAP_CREATE_LOCKED_COPY_PACKET, MapCreateLockedCopyPacket.class)
             .registerPacket(ProtocolInfo.ON_SCREEN_TEXTURE_ANIMATION_PACKET, OnScreenTextureAnimationPacket.class)
             .registerPacket(ProtocolInfo.COMPLETED_USING_ITEM_PACKET, CompletedUsingItemPacket.class)
@@ -876,6 +878,15 @@ public class Network {
             // v2192 packets
             .registerPacket(ProtocolInfo.SET_PLAYER_FURNACE_OPTIONS_PACKET, SetPlayerFurnaceOptionsPacket.class)
             .registerPacket(ProtocolInfo.RECORD_STARTED_PACKET, RecordStartedPacket.class)
+            // v2225 packets
+            .registerPacket(ProtocolInfo.CLIENTBOUND_MATCHMAKING_STATE_PACKET, ClientboundMatchmakingStatePacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_STONECUTTER_SET_RECIPE_PACKET, ServerboundStonecutterSetRecipePacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_STONECUTTER_SET_RECIPE_PACKET, ClientboundStonecutterSetRecipePacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_MATCHMAKING_CANCEL_PACKET, ServerboundMatchmakingCancelPacket.class)
+            .registerPacket(ProtocolInfo.SET_PASSENGER_OF_BLOCK_PACKET, SetPassengerOfBlockPacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_CURSOR_ITEM_DRAG_PACKET, ServerboundCursorItemDragPacket.class)
+            .registerPacket(ProtocolInfo.CLIENTBOUND_PLAY_AUDIO_CONTENT_PACKET, ClientboundPlayAudioContentPacket.class)
+            .registerPacket(ProtocolInfo.SERVERBOUND_REGISTER_AUDIO_CONTENT_PACKET, ServerboundRegisterAudioContentPacket.class)
             .build();
 
         this.packetPoolCurrentNetEase = this.packetPoolCurrent.toBuilder()
