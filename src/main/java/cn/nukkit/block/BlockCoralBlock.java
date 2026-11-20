@@ -26,20 +26,21 @@ public class BlockCoralBlock extends BlockSolidMeta {
         return CORAL_BLOCK;
     }
     
+    private static final String[] NAMES = new String[] {
+            "Tube Coral Block",
+            "Brain Coral Block",
+            "Bubble Coral Block",
+            "Fire Coral Block",
+            "Horn Coral Block",
+            // Invalid
+            "Tube Coral Block",
+            "Tube Coral Block",
+            "Tube Coral Block"
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[] {
-                "Tube Coral Block",
-                "Brain Coral Block",
-                "Bubble Coral Block",
-                "Fire Coral Block",
-                "Horn Coral Block",
-                // Invalid
-                "Tube Coral Block",
-                "Tube Coral Block",
-                "Tube Coral Block"
-        };
-        String name = names[this.getDamage() & 0x7];
+        String name = NAMES[this.getDamage() & 0x7];
         if (this.isDead()) {
             return "Dead " + name;
         } else {
@@ -120,7 +121,9 @@ public class BlockCoralBlock extends BlockSolidMeta {
             if (item.getEnchantment(Enchantment.ID_SILK_TOUCH) != null) {
                 return new Item[]{this.toItem() };
             } else {
-                return new Item[]{ new ItemBlock(this.clone(), this.getDamage() | 0x8) };
+                BlockCoralBlock dead = (BlockCoralBlock) this.clone();
+                dead.setDead(true);
+                return new Item[]{dead.toItem()};
             }
         } else {
             return Item.EMPTY_ARRAY;

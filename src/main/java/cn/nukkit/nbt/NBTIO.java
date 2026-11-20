@@ -184,7 +184,16 @@ public class NBTIO {
     }
 
     public static CompoundTag readCompressed(InputStream inputStream, ByteOrder endianness) throws IOException {
-        return read(new BufferedInputStream(new GZIPInputStream(inputStream)), endianness);
+        return read(gzipInput(inputStream), endianness);
+    }
+
+    /**
+     * GZIPInputStream pulls compressed input through a 512-byte buffer by default, i.e. one
+     * read call on a file per 512 bytes of a player profile. 8 KiB on both layers keeps a
+     * profile read to a handful of calls; payloads themselves are copied in bulk by NBTInputStream.
+     */
+    private static InputStream gzipInput(InputStream compressed) throws IOException {
+        return new BufferedInputStream(new GZIPInputStream(compressed, 8192), 8192);
     }
 
     public static CompoundTag readCompressed(byte[] data) throws IOException {
@@ -200,7 +209,7 @@ public class NBTIO {
     }
 
     public static CompoundTag readNetworkCompressed(InputStream inputStream, ByteOrder endianness) throws IOException {
-        return read(new BufferedInputStream(new GZIPInputStream(inputStream)), endianness);
+        return read(gzipInput(inputStream), endianness);
     }
 
     public static CompoundTag readNetworkCompressed(byte[] data) throws IOException {

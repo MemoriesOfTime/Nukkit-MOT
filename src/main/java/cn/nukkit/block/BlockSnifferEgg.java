@@ -47,6 +47,28 @@ public class BlockSnifferEgg extends BlockTransparentMeta implements BlockProper
         return this.getLevel().setBlock(this, this, true, true);
     }
 
+    // Bedrock collision (minecraft-data bedrock/1.26.30), same as EaseCation's BlockSnifferEgg:
+    // 14/16 wide along X, 12/16 along Z, full height.
+    @Override
+    public double getMinX() {
+        return this.x + 1 / 16d;
+    }
+
+    @Override
+    public double getMaxX() {
+        return this.x + 15 / 16d;
+    }
+
+    @Override
+    public double getMinZ() {
+        return this.z + 2 / 16d;
+    }
+
+    @Override
+    public double getMaxZ() {
+        return this.z + 14 / 16d;
+    }
+
     public void setCrackedState(CrackedState state) {
         setPropertyValue(VanillaProperties.CRACKED_STATE, state);
     }

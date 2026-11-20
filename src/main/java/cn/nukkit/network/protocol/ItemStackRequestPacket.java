@@ -11,6 +11,7 @@ import java.util.List;
 public class ItemStackRequestPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ITEM_STACK_REQUEST_PACKET;
+    private static final int MAX_REQUESTS = 128;
 
     private final List<ItemStackRequest> requests = new ArrayList<>();
 
@@ -25,7 +26,8 @@ public class ItemStackRequestPacket extends DataPacket {
 
     @Override
     public void decode() {
-        requests.addAll(List.of(getArray(ItemStackRequest.class, stream -> stream.readItemStackRequest(this.gameVersion))));
+        requests.addAll(List.of(getArray(ItemStackRequest.class,
+                stream -> stream.readItemStackRequest(this.gameVersion), MAX_REQUESTS, "item stack request count")));
     }
 
     @Override

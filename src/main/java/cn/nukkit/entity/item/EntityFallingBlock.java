@@ -250,10 +250,9 @@ public class EntityFallingBlock extends Entity {
                         this.level.setBlock(landingBlock, event.getTo(), true, true);
                         this.level.scheduleUpdate(this.level.getBlock(landingBlock), 1);
 
-                        // Relocate overlapping falling blocks upward to avoid repeated landing in the same position
+                        // Keep other falling blocks at their physical positions; occupied cells emit an item.
                         AxisAlignedBB bb = this.getBoundingBox();
                         bb.setMaxY(bb.getMaxY() + 0.021); //实体高度为0.98，这里增加一点防止误判
-                        resolveOverlappingFallingBlocks(CollisionHelper.getCollidingEntities(this.level, bb), landingBlock.y);
 
                         if (event.getTo().getId() == Item.ANVIL || blockId == Item.POINTED_DRIPSTONE) {
                             if (blockId == Item.ANVIL) {

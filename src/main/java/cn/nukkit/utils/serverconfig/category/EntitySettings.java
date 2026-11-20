@@ -32,6 +32,18 @@ public class EntitySettings extends OkaeriConfig {
     @CustomKey("ticks-per-spawns")
     private int ticksPerSpawns = 200;
 
+    @Comment("Mobs farther than this many blocks (horizontally) from every player in their world run their")
+    @Comment("update once per second instead of every tick, catching up the skipped time. Mobs already stop")
+    @Comment("walking past this range. 0 turns the throttle off and keeps the walking range at 80 blocks")
+    @CustomKey("activation-blocks")
+    private int activationBlocks = 80;
+
+    @Comment("Ticks between target searches for mobs without a follow target (vanilla-style reduced")
+    @Comment("tick delay, phase-spread per mob). Mobs with a target, under attack or knock-back still")
+    @Comment("search every tick. 1 restores the old per-tick search")
+    @CustomKey("target-search-interval")
+    private int targetSearchInterval = 10;
+
     @Comment("Ticks between entity despawn checks")
     @CustomKey("ticks-per-despawns")
     private int ticksPerDespawns = 12000;

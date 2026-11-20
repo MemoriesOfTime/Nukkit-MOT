@@ -10,9 +10,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
@@ -24,8 +24,8 @@ public class JavaPluginLoader implements PluginLoader {
 
     private final Server server;
 
-    private final Map<String, Class<?>> classes = new HashMap<>();
-    private final Map<String, PluginClassLoader> classLoaders = new HashMap<>();
+    private final Map<String, Class<?>> classes = new ConcurrentHashMap<>();
+    private final Map<String, PluginClassLoader> classLoaders = new ConcurrentHashMap<>();
 
     public JavaPluginLoader(Server server) {
         this.server = server;
@@ -194,8 +194,6 @@ public class JavaPluginLoader implements PluginLoader {
     }
 
     void setClass(final String name, final Class<?> clazz) {
-        if (!classes.containsKey(name)) {
-            classes.put(name, clazz);
-        }
+        classes.putIfAbsent(name, clazz);
     }
 }

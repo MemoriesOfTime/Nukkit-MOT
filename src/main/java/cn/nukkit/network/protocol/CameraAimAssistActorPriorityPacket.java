@@ -30,7 +30,7 @@ public class CameraAimAssistActorPriorityPacket extends DataPacket {
 
     @Override
     public void decode() {
-        int count = (int) this.getUnsignedVarInt();
+        int count = this.getUnsignedVarIntCount("camera actor priority count");
         this.priorities = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             int presetIndex = this.getLInt();

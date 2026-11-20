@@ -5,6 +5,11 @@ import cn.nukkit.utils.BlockColor;
 public class BlockFencePaleOak extends BlockFence {
 
     public BlockFencePaleOak() {
+        this(0);
+    }
+
+    public BlockFencePaleOak(int meta) {
+        super(meta);
     }
 
     @Override

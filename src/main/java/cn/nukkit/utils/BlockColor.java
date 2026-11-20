@@ -136,6 +136,11 @@ public class BlockColor  {
     }
 
     @Override
+    public int hashCode() {
+        return this.alpha << 24 | this.red << 16 | this.green << 8 | this.blue;
+    }
+
+    @Override
     public String toString() {
         return "BlockColor[r=" + this.red + ",g=" + this.green + ",b=" + this.blue + ",a=" + this.alpha + ']';
     }

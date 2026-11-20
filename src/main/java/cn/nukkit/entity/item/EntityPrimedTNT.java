@@ -158,16 +158,33 @@ public class EntityPrimedTNT extends Entity implements EntityExplosive {
 
     @Override
     public void explode() {
+        if (this.closed || !this.isAlive()) return;
         EntityExplosionPrimeEvent event = new EntityExplosionPrimeEvent(this, 4);
         server.getPluginManager().callEvent(event);
+        if (this.closed || !this.isAlive()) return;
         if (event.isCancelled()) {
             return;
         }
-        Explosion explosion = new Explosion(this, event.getForce(), this);
-        if (event.isBlockBreaking()) {
-            explosion.explodeA();
+        if (!this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
+            this.close();
+            return;
         }
-        explosion.explodeB();
+        Explosion explosion = new Explosion(this, event.getForce(), this);
+        Throwable closeFailure = null;
+        try {
+            this.close();
+        } catch (RuntimeException | Error failure) {
+            closeFailure = failure;
+        }
+        try {
+            if (event.isBlockBreaking()) explosion.explodeA();
+            explosion.explodeB();
+        } catch (RuntimeException | Error blastFailure) {
+            if (closeFailure == null) throw blastFailure;
+            if (closeFailure != blastFailure) closeFailure.addSuppressed(blastFailure);
+        }
+        if (closeFailure instanceof RuntimeException failure) throw failure;
+        if (closeFailure instanceof Error failure) throw failure;
     }
 
     public Entity getSource() {

@@ -3,6 +3,7 @@ package cn.nukkit.network;
 import cn.nukkit.lang.BaseLang;
 import io.netty.channel.EventLoop;
 import org.cloudburstmc.netty.channel.nethernet.signaling.NetherNetServerSignaling;
+import org.cloudburstmc.netty.channel.nethernet.signaling.PongData;
 import org.junit.jupiter.api.Test;
 import tel.schich.libdatachannel.PeerConnectionConfiguration;
 
@@ -96,6 +97,31 @@ class NetherNetUdpPortsTest {
     }
 
     @Test
+    void hostNamePrefixIsPassedThrough() {
+        NetherNetUdpPorts bare = NetherNetUdpPorts.parse("example.com:32000", LANG);
+        assertNotNull(bare);
+        assertEquals(32000, bare.begin());
+        assertEquals(0, bare.offset());
+        assertEquals(Set.of("example.com"), bare.advertisedAddresses(),
+                "a host name passes through verbatim, unresolved, for the signaling stack");
+
+        NetherNetUdpPorts mapping = NetherNetUdpPorts.parse("example.com:19132:32000", LANG);
+        assertNotNull(mapping);
+        assertEquals(19132 - 32000, mapping.offset());
+        assertEquals(Set.of("example.com"), mapping.advertisedAddresses());
+
+        NetherNetUdpPorts mixed = NetherNetUdpPorts.parse("Example.COM:32000,203.0.113.10:32000", LANG);
+        assertEquals(Set.of("Example.COM", "203.0.113.10"), mixed.advertisedAddresses(),
+                "host names and IP literals accumulate, the name keeping its case as written");
+
+        assertEquals("udp/32000 published as 19132 via [example.com]",
+                NetherNetUdpPorts.parse("example.com:19132:32000", LANG).toString());
+
+        NetherNetUdpPorts relayed = NetherNetUdpPorts.parse("example.com:19132", LANG).relayedThrough(19135);
+        assertEquals(Set.of("example.com"), relayed.advertisedAddresses(), "the host name survives relaying");
+    }
+
+    @Test
     void conflictingWindowsAreRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> NetherNetUdpPorts.parse("32000,33000", LANG),
@@ -127,8 +153,14 @@ class NetherNetUdpPortsTest {
                 "non-numeric values are invalid");
         assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("50000-abc", LANG),
                 "a non-numeric range end is invalid");
-        assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("example.com:32000", LANG),
-                "hostnames are not accepted, only IP literals");
+        assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("exa_mple.com:32000", LANG),
+                "a host name with illegal characters is rejected");
+        assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("-bad.com:32000", LANG),
+                "a label may not start with a hyphen");
+        assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("[example.com]:32000", LANG),
+                "brackets belong to IPv6 literals, not host names");
+        assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("myserver:32000", LANG),
+                "a dotless first group is a mapping's external range, not an address");
         assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("999.1.1.1:32000", LANG),
                 "an invalid IPv4 literal is rejected");
         assertThrows(IllegalArgumentException.class, () -> NetherNetUdpPorts.parse("[2001:db8::1:32000", LANG),
@@ -151,6 +183,11 @@ class NetherNetUdpPortsTest {
                 () -> NetherNetUdpPorts.parse("70000", new BaseLang("chs")));
         assertTrue(chs.getMessage().contains("端口范围"),
                 "the chs message comes from lang.ini, got: " + chs.getMessage());
+
+        IllegalArgumentException badHost = assertThrows(IllegalArgumentException.class,
+                () -> NetherNetUdpPorts.parse("exa_mple.com:32000", LANG));
+        assertTrue(badHost.getMessage().contains("is not a valid host name"),
+                "the badHostname message comes from lang.ini, got: " + badHost.getMessage());
     }
 
     @Test
@@ -275,7 +312,7 @@ class NetherNetUdpPortsTest {
 
         assertNotNull(decorated);
         assertNotSame(signaling, decorated);
-        decorated.sendFullSdp("peer", "a=candidate:1 1 UDP 2130706431 192.168.1.5 32000 typ host\r\n");
+        decorated.sendDescription("peer", "a=candidate:1 1 UDP 2130706431 192.168.1.5 32000 typ host\r\n");
         assertNotNull(signaling.lastSdp, "the wrapper delegates the answer onward");
         assertTrue(signaling.lastSdp.contains(" 19132 typ host"), "the delegated answer carries the external port");
     }
@@ -293,12 +330,12 @@ class NetherNetUdpPortsTest {
         String lastSdp;
 
         @Override
-        public void sendFullSdp(String targetNetworkId, String sdp) {
+        public void sendDescription(String targetNetworkId, String sdp) {
             this.lastSdp = sdp;
         }
 
         @Override
-        public void bind(SocketAddress localAddress, EventLoop eventLoop) {
+        public void bind(SocketAddress localAddress, InetSocketAddress advertisedAddress, EventLoop eventLoop) {
         }
 
         @Override
@@ -310,11 +347,11 @@ class NetherNetUdpPortsTest {
         }
 
         @Override
-        public void setSignalHandler(long connectionId, SignalHandler handler) {
+        public void setSignalHandler(String connectionId, SignalHandler handler) {
         }
 
         @Override
-        public void removeSignalHandler(long connectionId) {
+        public void removeSignalHandler(String connectionId) {
         }
 
         @Override

@@ -38,7 +38,7 @@ public class LinkedCompoundTag extends CompoundTag {
 
     @Override
     public LinkedCompoundTag copy() {
-        var nbt = new LinkedCompoundTag();
+        var nbt = new LinkedCompoundTag(this.getName());
         this.getTags().forEach((key, value) -> nbt.put(key, value.copy()));
         return nbt;
     }

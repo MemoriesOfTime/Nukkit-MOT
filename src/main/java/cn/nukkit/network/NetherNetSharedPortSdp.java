@@ -25,6 +25,8 @@ final class NetherNetSharedPortSdp {
     private static final long HOST_TYPE_PREFERENCE = 126;
     /** 与库内 SdpUtil 的 80000000/90000000 段错开。 Kept clear of SdpUtil's 80000000/90000000 ranges. */
     private static final int SYNTHESIZED_FOUNDATION_BASE = 70000000;
+    /** 域名候选单占一段：同 foundation 的同类型候选会被对端当成重复。 Appended domain candidates take their own foundation range, since host candidates sharing one count as duplicates. */
+    private static final int APPENDED_FOUNDATION_BASE = 71000000;
     static final int MAX_ADDRESSES_PER_FAMILY = 8;
 
     /** 每个地址族对外发布的端口，-1 表示该族没有 RakNet 监听、不发布候选。 External port per family, -1 means no listener for that family. */
@@ -32,6 +34,14 @@ final class NetherNetSharedPortSdp {
         int forFamily(InetAddress address) {
             return address instanceof Inet6Address ? this.ipv6 : this.ipv4;
         }
+    }
+
+    /** 追加候选取端口的方式。 How appended candidates take their port. */
+    enum PortSource {
+        /** 共用端口：全族沿用应答里的内部端口，由随后的改写平移到对外端口。 Shared port: both families stay on the answer's internal port for the rewrite to map. */
+        SHARED,
+        /** 独立媒体：每族取该族第一条 host 候选的端口。 Direct media: each family takes its own first host candidate's port. */
+        PER_FAMILY
     }
 
     private NetherNetSharedPortSdp() {
@@ -47,7 +57,8 @@ final class NetherNetSharedPortSdp {
      * library's advertised-address translation still has a same-family host line to build on.
      */
     static String rewriteAnswer(String sdp, int internalPort, List<InetAddress> addresses, ExternalPorts ports) {
-        List<String> synthesized = synthesizedCandidates(addresses, ports);
+        List<String> synthesized = synthesizedCandidates(addresses, ports, SYNTHESIZED_FOUNDATION_BASE,
+                udpHostPriorities(sdp));
         StringBuilder out = new StringBuilder(sdp.length() + synthesized.size() * 64);
         boolean replaced = false;
         for (String line : sdp.split("\r\n|\n")) {
@@ -103,24 +114,127 @@ final class NetherNetSharedPortSdp {
     }
 
     /**
-     * 每个地址一行 host 候选，本地偏好按顺序递减（RFC 8445 §5.1.2.1），foundation 各不相同。
-     * One host candidate per address, local preference descending in list order
-     * (RFC 8445 §5.1.2.1), each with its own foundation.
+     * 每个地址一行 host 候选，本地偏好按顺序递减且避开已有值（RFC 8445 §5.1.2.1），foundation 各不相同。
+     * One host candidate per address, with descending local preferences that avoid existing values
+     * (RFC 8445 §5.1.2.1) and a distinct foundation for each.
      */
-    static List<String> synthesizedCandidates(List<InetAddress> addresses, ExternalPorts ports) {
+    private static List<String> synthesizedCandidates(List<InetAddress> addresses, ExternalPorts ports,
+                                                      int foundationBase, Set<Long> usedPriorities) {
         List<String> lines = new ArrayList<>(addresses.size());
         int index = 0;
+        int localPreference = 65535;
         for (InetAddress address : addresses) {
             int port = ports.forFamily(address);
             if (port <= 0) {
                 continue;
             }
-            long priority = (HOST_TYPE_PREFERENCE << 24) | ((long) (65535 - index) << 8) | 255;
-            lines.add(CANDIDATE_PREFIX + (SYNTHESIZED_FOUNDATION_BASE + index) + " 1 UDP " + priority + " "
+            long priority;
+            while (true) {
+                if (localPreference < 0) {
+                    // 每族至多 8 个地址，走不到这里；真到了就少发几条，别让应答断在异常上
+                    // Unreachable with the per-family cap; should it happen, send fewer lines rather
+                    // than lose the whole answer to an exception
+                    return lines;
+                }
+                priority = (HOST_TYPE_PREFERENCE << 24) | ((long) localPreference-- << 8) | 255;
+                if (usedPriorities.add(priority)) {
+                    break;
+                }
+            }
+            lines.add(CANDIDATE_PREFIX + (foundationBase + index) + " 1 UDP " + priority + " "
                     + address.getHostAddress() + " " + port + " typ host");
             index++;
         }
         return lines;
+    }
+
+    private static Set<Long> udpHostPriorities(String sdp) {
+        Set<Long> priorities = new HashSet<>();
+        for (String line : sdp.split("\r\n|\n")) {
+            if (!line.startsWith(CANDIDATE_PREFIX)) {
+                continue;
+            }
+            String[] parts = line.split(" ");
+            if (!isHostUdp(parts)) {
+                continue;
+            }
+            try {
+                priorities.add(Long.parseLong(parts[3]));
+            } catch (NumberFormatException ignored) {
+                // 非本方法生成的非法候选保持原样 Leave malformed candidates from elsewhere untouched
+            }
+        }
+        return priorities;
+    }
+
+    /**
+     * 在候选块末尾追加若干地址的 host 候选，端口取应答里的 UDP host 候选（媒体 socket 的端口；共用端口模式下
+     * 是内部回环端口，由随后的改写按地址族平移到对外端口）。共用端口模式全族沿用这一个端口：应答里只有内部回环
+     * 候选，IPv6 的可达性来自中继监听而非本地族。独立媒体则每族取该族第一条 host 候选的端口，应答里没有的族
+     * 不追加——同一个端口换个地址族只会让对端多跑一轮失败的检查。
+     * <p>
+     * Appends host candidates for the given addresses at the end of the candidate block, on the
+     * port of the answer's UDP host candidates (the media socket's port, the internal loopback one
+     * in shared-port mode, which the rewrite that follows maps per family). Shared-port mode keeps
+     * both families on that one port: the answer carries only internal loopback candidates, and
+     * IPv6 reachability comes from the relay listeners rather than the local family. Direct media
+     * gives each family its first host candidate's port and none to a family the answer lacks,
+     * since one port for another family only costs the peer a failed check.
+     */
+    static String appendCandidates(String sdp, List<InetAddress> addresses, boolean includeIpv6, PortSource portSource) {
+        List<String> added = synthesizedCandidates(selectAddresses(addresses, includeIpv6),
+                appendedPorts(sdp, portSource), APPENDED_FOUNDATION_BASE, udpHostPriorities(sdp));
+        if (added.isEmpty()) {
+            return sdp;
+        }
+        StringBuilder out = new StringBuilder(sdp.length() + added.size() * 64);
+        boolean written = false;
+        for (String line : sdp.split("\r\n|\n")) {
+            if (line.isEmpty()) {
+                continue;
+            }
+            if (!written && line.startsWith("a=end-of-candidates")) {
+                appendAll(out, added);
+                written = true;
+            }
+            out.append(line).append("\r\n");
+        }
+        if (!written) {
+            appendAll(out, added);
+        }
+        return out.toString();
+    }
+
+    /** 追加候选取的端口：共用端口模式取首个 host 候选，独立媒体按族各取首个。 The port appended candidates use: the first host candidate in shared mode, the first per family for direct media. */
+    private static ExternalPorts appendedPorts(String sdp, PortSource portSource) {
+        int first = -1;
+        int ipv4 = -1;
+        int ipv6 = -1;
+        for (String line : sdp.split("\r\n|\n")) {
+            if (!line.startsWith(CANDIDATE_PREFIX)) {
+                continue;
+            }
+            String[] parts = line.split(" ");
+            if (!isHostUdp(parts)) {
+                continue;
+            }
+            InetAddress address = NetUtil.createInetAddressFromIpAddressString(parts[4]);
+            int port = address == null ? -1 : parsePort(parts[5]);
+            if (port <= 0) {
+                continue;
+            }
+            if (first < 0) {
+                first = port;
+            }
+            if (address instanceof Inet6Address) {
+                if (ipv6 < 0) {
+                    ipv6 = port;
+                }
+            } else if (ipv4 < 0) {
+                ipv4 = port;
+            }
+        }
+        return portSource == PortSource.SHARED ? new ExternalPorts(first, first) : new ExternalPorts(ipv4, ipv6);
     }
 
     /** 回环的 c= 行换成首个同族可达地址，没有则用通配地址。 A loopback c= line takes the first same-family address, else the wildcard. */

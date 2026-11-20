@@ -5,9 +5,13 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockDoubleSlabBlackstone extends BlockSolid {
+public class BlockDoubleSlabBlackstone extends BlockSolidMeta {
     public BlockDoubleSlabBlackstone() {
+        this(0);
+    }
 
+    public BlockDoubleSlabBlackstone(int meta) {
+        super(meta);
     }
 
     @Override

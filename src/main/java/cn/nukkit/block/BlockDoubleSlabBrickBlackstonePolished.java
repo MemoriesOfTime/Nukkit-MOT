@@ -5,7 +5,11 @@ import cn.nukkit.item.ItemBlock;
 
 public class BlockDoubleSlabBrickBlackstonePolished extends BlockDoubleSlabBlackstonePolished {
     public BlockDoubleSlabBrickBlackstonePolished() {
+        this(0);
+    }
 
+    public BlockDoubleSlabBrickBlackstonePolished(int meta) {
+        super(meta);
     }
 
     @Override
