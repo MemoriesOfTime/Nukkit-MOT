@@ -110,11 +110,9 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
 
     @Override
     public CompoundTag getSpawnCompound(int protocol) {
-        if (!this.namedTag.contains("Item")) {
-            this.setItem(new ItemBlock(Block.get(BlockID.AIR)), false);
-        }
-
-        CompoundTag itemOriginal = namedTag.getCompound("Item");
+        // Serialization may run under a chunk read lock: never call a world-mutating setter.
+        CompoundTag itemOriginal = this.namedTag.contains("Item") ? this.namedTag.getCompound("Item")
+                : NBTIO.putItemHelper(new ItemBlock(Block.get(BlockID.AIR)));
 
         CompoundTag tag = new CompoundTag()
                 .putString("id", this instanceof BlockEntityItemFrameGlow
