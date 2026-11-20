@@ -1,15 +1,47 @@
 package cn.nukkit.entity.route;
 
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+
 /**
  * @author zzz1999 @ MobPlugin
  */
 public class RouteFinderSearchTask implements Runnable {
 
+    private static final int DIRECT = 0;
+    private static final int QUEUED = 1;
+    private static final int RUNNING = 2;
+    private static final int RELEASED = 3;
+    private static final AtomicIntegerFieldUpdater<RouteFinderSearchTask> ADMISSION =
+            AtomicIntegerFieldUpdater.newUpdater(RouteFinderSearchTask.class, "admissionState");
+
     private final RouteFinder route;
     private int retryTime;
+    private volatile int admissionState;
 
     public RouteFinderSearchTask(RouteFinder route) {
         this.route = route;
+    }
+
+    boolean tryQueue() {
+        if (this.route == null || !ADMISSION.compareAndSet(this, DIRECT, QUEUED)) {
+            return false;
+        }
+        // Cancellation must see QUEUED as soon as the route exposes this owner.
+        if (!this.route.reserveSearch(this)) {
+            ADMISSION.compareAndSet(this, QUEUED, DIRECT);
+            return false;
+        }
+        if (this.route.isSearchClosed()) {
+            discardQueued();
+            return false;
+        }
+        return this.admissionState == QUEUED;
+    }
+
+    void discardQueued() {
+        if (this.route != null && ADMISSION.compareAndSet(this, QUEUED, RELEASED)) {
+            this.route.releaseSearch(this);
+        }
     }
 
     @Override
@@ -18,20 +50,36 @@ public class RouteFinderSearchTask implements Runnable {
             return;
         }
 
-        while (this.retryTime < 5) {
-            if (!this.route.isSearching()) {
-                this.route.research();
-                return;
-            } else {
-                this.retryTime++;
-
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ignore) {
-                }
-            }
+        boolean reserved = this.admissionState != DIRECT;
+        if (reserved && !ADMISSION.compareAndSet(this, QUEUED, RUNNING)) {
+            return;
         }
 
-        this.route.interrupt();
+        try {
+            while (this.retryTime < 5) {
+                if (this.route.isSearchClosed()) {
+                    return;
+                }
+                if (!this.route.isSearching()) {
+                    this.route.research();
+                    return;
+                } else {
+                    this.retryTime++;
+
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ignore) {
+                    }
+                }
+            }
+
+            this.route.interrupt();
+        } finally {
+            if (reserved) {
+                // Failed admission cannot cancel a task another worker already started.
+                this.admissionState = RELEASED;
+                this.route.releaseSearch(this);
+            }
+        }
     }
 }
