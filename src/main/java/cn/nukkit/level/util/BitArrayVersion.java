@@ -15,6 +15,8 @@ public enum BitArrayVersion {
      */
     V0(0, 0, V1);
 
+    private static final BitArrayVersion[] LOOKUP_VERSIONS = values();
+
     final byte bits;
     final byte entriesPerWord;
     final int maxEntryValue;
@@ -28,7 +30,7 @@ public enum BitArrayVersion {
     }
 
     public static BitArrayVersion get(int version, boolean read) {
-        for (BitArrayVersion ver : values()) {
+        for (BitArrayVersion ver : LOOKUP_VERSIONS) {
             if ((!read && ver.entriesPerWord <= version) || (read && ver.bits == version)) {
                 return ver;
             }

@@ -14,6 +14,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -74,13 +75,15 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
         Entity collisionEntity = null;
         Block collisionBlock = null;
         for (int i = 0; i < SPLIT_NUMBER; ++i) {
+            AxisAlignedBB sweptAABB = currentAABB.addCoord(dirVector.x, dirVector.y, dirVector.z);
             AxisAlignedBB movedAABB = currentAABB.offset(dirVector.x, dirVector.y, dirVector.z);
 
-            List<Block> collisionBlocks = CollisionHelper.getCollisionBlocks(this.level, movedAABB);
+            List<Block> collisionBlocks = CollisionHelper.getCollisionBlocks(this.level, sweptAABB);
 
             if (!collisionBlocks.isEmpty()) {
                 Optional<Block> closestBlock = collisionBlocks.stream()
                         .filter(block -> !this.canPassThroughBarrier() || block.getId() != BlockID.BARRIER)
+                        .filter(block -> crossesBlock(block, movedAABB, sweptAABB, dirVector))
                         .min(Comparator.comparingDouble(projectile::distanceSquared));
 
                 if (closestBlock.isPresent()) {
@@ -190,7 +193,8 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
                 blockFace = BlockFace.UP;
                 block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ()).up();
             }
-            if (block.getId() == 0 && collisionBlock != null) {
+            // A solid guessed neighbor must not replace the block found by the collision sweep.
+            if (collisionBlock != null) {
                 block = collisionBlock;
             }
             ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(block.getFloorX(), block.getFloorY(), block.getFloorZ(), blockFace, this));
@@ -202,6 +206,28 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
         }
 
         return true;
+    }
+
+    /** Sweep the projectile body through each actual collision part, including thin pane arms. */
+    private static boolean crossesBlock(Block block, AxisAlignedBB endBox, AxisAlignedBB sweptBox, Vector3 step) {
+        // Preserve endpoint contacts, including custom blocks with their own collision predicate.
+        if (block.collidesWithBB(endBox)) {
+            return true;
+        }
+        double halfX = (endBox.getMaxX() - endBox.getMinX()) / 2;
+        double halfY = (endBox.getMaxY() - endBox.getMinY()) / 2;
+        double halfZ = (endBox.getMaxZ() - endBox.getMinZ()) / 2;
+        Vector3 end = new Vector3(endBox.getMinX() + halfX, endBox.getMinY() + halfY, endBox.getMinZ() + halfZ);
+        Vector3 start = end.subtract(step);
+        List<AxisAlignedBB> parts = new ArrayList<>();
+        block.addCollisionBoxesToList(sweptBox, parts);
+        for (AxisAlignedBB part : parts) {
+            AxisAlignedBB expanded = part.grow(halfX, halfY, halfZ);
+            if (expanded.isVectorInside(start) || expanded.calculateIntercept(start, end) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

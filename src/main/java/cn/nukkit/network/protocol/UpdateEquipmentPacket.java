@@ -29,6 +29,7 @@ public class UpdateEquipmentPacket extends DataPacket {
         this.reset();
         this.putByte((byte) this.windowId);
         this.putByte((byte) this.windowType);
+        this.putVarInt(this.unknown);
         this.putEntityUniqueId(this.eid);
         this.put(this.namedtag);
     }

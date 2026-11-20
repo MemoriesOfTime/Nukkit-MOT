@@ -55,11 +55,6 @@ public class BlockFenceNetherBrick extends BlockFence {
     }
 
     @Override
-    public boolean canConnect(Block block) {
-        return (block instanceof BlockFenceNetherBrick || block instanceof BlockFenceGate) || block.isSolid() && !block.isTransparent();
-    }
-
-    @Override
     public BlockColor getColor() {
         return BlockColor.NETHERRACK_BLOCK_COLOR;
     }

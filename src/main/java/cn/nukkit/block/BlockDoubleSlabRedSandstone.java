@@ -47,25 +47,26 @@ public class BlockDoubleSlabRedSandstone extends BlockSolidMeta {
         return ItemTool.TIER_WOODEN;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Red Sandstone",
+            "Purpur",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Red Sandstone",
-                "Purpur",
-                "",
-                "",
-                "",
-                "",
-                "",
-                ""
-        };
-
-        return "Double " + names[this.getDamage() & 0x07] + " Slab";
+        return "Double " + NAMES[this.getDamage() & 0x07] + " Slab";
     }
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(RED_SANDSTONE_SLAB), this.getDamage() & 0x07);
+        int damage = this.getDamage() & 0x07;
+        return new ItemBlock(Block.get(RED_SANDSTONE_SLAB, damage), damage);
     }
 
     @Override
