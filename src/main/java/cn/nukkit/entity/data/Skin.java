@@ -46,15 +46,7 @@ public class Skin {
     public static final String STEVE_GEOMETRY_OLD = "{\"geometry.humanoid\":{\"bones\":[{\"name\":\"body\",\"pivot\":[0,24,0],\"cubes\":[{\"origin\":[-4,12,-2],\"size\":[8,12,4],\"uv\":[16,16]}]},{\"name\":\"waist\",\"neverRender\":true,\"pivot\":[0,12,0]},{\"name\":\"head\",\"pivot\":[0,24,0],\"cubes\":[{\"origin\":[-4,24,-4],\"size\":[8,8,8],\"uv\":[0,0]}]},{\"name\":\"hat\",\"pivot\":[0,24,0],\"cubes\":[{\"origin\":[-4,24,-4],\"size\":[8,8,8],\"uv\":[32,0],\"inflate\":0.5}],\"neverRender\":true},{\"name\":\"rightArm\",\"pivot\":[-5,22,0],\"cubes\":[{\"origin\":[-8,12,-2],\"size\":[4,12,4],\"uv\":[40,16]}]},{\"name\":\"leftArm\",\"pivot\":[5,22,0],\"cubes\":[{\"origin\":[4,12,-2],\"size\":[4,12,4],\"uv\":[40,16]}],\"mirror\":true},{\"name\":\"rightLeg\",\"pivot\":[-1.9,12,0],\"cubes\":[{\"origin\":[-3.9,0,-2],\"size\":[4,12,4],\"uv\":[0,16]}]},{\"name\":\"leftLeg\",\"pivot\":[1.9,12,0],\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[0,16]}],\"mirror\":true}]},\"geometry.cape\":{\"texturewidth\":64,\"textureheight\":32,\"bones\":[{\"name\":\"cape\",\"pivot\":[0,24,-3],\"cubes\":[{\"origin\":[-5,8,-3],\"size\":[10,16,1],\"uv\":[0,0]}],\"material\":\"alpha\"}]},\"geometry.humanoid.custom:geometry.humanoid\":{\"bones\":[{\"name\":\"hat\",\"neverRender\":false,\"material\":\"alpha\",\"pivot\":[0,24,0]},{\"name\":\"leftArm\",\"reset\":true,\"mirror\":false,\"pivot\":[5,22,0],\"cubes\":[{\"origin\":[4,12,-2],\"size\":[4,12,4],\"uv\":[32,48]}]},{\"name\":\"rightArm\",\"reset\":true,\"pivot\":[-5,22,0],\"cubes\":[{\"origin\":[-8,12,-2],\"size\":[4,12,4],\"uv\":[40,16]}]},{\"name\":\"rightItem\",\"pivot\":[-6,15,1],\"neverRender\":true,\"parent\":\"rightArm\"},{\"name\":\"leftSleeve\",\"pivot\":[5,22,0],\"cubes\":[{\"origin\":[4,12,-2],\"size\":[4,12,4],\"uv\":[48,48],\"inflate\":0.25}],\"material\":\"alpha\"},{\"name\":\"rightSleeve\",\"pivot\":[-5,22,0],\"cubes\":[{\"origin\":[-8,12,-2],\"size\":[4,12,4],\"uv\":[40,32],\"inflate\":0.25}],\"material\":\"alpha\"},{\"name\":\"leftLeg\",\"reset\":true,\"mirror\":false,\"pivot\":[1.9,12,0],\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[16,48]}]},{\"name\":\"leftPants\",\"pivot\":[1.9,12,0],\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[0,48],\"inflate\":0.25}],\"pos\":[1.9,12,0],\"material\":\"alpha\"},{\"name\":\"rightPants\",\"pivot\":[-1.9,12,0],\"cubes\":[{\"origin\":[-3.9,0,-2],\"size\":[4,12,4],\"uv\":[0,32],\"inflate\":0.25}],\"pos\":[-1.9,12,0],\"material\":\"alpha\"},{\"name\":\"jacket\",\"pivot\":[0,24,0],\"cubes\":[{\"origin\":[-4,12,-2],\"size\":[8,12,4],\"uv\":[16,32],\"inflate\":0.25}],\"material\":\"alpha\"}]},\"geometry.humanoid.customSlim:geometry.humanoid\":{\"bones\":[{\"name\":\"hat\",\"neverRender\":false,\"material\":\"alpha\"},{\"name\":\"leftArm\",\"reset\":true,\"mirror\":false,\"pivot\":[5,21.5,0],\"cubes\":[{\"origin\":[4,11.5,-2],\"size\":[3,12,4],\"uv\":[32,48]}]},{\"name\":\"rightArm\",\"reset\":true,\"pivot\":[-5,21.5,0],\"cubes\":[{\"origin\":[-7,11.5,-2],\"size\":[3,12,4],\"uv\":[40,16]}]},{\"pivot\":[-6,14.5,1],\"neverRender\":true,\"name\":\"rightItem\",\"parent\":\"rightArm\"},{\"name\":\"leftSleeve\",\"pivot\":[5,21.5,0],\"cubes\":[{\"origin\":[4,11.5,-2],\"size\":[3,12,4],\"uv\":[48,48],\"inflate\":0.25}],\"material\":\"alpha\"},{\"name\":\"rightSleeve\",\"pivot\":[-5,21.5,0],\"cubes\":[{\"origin\":[-7,11.5,-2],\"size\":[3,12,4],\"uv\":[40,32],\"inflate\":0.25}],\"material\":\"alpha\"},{\"name\":\"leftLeg\",\"reset\":true,\"mirror\":false,\"pivot\":[1.9,12,0],\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[16,48]}]},{\"name\":\"leftPants\",\"pivot\":[1.9,12,0],\"cubes\":[{\"origin\":[-0.1,0,-2],\"size\":[4,12,4],\"uv\":[0,48],\"inflate\":0.25}],\"material\":\"alpha\"},{\"name\":\"rightPants\",\"pivot\":[-1.9,12,0],\"cubes\":[{\"origin\":[-3.9,0,-2],\"size\":[4,12,4],\"uv\":[0,32],\"inflate\":0.25}],\"material\":\"alpha\"},{\"name\":\"jacket\",\"pivot\":[0,24,0],\"cubes\":[{\"origin\":[-4,12,-2],\"size\":[8,12,4],\"uv\":[16,32],\"inflate\":0.25}],\"material\":\"alpha\"}]}}";
     //1.21.90+
     public static final String STEVE_GEOMETRY = "{\"format_version\":\"1.12.0\",\"minecraft:geometry\":[{\"bones\":[{\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"waist\",\"pivot\":[0.0,12.0,0.0]},{\"cubes\":[{\"origin\":[-5.0,8.0,3.0],\"size\":[10,16,1],\"uv\":[0,0]}],\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0.0,24.0,3.0],\"rotation\":[0.0,180.0,0.0]}],\"description\":{\"identifier\":\"geometry.cape\",\"texture_height\":32,\"texture_width\":64}},{\"bones\":[{\"name\":\"root\",\"pivot\":[0.0,0.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,16]}],\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"waist\",\"parent\":\"root\",\"pivot\":[0.0,12.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[0,0]}],\"name\":\"head\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0.0,24,3.0]},{\"cubes\":[{\"inflate\":0.50,\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[32,0]}],\"name\":\"hat\",\"parent\":\"head\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"origin\":[4.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[32,48]}],\"name\":\"leftArm\",\"parent\":\"body\",\"pivot\":[5.0,22.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[4.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[48,48]}],\"name\":\"leftSleeve\",\"parent\":\"leftArm\",\"pivot\":[5.0,22.0,0.0]},{\"name\":\"leftItem\",\"parent\":\"leftArm\",\"pivot\":[6.0,15.0,1.0]},{\"cubes\":[{\"origin\":[-8.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[40,16]}],\"name\":\"rightArm\",\"parent\":\"body\",\"pivot\":[-5.0,22.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-8.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[40,32]}],\"name\":\"rightSleeve\",\"parent\":\"rightArm\",\"pivot\":[-5.0,22.0,0.0]},{\"locators\":{\"lead_hold\":[-6,15,1]},\"name\":\"rightItem\",\"parent\":\"rightArm\",\"pivot\":[-6,15,1]},{\"cubes\":[{\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[16,48]}],\"name\":\"leftLeg\",\"parent\":\"root\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,48]}],\"name\":\"leftPants\",\"parent\":\"leftLeg\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,16]}],\"name\":\"rightLeg\",\"parent\":\"root\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,32]}],\"name\":\"rightPants\",\"parent\":\"rightLeg\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,32]}],\"name\":\"jacket\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]}],\"description\":{\"identifier\":\"geometry.humanoid.custom\",\"texture_height\":64,\"texture_width\":64,\"visible_bounds_height\":2,\"visible_bounds_offset\":[0,1,0],\"visible_bounds_width\":1}},{\"bones\":[{\"name\":\"root\",\"pivot\":[0.0,0.0,0.0]},{\"name\":\"waist\",\"parent\":\"root\",\"pivot\":[0.0,12.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,16]}],\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[0,0]}],\"name\":\"head\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"inflate\":0.50,\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[32,0]}],\"name\":\"hat\",\"parent\":\"head\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,16]}],\"name\":\"rightLeg\",\"parent\":\"root\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,32]}],\"name\":\"rightPants\",\"parent\":\"rightLeg\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[16,48]}],\"name\":\"leftLeg\",\"parent\":\"root\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,48]}],\"name\":\"leftPants\",\"parent\":\"leftLeg\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"origin\":[4.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[32,48]}],\"name\":\"leftArm\",\"parent\":\"body\",\"pivot\":[5.0,21.50,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[4.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[48,48]}],\"name\":\"leftSleeve\",\"parent\":\"leftArm\",\"pivot\":[5.0,21.50,0.0]},{\"name\":\"leftItem\",\"parent\":\"leftArm\",\"pivot\":[6,14.50,1]},{\"cubes\":[{\"origin\":[-7.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[40,16]}],\"name\":\"rightArm\",\"parent\":\"body\",\"pivot\":[-5.0,21.50,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-7.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[40,32]}],\"name\":\"rightSleeve\",\"parent\":\"rightArm\",\"pivot\":[-5.0,21.50,0.0]},{\"locators\":{\"lead_hold\":[-6,14.50,1]},\"name\":\"rightItem\",\"parent\":\"rightArm\",\"pivot\":[-6,14.50,1]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,32]}],\"name\":\"jacket\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0.0,24,-3.0]}],\"description\":{\"identifier\":\"geometry.humanoid.customSlim\",\"texture_height\":64,\"texture_width\":64,\"visible_bounds_height\":2,\"visible_bounds_offset\":[0,1,0],\"visible_bounds_width\":1}}]}";
-    public static Skin NO_PERSONA_SKIN;
-    static {
-        Skin skin = new Skin();
-        skin.setGeometryData(STEVE_GEOMETRY);
-        skin.setGeometryName("geometry.humanoid.custom");
-        skin.setSkinId("Standard_Custom");
-        skin.setSkinData(Base64.getDecoder().decode(Skin.STEVE_SKIN));
-        NO_PERSONA_SKIN = skin;
-    }
+    public static Skin NO_PERSONA_SKIN = createDefaultSkin();
 
     private boolean noPlayFab; // Don't attempt to generate missing play fab id multiple times
     private String fullSkinId;
@@ -84,12 +76,89 @@ public class Skin {
     @OnlyNetEase
     private String skinIID = "";
     @OnlyNetEase
+    private String udid = "";
+    @OnlyNetEase
     private int growthLevel;
     @OnlyNetEase
     private byte[] bloomData;
 
     /** 内容指纹缓存（getContentFingerprint 惰性计算；影响摘要的 setter 负责清除）。 */
     private volatile String cachedFingerprint;
+
+    private static Skin createDefaultSkin() {
+        Skin skin = new Skin();
+        skin.setGeometryData(STEVE_GEOMETRY);
+        skin.setGeometryName("geometry.humanoid.custom");
+        skin.setSkinId("Standard_Custom");
+        skin.setSkinData(Base64.getDecoder().decode(Skin.STEVE_SKIN));
+        return skin;
+    }
+
+    /**
+     * 返回继承公共默认模板并保留归属 UID 的默认皮肤；有归属时使用独立副本。
+     * <p>
+     * Returns the shared default template with the owner UID, using an isolated copy when owned.
+     */
+    public Skin getDefaultSkin() {
+        if (this.getUdid().isEmpty()) {
+            return NO_PERSONA_SKIN;
+        }
+        Skin skin = NO_PERSONA_SKIN.copy();
+        skin.setUdid(this.getUdid());
+        // 副本保持共享默认皮肤的身份，避免自动生成随机后缀及 PlayFab ID。
+        // The copy keeps the shared default's identity instead of generating a random suffix or PlayFab ID.
+        if (skin.fullSkinId == null) {
+            skin.fullSkinId = skin.getSkinId();
+        }
+        skin.noPlayFab = true;
+        return skin;
+    }
+
+    /**
+     * 复制全部渲染与身份字段，图片字节和可变集合保持独立。
+     * <p>
+     * Copies all render and identity fields with independent image bytes and mutable collections.
+     */
+    private Skin copy() {
+        Skin skin = new Skin();
+        skin.noPlayFab = this.noPlayFab;
+        skin.fullSkinId = this.fullSkinId;
+        skin.skinId = this.skinId;
+        skin.playFabId = this.playFabId;
+        skin.skinResourcePatch = this.skinResourcePatch;
+        skin.skinData = copyImage(this.skinData);
+        for (SkinAnimation animation : this.animations) {
+            skin.animations.add(new SkinAnimation(copyImage(animation.image), animation.type,
+                    animation.frames, animation.expression));
+        }
+        skin.personaPieces.addAll(this.personaPieces);
+        skin.tintColors.addAll(this.tintColors);
+        skin.capeData = copyImage(this.capeData);
+        skin.geometryData = this.geometryData;
+        skin.animationData = this.animationData;
+        skin.premium = this.premium;
+        skin.persona = this.persona;
+        skin.capeOnClassic = this.capeOnClassic;
+        skin.primaryUser = this.primaryUser;
+        skin.capeId = this.capeId;
+        skin.isLegacySlim = this.isLegacySlim;
+        skin.skinColor = this.skinColor;
+        skin.armSize = this.armSize;
+        skin.trusted = this.trusted;
+        skin.geometryDataEngineVersion = this.geometryDataEngineVersion;
+        skin.overridingPlayerAppearance = this.overridingPlayerAppearance;
+        skin.profileHash = this.profileHash;
+        skin.skinIID = this.skinIID;
+        skin.udid = this.udid;
+        skin.growthLevel = this.growthLevel;
+        skin.bloomData = this.bloomData == null ? null : this.bloomData.clone();
+        return skin;
+    }
+
+    private static SerializedImage copyImage(SerializedImage image) {
+        return image == null ? null
+                : new SerializedImage(image.width, image.height, image.data == null ? null : image.data.clone());
+    }
 
     public boolean isValid() {
         return isValid(Server.getInstance().doNotLimitSkinGeometry);
@@ -132,6 +201,7 @@ public class Skin {
                 (capeData == null || doNotLimitSkinGeometry || capeData.data.length <= MAX_DATA_SIZE) && //capeData
                 (animationData == null || doNotLimitSkinGeometry || animationData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE) && //animationData
                 (playFabId == null || playFabId.length() < 100) && //playFabId
+                (udid == null || udid.length() < 100) && //netease owner uid
                 (capeId == null || capeId.length() < 100) && //capeId
                 (skinColor == null || skinColor.length() < 100) && //skinColor
                 (armSize == null || armSize.length() < 100) && //armSize
@@ -496,6 +566,21 @@ public class Skin {
     @OnlyNetEase
     public void setSkinIID(String skinIID) {
         this.skinIID = skinIID == null ? "" : skinIID;
+    }
+
+    /**
+     * 服务端认定的皮肤归属者网易账号 uid，不直接采信换肤包。
+     * <p>
+     * NetEase account uid established by the server for this skin; skin-change packets are not trusted.
+     */
+    @OnlyNetEase
+    public String getUdid() {
+        return this.udid;
+    }
+
+    @OnlyNetEase
+    public void setUdid(String udid) {
+        this.udid = udid == null ? "" : udid;
     }
 
     @OnlyNetEase

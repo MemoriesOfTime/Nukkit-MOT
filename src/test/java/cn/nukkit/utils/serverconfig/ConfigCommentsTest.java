@@ -34,6 +34,8 @@ class ConfigCommentsTest {
         assertTrue(yaml.contains("启用客户端区块缓存（blob 哈希"), "client cache field should be localized");
         assertTrue(yaml.contains("启用子区块按需拉取"), "sub-chunk pull field should be localized");
         assertFalse(yaml.contains("requires client support"), "chunk cache English fallback should not leak through");
+        assertTrue(yaml.contains("启用玩家移动碰撞校验"));
+        assertTrue(yaml.contains("movement-collision-check: true"), "collision gate defaults on in generated config");
     }
 
     @Test
@@ -45,6 +47,7 @@ class ConfigCommentsTest {
         assertTrue(yaml.contains("Use virtual threads for opt-in async tasks"), "virtual-threads comment should resolve from eng properties");
         assertTrue(yaml.contains("Enable client chunk cache (blob hashes"), "client cache field should resolve from eng properties");
         assertTrue(yaml.contains("Enable sub-chunk request pull mode"), "sub-chunk pull field should resolve from eng properties");
+        assertTrue(yaml.contains("Enable player movement collision checks"));
     }
 
     private String saveWithComments(String lang) throws IOException {

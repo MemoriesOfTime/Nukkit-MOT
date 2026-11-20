@@ -3,12 +3,15 @@ package cn.nukkit.level;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.SubChunkPacket;
 import cn.nukkit.network.protocol.SubChunkRequestPacket;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.BooleanSupplier;
 import java.util.function.ToIntBiFunction;
@@ -32,8 +35,8 @@ import java.util.function.ToLongFunction;
  */
 public class PlayerSubChunkRequestState {
 
-    // 队列上限：包数与 offset 总数，超限丢弃新请求（客户端会重新请求）
-    // Queue caps: packets and total offsets; new requests are dropped over the caps (the client re-requests)
+    // 队列上限：包数与 offset 总数，超限的新请求转入拒绝队列
+    // Queue caps: packets and total offsets; new requests over the caps move to the rejected queue
     private static final int MAX_DEFERRED_REQUESTS = 256;
     private static final int MAX_DEFERRED_OFFSETS = 65536;
     // 每 tick 每玩家响应序列化字节上限，超出部分留待下 tick / per-player per-tick response
@@ -53,6 +56,9 @@ public class PlayerSubChunkRequestState {
     private final ArrayDeque<SubChunkRequestPacket> deferredRequests = new ArrayDeque<>();
     // 队列保留的 offset 总数（空列表请求按 1 计）/ offsets retained in the queue (an empty list counts as 1)
     private int deferredOffsets;
+    // Over-cap requests awaiting a failure answer; same caps as the deferred queue
+    private final ArrayDeque<SubChunkRequestPacket> rejectedRequests = new ArrayDeque<>();
+    private int rejectedOffsets;
     // miss 补发积压（BlobStatus 回报超出本 tick 字节预算的部分），按批排队、队头排空
     // / Miss-response backlog (the part of a BlobStatus report over this tick's byte
     // budget), queued per batch and drained from the head
@@ -87,6 +93,11 @@ public class PlayerSubChunkRequestState {
     private final Long2IntOpenHashMap columnWaitingSince = new Long2IntOpenHashMap();
     private final Long2IntOpenHashMap columnOutstanding = new Long2IntOpenHashMap();
     private final LongOpenHashSet columnDelivered = new LongOpenHashSet();
+    // A new accepted shell owns a fresh receipt, even when clear() did not change the player epoch.
+    private final Long2ObjectOpenHashMap<Object> columnReceipts = new Long2ObjectOpenHashMap<>();
+    // Failure releases active work but preserves the exact absolute-Y obligation until a retry succeeds.
+    // Allocated only after a valid section fails; unload/full replacement/clear reclaim it.
+    private Long2ObjectOpenHashMap<IntOpenHashSet> columnUndeliveredSections;
 
     /**
      * 一次异步序列化的完成应答：worker 构建的条目列表与缓存模式下的 blob 组装材料
@@ -115,12 +126,25 @@ public class PlayerSubChunkRequestState {
          * take credit owned by new-epoch submissions
          */
         public final int offsets;
+        public final Level sourceLevel;
+        public final Map<Long, Object> columnReceipts;
+        public final List<BlockVector3> submittedOffsets;
 
         public CompletedSubChunkAnswer(int epoch, SubChunkRequestPacket request, boolean cacheMode,
                                        List<SubChunkPacket.SubChunkData> entries,
                                        long[] blobHashes, byte[][] blobSections, byte[][] blobEntities,
                                        int offsets) {
+            this(epoch, request, cacheMode, entries, blobHashes, blobSections, blobEntities, offsets, null, null, null);
+        }
+
+        public CompletedSubChunkAnswer(int epoch, SubChunkRequestPacket request, boolean cacheMode,
+                                       List<SubChunkPacket.SubChunkData> entries,
+                                       long[] blobHashes, byte[][] blobSections, byte[][] blobEntities, int offsets,
+                                       Level sourceLevel, Map<Long, Object> columnReceipts, List<BlockVector3> submittedOffsets) {
             this.epoch = epoch;
+            this.sourceLevel = sourceLevel;
+            this.columnReceipts = columnReceipts;
+            this.submittedOffsets = submittedOffsets;
             this.request = request;
             this.cacheMode = cacheMode;
             this.entries = entries;
@@ -167,9 +191,9 @@ public class PlayerSubChunkRequestState {
     }
 
     /**
-     * 入队一个新请求；包数或 offset 总数超上限时拒绝（客户端会重新请求）。
+     * 入队一个新请求；包数或 offset 总数超上限时拒绝。
      * <p>
-     * Enqueues a new request; rejected over the packet or offset cap (the client re-requests).
+     * Enqueues a new request; rejected over the packet or offset cap.
      */
     public boolean tryDefer(SubChunkRequestPacket pk) {
         int count = requestOffsetCount(pk);
@@ -252,6 +276,39 @@ public class PlayerSubChunkRequestState {
         return best;
     }
 
+    /**
+     * 登记一个待以失败条目应答的超限请求。
+     * <p>
+     * Registers an over-cap request to be answered with failure entries.
+     */
+    public boolean tryReject(SubChunkRequestPacket pk) {
+        int count = requestOffsetCount(pk);
+        if (this.rejectedRequests.size() >= MAX_DEFERRED_REQUESTS
+                || this.rejectedOffsets + count > MAX_DEFERRED_OFFSETS) {
+            return false;
+        }
+        this.rejectedRequests.add(pk);
+        this.rejectedOffsets += count;
+        return true;
+    }
+
+    public SubChunkRequestPacket pollRejected() {
+        SubChunkRequestPacket pk = this.rejectedRequests.poll();
+        if (pk != null) {
+            this.rejectedOffsets -= requestOffsetCount(pk);
+        }
+        return pk;
+    }
+
+    public void pushRejectedFront(SubChunkRequestPacket residual) {
+        this.rejectedRequests.addFirst(residual);
+        this.rejectedOffsets += requestOffsetCount(residual);
+    }
+
+    public boolean hasRejected() {
+        return !this.rejectedRequests.isEmpty();
+    }
+
     public boolean hasDeferred() {
         return !this.deferredRequests.isEmpty();
     }
@@ -285,6 +342,11 @@ public class PlayerSubChunkRequestState {
     public boolean responseBytesExceeded(int tick) {
         return this.responseBytesTick == tick
                 && this.responseBytesThisTick >= MAX_RESPONSE_TICK_BYTES;
+    }
+
+    /** Whether response work has already reserved any bytes in this tick. */
+    public boolean hasResponseBytes(int tick) {
+        return this.responseBytesTick == tick && this.responseBytesThisTick > 0;
     }
 
     /**
@@ -343,6 +405,8 @@ public class PlayerSubChunkRequestState {
     public void clear() {
         this.deferredRequests.clear();
         this.deferredOffsets = 0;
+        this.rejectedRequests.clear();
+        this.rejectedOffsets = 0;
         this.deferredMissBatches.clear();
         this.deferredMissHashes = 0;
         this.completions.clear();
@@ -355,6 +419,8 @@ public class PlayerSubChunkRequestState {
         this.columnWaitingSince.clear();
         this.columnOutstanding.clear();
         this.columnDelivered.clear();
+        this.columnReceipts.clear();
+        this.columnUndeliveredSections = null;
     }
 
     /**
@@ -364,6 +430,9 @@ public class PlayerSubChunkRequestState {
      * a full send is delivered right away.
      */
     public void onColumnSent(long index, int tick, boolean pullMode) {
+        clearUndeliveredSections(index);
+        this.columnReceipts.remove(index);
+        if (pullMode) this.columnReceipts.put(index, new Object());
         if (!pullMode) {
             this.columnWaitingSince.remove(index);
             this.columnOutstanding.remove(index);
@@ -376,9 +445,20 @@ public class PlayerSubChunkRequestState {
     }
 
     public void forgetColumn(long index) {
+        clearUndeliveredSections(index);
+        this.columnReceipts.remove(index);
         this.columnWaitingSince.remove(index);
         this.columnOutstanding.remove(index);
         this.columnDelivered.remove(index);
+    }
+
+    /** An accepted pull shell remains serviceable even after pull mode is disabled. */
+    public boolean hasPullChunk(long index) {
+        return this.columnWaitingSince.containsKey(index);
+    }
+
+    public boolean hasPullChunks() {
+        return !this.columnWaitingSince.isEmpty();
     }
 
     public void addOutstandingOffsets(long index, int count) {
@@ -396,6 +476,37 @@ public class PlayerSubChunkRequestState {
         this.columnDelivered.add(index);
     }
 
+    public Object columnReceipt(long index) { return this.columnReceipts.get(index); }
+
+    public void releaseOutstandingOffsets(long index, int count) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) return;
+        this.columnOutstanding.put(index, Math.max(0, this.columnOutstanding.get(index) - count));
+    }
+
+    /** Release active credit without claiming that the exact absolute section was delivered. */
+    public void releaseOutstandingOffsets(long index, int count, int absoluteSectionY) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) return;
+        releaseOutstandingOffsets(index, count);
+        if (this.columnUndeliveredSections == null) this.columnUndeliveredSections = new Long2ObjectOpenHashMap<>();
+        this.columnUndeliveredSections.computeIfAbsent(index, ignored -> new IntOpenHashSet()).add(absoluteSectionY);
+    }
+
+    /** A successful retry fulfills only its own absolute-section obligation. */
+    public void completeOutstandingOffsets(long index, int count, int absoluteSectionY) {
+        if (count <= 0 || !this.columnWaitingSince.containsKey(index)) return;
+        completeOutstandingOffsets(index, count);
+        if (this.columnUndeliveredSections != null) {
+            IntOpenHashSet missing = this.columnUndeliveredSections.get(index);
+            if (missing != null && missing.remove(absoluteSectionY) && missing.isEmpty()) clearUndeliveredSections(index);
+        }
+    }
+
+    private void clearUndeliveredSections(long index) {
+        if (this.columnUndeliveredSections == null) return;
+        this.columnUndeliveredSections.remove(index);
+        if (this.columnUndeliveredSections.isEmpty()) this.columnUndeliveredSections = null;
+    }
+
     /**
      * 列数据是否就绪：未等待 / 已派发完 / 等待超过 timeoutTicks 均视为就绪。
      * <p>
@@ -406,7 +517,8 @@ public class PlayerSubChunkRequestState {
         if (!this.columnWaitingSince.containsKey(index)) {
             return true;
         }
-        if (this.columnDelivered.contains(index) && this.columnOutstanding.get(index) <= 0) {
+        if (this.columnDelivered.contains(index) && this.columnOutstanding.get(index) <= 0
+                && (this.columnUndeliveredSections == null || !this.columnUndeliveredSections.containsKey(index))) {
             return true;
         }
         return tick - this.columnWaitingSince.get(index) > timeoutTicks;

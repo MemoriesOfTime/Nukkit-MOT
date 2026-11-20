@@ -130,7 +130,11 @@ public class SyncSkinPacket extends DataPacket {
         public UUID uuid;
         /** 轮 1 的第三字段：皮肤纹理字节。 */
         public byte[] skinBytes = new byte[0];
-        /** 轮 2 udid。 */
+        /**
+         * 轮 2 udid：客户端提供的归属账号 uid。
+         * <p>
+         * Round 2 udid: the client-supplied owning account uid.
+         */
         public String string1 = "";
         /** 轮 3 extraData。 */
         public String string2 = "";

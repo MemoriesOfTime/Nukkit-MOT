@@ -5,7 +5,9 @@ import cn.nukkit.Server;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.network.session.NetherNetPlayerSession;
 import cn.nukkit.utils.serverconfig.category.NetherNetSettings;
+import org.cloudburstmc.netty.channel.nethernet.AddressSource;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChildChannel;
+import org.cloudburstmc.netty.channel.nethernet.SourcedAddress;
 import org.cloudburstmc.netty.util.nethernet.PlayerInfo;
 import org.cloudburstmc.netty.util.nethernet.TransportIdentityBinding;
 import org.jose4j.jwt.JwtClaims;
@@ -21,7 +23,8 @@ import java.security.PublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.Base64;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 
 /**
@@ -70,7 +73,8 @@ class NetherNetOfflineIdentityBindingTest {
 
     private static NetherNetChildChannel channel() {
         return new NetherNetChildChannel(null, null,
-                new InetSocketAddress("127.0.0.1", 51234), new InetSocketAddress("127.0.0.1", 19132));
+                new SourcedAddress(new InetSocketAddress("127.0.0.1", 51234), AddressSource.SIGNALING, null),
+                new InetSocketAddress("127.0.0.1", 19132));
     }
 
     private static void admit(NetherNetChildChannel channel, PublicKey key) {
