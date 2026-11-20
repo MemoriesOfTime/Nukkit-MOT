@@ -7,6 +7,10 @@ public class BookEditPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.BOOK_EDIT_PACKET;
 
+    private static final int MAX_PAGE_CHARS = 256;
+    private static final int MAX_PHOTO_NAME_CHARS = 256;
+    private static final int MAX_SIGNED_FIELD_CHARS = 64;
+
     public Action action;
     public int inventorySlot;
     public int pageNumber;
@@ -39,8 +43,8 @@ public class BookEditPacket extends DataPacket {
             case REPLACE_PAGE:
             case ADD_PAGE:
                 this.pageNumber = this.protocol >= ProtocolInfo.v1_26_0 ? this.getVarInt() : this.getByte();
-                this.text = this.getString();
-                this.photoName = this.getString();
+                this.text = this.getString(MAX_PAGE_CHARS);
+                this.photoName = this.getString(MAX_PHOTO_NAME_CHARS);
                 break;
             case DELETE_PAGE:
                 this.pageNumber = this.protocol >= ProtocolInfo.v1_26_0 ? this.getVarInt() : this.getByte();
@@ -50,9 +54,9 @@ public class BookEditPacket extends DataPacket {
                 this.secondaryPageNumber = this.protocol >= ProtocolInfo.v1_26_0 ? this.getVarInt() : this.getByte();
                 break;
             case SIGN_BOOK:
-                this.title = this.getString();
-                this.author = this.getString();
-                this.xuid = this.getString();
+                this.title = this.getString(MAX_SIGNED_FIELD_CHARS);
+                this.author = this.getString(MAX_SIGNED_FIELD_CHARS);
+                this.xuid = this.getString(MAX_SIGNED_FIELD_CHARS);
                 break;
         }
     }

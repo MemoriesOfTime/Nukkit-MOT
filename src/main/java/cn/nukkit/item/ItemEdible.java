@@ -55,7 +55,11 @@ public abstract class ItemEdible extends Item {
             return false; // Inventory#sendContents is called in Player
         }
 
-        if (food != null && food.eatenBy(player)) {
+        if (food != null && !food.eatenBy(player)) {
+            return false;
+        }
+
+        if (food != null) {
             player.getLevel().addSoundToViewers(player, Sound.RANDOM_BURP);
             if (!player.isCreative() && !player.isSpectator()) {
                 --this.count;

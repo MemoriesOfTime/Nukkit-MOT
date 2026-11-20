@@ -1,6 +1,7 @@
 package cn.nukkit.level.generator.object.tree;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockSapling;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
@@ -45,7 +46,8 @@ public class ObjectBigSpruceTree extends ObjectSpruceTree {
                     if (xx == 0 && zz == 0) continue;
                     int xxx = x + xx;
                     int zzz = z + zz;
-                    if (level.getBlockIdAt(xxx, y, zzz) == Block.SAPLING) {
+                    if (level.getBlockIdAt(xxx, y, zzz) == Block.SAPLING
+                            && (level.getBlockDataAt(xxx, y, zzz) & BlockSapling.TYPE_BIT) == BlockSapling.SPRUCE) {
                         trunkPositions.add(new Vector3(xxx, y, zzz));
                     }
                 }

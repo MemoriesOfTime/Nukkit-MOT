@@ -63,8 +63,8 @@ public class NukkitMath {
 
     public static int ceilDouble(double n) {
         if (n <= Integer.MIN_VALUE || n >= Integer.MAX_VALUE) throw new IllegalArgumentException("double to int overflow: " + n);
-        int i = (int) (n + 1);
-        return n >= i ? i : i - 1;
+        int i = (int) n;
+        return n > i ? i + 1 : i;
     }
 
     public static int floorFloat(float n) {
@@ -73,8 +73,9 @@ public class NukkitMath {
     }
 
     public static int ceilFloat(float n) {
-        int i = (int) (n + 1);
-        return n >= i ? i : i - 1;
+        int i = (int) n;
+        // A float can exceed the integer range; keep the narrowing conversion saturated.
+        return n > i && i < Integer.MAX_VALUE ? i + 1 : i;
     }
 
     public static int randomRange(NukkitRandom random) {

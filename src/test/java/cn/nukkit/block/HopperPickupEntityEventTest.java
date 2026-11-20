@@ -1,7 +1,6 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Server;
-import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.event.Event;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
@@ -9,6 +8,7 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.plugin.PluginManager;
@@ -20,6 +20,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class HopperPickupEntityEventTest {
+
+    @org.junit.jupiter.api.BeforeAll
+    static void initializeServer() { cn.nukkit.MockServer.init(); }
 
     @Test
     void aPickupCarriesTheEntityItTakes() {
@@ -33,7 +36,11 @@ class HopperPickupEntityEventTest {
         when(drop.getItem()).thenReturn(Item.get(Item.DIAMOND, 0, 3));
         Level level = mock(Level.class);
         AxisAlignedBB area = new SimpleAxisAlignedBB(0, 0, 0, 1, 1, 1);
-        when(level.getCollidingEntities(area)).thenReturn(new Entity[]{drop});
+        BaseFullChunk chunk = mock(BaseFullChunk.class);
+        when(chunk.hasPickupEntities(true)).thenReturn(true);
+        when(chunk.getEntities()).thenReturn(java.util.Map.of(1L, drop));
+        when(level.getChunkIfLoaded(0, 0)).thenReturn(chunk);
+        when(drop.getBoundingBox()).thenReturn(area);
         Position at = new Position(0, 64, 0, level);
 
         boolean picked = hopper(inventory, at).pickupItems(area);
@@ -48,6 +55,31 @@ class HopperPickupEntityEventTest {
         assertEquals(InventoryMoveItemEvent.Action.PICKUP, move.getAction());
         assertSame(drop, move.getPickedEntity());
         verify(drop).close();
+    }
+
+    @Test
+    void cancelledPickupLeavesTheDropUntouched() {
+        PluginManager plugins = Server.getInstance().getPluginManager();
+        Inventory inventory = mock(Inventory.class);
+        when(inventory.canAddItem(any())).thenReturn(true);
+        EntityItem drop = mock(EntityItem.class);
+        when(drop.getItem()).thenReturn(Item.get(Item.DIAMOND));
+        Level level = mock(Level.class);
+        BaseFullChunk chunk = mock(BaseFullChunk.class);
+        AxisAlignedBB area = new SimpleAxisAlignedBB(0, 64, 0, 1, 65, 1);
+        when(chunk.hasPickupEntities(true)).thenReturn(true);
+        when(chunk.getEntities()).thenReturn(java.util.Map.of(1L, drop));
+        when(level.getChunkIfLoaded(0, 0)).thenReturn(chunk);
+        when(drop.getBoundingBox()).thenReturn(area);
+        doAnswer(call -> {
+            ((InventoryMoveItemEvent) call.getArgument(0)).setCancelled();
+            return null;
+        }).when(plugins).callEvent(any(InventoryMoveItemEvent.class));
+        try {
+            assertFalse(hopper(inventory, new Position(0, 64, 0, level)).pickupItems(area));
+            verify(drop, never()).close();
+            verify(inventory, never()).addItem(any(Item[].class));
+        } finally { reset(plugins); }
     }
 
     @Test

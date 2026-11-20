@@ -30,6 +30,12 @@ public class BlockItemFrameGlow extends BlockItemFrame {
     }
 
     @Override
+    @NotNull
+    public String getBlockEntityType() {
+        return BlockEntity.GLOW_ITEM_FRAME;
+    }
+
+    @Override
     public Item toItem() {
         return Item.get(Item.GLOW_ITEM_FRAME);
     }

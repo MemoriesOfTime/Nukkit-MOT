@@ -207,12 +207,12 @@ public class EntityWolf extends EntityTameableMob implements InventoryHolder {
                     this.setOwner(player);
                     this.setCollarColor(DyeColor.RED);
                     this.getLevel().dropExpOrb(this, Utils.rand(1, 7));
+                } else {
+                    EntityEventPacket packet = new EntityEventPacket();
+                    packet.eid = this.getId();
+                    packet.event = EntityEventPacket.TAME_FAIL;
+                    player.dataPacket(packet);
                 }
-
-                EntityEventPacket packet = new EntityEventPacket();
-                packet.eid = this.getId();
-                packet.event = EntityEventPacket.TAME_FAIL;
-                player.dataPacket(packet);
 
                 return true;
             }
