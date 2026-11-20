@@ -55,4 +55,24 @@ public class ChunkSettings extends OkaeriConfig {
     @Comment("Max pending chunk writes per world before unloading pauses (backpressure)")
     @CustomKey("max-pending-chunk-writes")
     private int maxPendingChunkWrites = 128;
+
+    @Comment("Enable client chunk cache (blob hashes, protocol >= 475, requires client support)")
+    @CustomKey("client-cache")
+    private boolean clientCache = false;
+
+    @Comment("Server-wide shared blob store budget in MB for the client chunk cache; also the hard cap for pinned (in-flight) blobs (raise for view distance 16+ or dispersed player groups)")
+    @CustomKey("blob-store-max-mb")
+    private int blobStoreMaxMb = 64;
+
+    @Comment("Per-player pending blob hash cap; over it the chunk degrades to a full send")
+    @CustomKey("blob-pending-cap")
+    private int blobPendingCap = 512;
+
+    @Comment("Enable sub-chunk request pull mode (protocol >= 534)")
+    @CustomKey("sub-chunk-requests")
+    private boolean subChunkRequests = true;
+
+    @Comment("Sub-chunk serialization entries per player per tick")
+    @CustomKey("subchunk-entries-per-tick")
+    private int subChunkEntriesPerTick = 64;
 }

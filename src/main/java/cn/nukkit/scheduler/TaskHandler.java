@@ -3,6 +3,8 @@ package cn.nukkit.scheduler;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 
+import java.util.function.Consumer;
+
 /**
  * @author MagicDroidX
  */
@@ -21,13 +23,20 @@ public class TaskHandler {
     private int lastRunTick;
     private int nextRunTick;
 
-    private boolean cancelled;
+    private volatile boolean cancelled;
+    private final Consumer<TaskHandler> cancellationListener;
 
     public TaskHandler(Plugin plugin, Runnable task, int taskId, boolean asynchronous) {
         this(plugin, task, taskId, asynchronous, false);
     }
 
     public TaskHandler(Plugin plugin, Runnable task, int taskId, boolean asynchronous, boolean virtual) {
+        this(plugin, task, taskId, asynchronous, virtual, null);
+    }
+
+    TaskHandler(Plugin plugin, Runnable task, int taskId, boolean asynchronous, boolean virtual,
+                Consumer<TaskHandler> cancellationListener) {
+        this.cancellationListener = cancellationListener;
         this.asynchronous = asynchronous;
         this.virtual = virtual;
         this.plugin = plugin;
@@ -84,14 +93,22 @@ public class TaskHandler {
     }
 
     public void cancel() {
-        if (!this.cancelled && this.task instanceof Task) {
-            ((Task) this.task).onCancel();
+        if (this.cancelled) return;
+        try {
+            if (this.task instanceof Task) ((Task) this.task).onCancel();
+        } finally {
+            markCancelled();
         }
-        this.cancelled = true;
     }
 
     public void remove() {
+        if (!this.cancelled) markCancelled();
+    }
+
+    private void markCancelled() {
         this.cancelled = true;
+        // Never mutate the scheduler's ArrayDeque from a worker thread.
+        if (cancellationListener != null) cancellationListener.accept(this);
     }
 
     public void run(int currentTick) {

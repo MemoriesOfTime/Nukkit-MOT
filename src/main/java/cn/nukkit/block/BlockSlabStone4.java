@@ -27,20 +27,20 @@ public class BlockSlabStone4 extends BlockSlab {
         return STONE_SLAB4;
     }
 
+    private static final String[] NAMES = new String[]{
+            "Mossy Stone Brick",
+            "Smooth Quartz",
+            "Stone",
+            "Cut Sandstone",
+            "Cut Red Sandstone",
+            "",
+            "",
+            ""
+    };
+
     @Override
     public String getName() {
-        String[] names = new String[]{
-                "Mossy Stone Brick",
-                "Smooth Quartz",
-                "Stone",
-                "Cut Sandstone",
-                "Cut Red Sandstone",
-                "",
-                "",
-                ""
-        };
-
-        return ((this.getDamage() & 0x08) > 0 ? "Upper " : "") + names[this.getDamage() & 0x07] + " Slab";
+        return ((this.getDamage() & 0x08) > 0 ? "Upper " : "") + NAMES[this.getDamage() & 0x07] + " Slab";
     }
 
     @Override
