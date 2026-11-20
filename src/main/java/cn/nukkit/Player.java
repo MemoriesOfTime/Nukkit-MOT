@@ -8754,8 +8754,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             || !this.isAlive() || !this.isOnline() || this.isSpectator()
                             || pickedXPOrb >= server.getTick() || xpOrb.getPickupDelay() > 0
                             || xpOrb.getLevel() != this.getLevel()
-                            || !this.boundingBox.isVectorInside(entity)
-                            || (entity.namedTag != null && entity.namedTag.getByte("km_combat_drop_locked") != 0)) {
+                            || !this.boundingBox.isVectorInside(entity)) {
                         return false;
                     }
                 }
