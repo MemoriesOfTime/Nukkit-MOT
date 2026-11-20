@@ -11,6 +11,7 @@ import cn.nukkit.network.session.RakNetPlayerSession;
 import cn.nukkit.utils.Utils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.epoll.Epoll;
@@ -78,6 +79,11 @@ public class RakNetInterface implements AdvancedSourceInterface {
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .channelFactory(RakChannelFactory.server(transport.datagramChannel))
                 .group(this.eventLoopGroup)
+                // 网络缓冲池化：全局默认 io.netty.allocator.type=unpooled 会让每个数据报/发送批次注册 Cleaner，
+                // 在事件循环间形成全局锁；RakNet 会话配置把未知选项委托给底层通道，在服务端通道设定即可覆盖收发。
+                // Pooled network buffers: the unpooled default registers a Cleaner per datagram/batch and forms a
+                // global lock across event loops; RakNet session configs delegate unknown options, so one set here covers both directions.
+                .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .option(RakChannelOption.RAK_GUID, this.serverId)
                 .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)

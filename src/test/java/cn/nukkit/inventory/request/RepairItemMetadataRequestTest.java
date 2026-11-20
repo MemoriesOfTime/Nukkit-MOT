@@ -7,26 +7,31 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
-import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.ConsumeAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftRecipeAction;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.CraftResultsDeprecatedAction;
 import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+
 import java.util.List;
-import static cn.nukkit.inventory.request.CakeCraftingReproTest.*;
+
+import static cn.nukkit.inventory.request.CakeCraftingRequestTest.*;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 
 class RepairItemMetadataRequestTest {
     @BeforeAll
     static void init() {
-        CakeCraftingReproTest.init();
+        CakeCraftingRequestTest.init();
     }
     @BeforeEach
     void setUp() {
-        new CakeCraftingReproTest().setUp();
+        new CakeCraftingRequestTest().setUp();
     }
 
     @ParameterizedTest
@@ -35,13 +40,13 @@ class RepairItemMetadataRequestTest {
         bindPlayer(version);
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1).setCustomName("First shovel");
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1);
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
         assertTrue(ui.getBigCraftingGrid().getItem(1).isNull());
         Item result = inventory.getItem(2);
         assertEquals(Item.IRON_SHOVEL, result.getId());
-        assertEquals(163, result.getDamage());
+        assertEquals(162, result.getDamage());
         assertEquals(1, result.getCount());
         assertFalse(result.hasCustomName());
     }
@@ -52,7 +57,7 @@ class RepairItemMetadataRequestTest {
         bindPlayer(version);
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1).setCustomName("First shovel");
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1).setNamedTag(new CompoundTag().putString("example:owner", "owned"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));
@@ -67,7 +72,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString(key, "owned"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));
@@ -82,7 +87,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:origin", "example:original"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
         assertTrue(ui.getBigCraftingGrid().getItem(1).isNull());
@@ -98,7 +103,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:origin", "example:original"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));
@@ -113,7 +118,7 @@ class RepairItemMetadataRequestTest {
                 .setNamedTag(new CompoundTag().putString("example:owner", "first"));
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:owner", "second"));
-        Item output = Item.get(Item.IRON_SHOVEL, 163, 1).setNamedTag(first.getNamedTag().copy());
+        Item output = Item.get(Item.IRON_SHOVEL, 162, 1).setNamedTag(first.getNamedTag().copy());
         execute(first, second, output);
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
@@ -128,7 +133,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1)
                 .setNamedTag(new CompoundTag().putString("example:origin", "example:original"));
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1).setNamedTag(first.getNamedTag().copy());
-        Item output = Item.get(Item.IRON_SHOVEL, 163, 1).setNamedTag(first.getNamedTag().copy());
+        Item output = Item.get(Item.IRON_SHOVEL, 162, 1).setNamedTag(first.getNamedTag().copy());
         execute(first, second, output);
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
@@ -143,7 +148,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         first.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_EFFICIENCY).setLevel(2));
         first.setNamedTag(first.getNamedTag().putInt("RepairCost", 3));
-        execute(first, Item.get(Item.IRON_SHOVEL, 225, 1), Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, Item.get(Item.IRON_SHOVEL, 225, 1), Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.OK, lastResponse().entries.get(0).getResult());
         assertTrue(ui.getBigCraftingGrid().getItem(0).isNull());
         assertTrue(ui.getBigCraftingGrid().getItem(1).isNull());
@@ -164,7 +169,7 @@ class RepairItemMetadataRequestTest {
         Item first = Item.get(Item.IRON_SHOVEL, 200, 1);
         Item second = Item.get(Item.IRON_SHOVEL, 225, 1)
                 .setNamedTag(new CompoundTag().putString("example:owner", "original"));
-        execute(first, second, Item.get(Item.IRON_SHOVEL, 163, 1));
+        execute(first, second, Item.get(Item.IRON_SHOVEL, 162, 1));
         assertEquals(ItemStackResponseStatus.ERROR, lastResponse().entries.get(0).getResult());
         assertEquals(first, ui.getBigCraftingGrid().getItem(0));
         assertEquals(second, ui.getBigCraftingGrid().getItem(1));
