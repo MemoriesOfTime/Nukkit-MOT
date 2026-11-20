@@ -16,6 +16,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntPredicate;
 
@@ -113,6 +118,70 @@ class LevelEntityTickSnapshotTest {
         assertEquals(List.of("0:10", "1:10"), f.calls);
     }
 
+    @Test void repeatedSchedulingDoesNotOverwriteAndTickRemovalAllowsRescheduling() throws Exception {
+        Fixture f = new Fixture();
+        CountingUpdateMap map = new CountingUpdateMap();
+        set(f.level, "updateEntities", map);
+        CountingEntity entity = f.add(1, tick -> false);
+        entity.prepare(f.level, 1);
+        setEntityField(entity, "published", true);
+        map.remove(1);
+        map.putCalls.set(0);
+
+        entity.scheduleUpdate();
+        entity.scheduleUpdate();
+
+        assertEquals(0, map.putCalls.get());
+        assertEquals(1, map.insertions.get());
+        assertSame(entity, map.get(1));
+        f.level.doTick(10);
+        assertNull(map.get(1));
+
+        entity.scheduleUpdate();
+        assertSame(entity, map.get(1));
+        assertEquals(2, map.insertions.get());
+    }
+
+    @Test void concurrentSchedulingOfSameEntityInsertsOnlyOnce() throws Exception {
+        Fixture f = new Fixture();
+        CountingUpdateMap map = new CountingUpdateMap();
+        set(f.level, "updateEntities", map);
+        CountingEntity entity = newEntity(f, CountingEntity.class, 2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<?>> schedules = new ArrayList<>();
+            for (int i = 0; i < 32; i++) {
+                schedules.add(executor.submit(() -> {
+                    if (!start.await(5, TimeUnit.SECONDS)) throw new AssertionError("start timed out");
+                    entity.scheduleUpdate();
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> schedule : schedules) schedule.get(5, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+        }
+        assertSame(entity, map.get(2));
+        assertEquals(1, map.insertions.get());
+        assertEquals(0, map.putCalls.get());
+    }
+
+    @Test void differentEntityWithSameIdReplacesConcurrentMapping() throws Exception {
+        Fixture f = new Fixture();
+        CountingUpdateMap map = new CountingUpdateMap();
+        set(f.level, "updateEntities", map);
+        CountingEntity current = newEntity(f, CountingEntity.class, 3);
+        CountingEntity replacement = newEntity(f, ReplacementEntity.class, 3);
+        map.put(3, current);
+        map.interleavedReplacement = newEntity(f, InterleavedEntity.class, 3);
+
+        replacement.scheduleUpdate();
+
+        assertSame(replacement, map.get(3));
+    }
+
     @Test void concurrentShrinkPaddingCannotReuseOldTailKeys() throws Exception {
         Fixture f = new Fixture();
         ShrinkingMap map = new ShrinkingMap();
@@ -134,6 +203,26 @@ class LevelEntityTickSnapshotTest {
             return before;
         }
         @Override public boolean isEmpty() { return super.size() == 0; }
+    }
+
+    static final class CountingUpdateMap extends Long2ObjectNonBlockingMap<Entity> {
+        final AtomicInteger putCalls = new AtomicInteger();
+        final AtomicInteger insertions = new AtomicInteger();
+        Entity interleavedReplacement;
+
+        @Override public Entity put(long key, Entity value) {
+            putCalls.incrementAndGet();
+            return super.put(key, value);
+        }
+
+        @Override public Entity putIfAbsent(long key, Entity value) {
+            Entity previous = super.putIfAbsent(key, value);
+            if (previous == null) insertions.incrementAndGet();
+            Entity replacement = interleavedReplacement;
+            interleavedReplacement = null;
+            if (replacement != null) super.put(key, replacement);
+            return previous;
+        }
     }
 
     static final class Fixture {
@@ -178,16 +267,31 @@ class LevelEntityTickSnapshotTest {
     private static void set(Level level, String name, Object value) throws Exception {
         Field f = Level.class.getDeclaredField(name); f.setAccessible(true); f.set(level, value);
     }
+    private static void setEntityField(Entity entity, String name, Object value) throws Exception {
+        Field f = Entity.class.getDeclaredField(name); f.setAccessible(true); f.set(entity, value);
+    }
+    private static <T extends CountingEntity> T newEntity(Fixture f, Class<T> type, long id) throws Exception {
+        T entity = allocate(type);
+        entity.key = id;
+        entity.calls = f.calls;
+        entity.action = tick -> true;
+        entity.prepare(f.level, id);
+        setEntityField(entity, "published", true);
+        return entity;
+    }
     static class CountingEntity extends Entity {
         long key;
         List<String> calls;
         IntPredicate action;
         boolean sleep;
         CountingEntity() { super(null, null); }
+        void prepare(Level level, long id) { this.setLevel(level); this.id = id; }
         @Override public int getNetworkId() { return -1; }
         @Override public boolean isActivationThrottled(int tick) { return sleep; }
         @Override public boolean onUpdate(int tick) { calls.add(key + ":" + tick); return action.test(tick); }
     }
+    static final class ReplacementEntity extends CountingEntity {}
+    static final class InterleavedEntity extends CountingEntity {}
 
     @SuppressWarnings("removal")
     static <T> T allocate(Class<T> type) throws Exception {
