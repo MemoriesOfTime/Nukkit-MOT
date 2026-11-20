@@ -14,13 +14,17 @@ import cn.nukkit.level.vibration.VibrationManager;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.HashMap;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -151,6 +155,63 @@ class TotemOfUndyingTest {
         assertTrue(player.getHealth() <= 0);
     }
 
+    @ParameterizedTest
+    @MethodSource("supportedTotemProtocols")
+    void successfulTotemRescueStartsNormalHurtWindow(int protocol) {
+        Player player = player(protocol);
+        player.getInventory().setItemInHand(new ItemTotem(0));
+        player.getOffhandInventory().setItem(0, new ItemTotem(0));
+        EntityDamageEvent lethalHit = melee(player, 30);
+
+        assertFalse(player.attack(lethalHit));
+        assertTrue(lethalHit.isCancelled());
+        assertEquals(10, ((EntityLiving) player).attackTime);
+        assertEquals(0, player.noDamageTicks);
+
+        assertFalse(player.attack(melee(player, 30)));
+        assertFalse(player.attack(melee(player, 20)));
+        assertEquals(1, player.getHealth());
+        assertEquals(1, player.getOffhandInventory().getItem(0).getCount());
+    }
+
+    @Test
+    void strongerHitCanStillBreakTheHurtWindowAfterTotemRescue() {
+        Player player = player(ProtocolInfo.v1_20_0);
+        player.getInventory().setItemInHand(new ItemTotem(0));
+
+        assertFalse(player.attack(melee(player, 30)));
+        assertTrue(player.attack(melee(player, 31)));
+        assertTrue(player.getHealth() <= 0);
+    }
+
+    @Test
+    void totemRescueDoesNotShortenAnExistingHurtWindow() {
+        Player player = player(ProtocolInfo.v1_20_0);
+        player.getInventory().setItemInHand(new ItemTotem(0));
+        doAnswer(invocation -> {
+            ((EntityLiving) player).attackTime = 40;
+            player.noDamageTicks = 7;
+            return null;
+        }).when(player).removeAllEffects(EntityPotionEffectEvent.Cause.TOTEM);
+
+        assertFalse(player.attack(melee(player, 30)));
+        assertEquals(40, ((EntityLiving) player).attackTime);
+        assertEquals(7, player.noDamageTicks);
+    }
+
+    @Test
+    void preexistingAbsoluteProtectionBlocksDamageWithoutConsumingATotem() {
+        Player player = player(ProtocolInfo.v1_20_0);
+        player.getInventory().setItemInHand(new ItemTotem(0));
+        player.noDamageTicks = 12;
+
+        assertFalse(player.attack(melee(player, 30)));
+        assertEquals(20, player.getHealth());
+        assertEquals(1, player.getInventory().getItemInHand().getCount());
+        assertEquals(12, player.noDamageTicks);
+        assertEquals(0, ((EntityLiving) player).attackTime);
+    }
+
     @Test
     void voidAndSuicideStillBypassBothHands() {
         for (EntityDamageEvent.DamageCause cause : new EntityDamageEvent.DamageCause[]{
@@ -163,6 +224,12 @@ class TotemOfUndyingTest {
             assertEquals(1, player.getInventory().getItemInHand().getCount());
             assertEquals(1, player.getOffhandInventory().getItem(0).getCount());
         }
+    }
+
+    private static Stream<Arguments> supportedTotemProtocols() {
+        return ProtocolInfo.SUPPORTED_PROTOCOLS.stream()
+                .filter(protocol -> protocol >= ProtocolInfo.v1_20_0)
+                .map(Arguments::of);
     }
 
     private static EntityDamageEvent melee(Player target, float amount) {
@@ -201,6 +268,8 @@ class TotemOfUndyingTest {
         doCallRealMethod().when((EntityHumanType) player).damageArmor(any(Item.class), nullable(Entity.class),
                 anyFloat(), anyBoolean(), any(EntityDamageEvent.DamageCause.class));
         doCallRealMethod().when(player).attack(any(EntityDamageEvent.class));
+        doCallRealMethod().when(player).setLastDamageCause(any(EntityDamageEvent.class));
+        when(player.getLastDamageCause()).thenCallRealMethod();
         return player;
     }
 }

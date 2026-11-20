@@ -1926,6 +1926,9 @@ public abstract class Entity extends Location implements Metadatable {
                         inv.decreaseCount(inv.getHeldItemIndex());
                     }
 
+                    // EntityLiving.attack cannot start its hurt window when rescue returns false.
+                    p.attackTime = Math.max(p.attackTime, source.getAttackCooldown());
+                    this.scheduleUpdate();
                     source.setCancelled(true);
                     return false;
                 }
