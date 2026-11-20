@@ -1300,11 +1300,19 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         // An explicit "minecraft:" name reaches this legacy constant fallback only after every
         // registry missed it. Keep it only when the result has a runtime item mapping; otherwise a
         // block-only constant (e.g. PALE_OAK_DOOR -> -990) would become an item no client can see.
-        if (explicitNamespace && id != 0
-                && !RuntimeItems.getMapping(ProtocolInfo.CURRENT_PROTOCOL).isRegistered(id, meta.orElse(0))) {
+        if (explicitNamespace && id != 0 && !isRegisteredLegacyItem(id, meta.orElse(0))) {
             return Item.AIR_ITEM.clone();
         }
         return get(id, meta.orElse(0));
+    }
+
+    private static boolean isRegisteredLegacyItem(int id, int meta) {
+        try {
+            return RuntimeItems.getMapping(GameVersion.getLastVersion()).isRegistered(id, meta);
+        } catch (IllegalStateException notInitialized) {
+            // Before the runtime item tables are loaded keep the historical lookup result.
+            return true;
+        }
     }
 
     public static Item fromJson(Map<String, Object> data) {
