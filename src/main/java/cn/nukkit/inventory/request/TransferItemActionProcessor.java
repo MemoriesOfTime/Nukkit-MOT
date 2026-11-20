@@ -92,8 +92,13 @@ public abstract class TransferItemActionProcessor<T extends TransferItemStackReq
         }
 
         int destCount = destItem.isNull() ? 0 : destItem.getCount();
-        if (destCount + count > sourceItem.getMaxStackSize()) {
+        int stackLimit = Math.min(sourceItem.getMaxStackSize(), dstInv.getMaxStackSize());
+        if (destCount >= stackLimit) {
             return context.error();
+        }
+        if (destCount + count > stackLimit) {
+            count = stackLimit - destCount;
+            fullTransfer = false;
         }
 
         if (!isSlotCompatible(dstInv, dstSlot, sourceItem)) {
