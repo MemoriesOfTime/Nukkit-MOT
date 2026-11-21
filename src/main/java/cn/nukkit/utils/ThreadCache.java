@@ -111,30 +111,8 @@ public class ThreadCache {
         private boolean detached;
 
         @Override
-        public void reserve(int additionalBytes) {
-            try {
-                super.reserve(additionalBytes);
-            } finally {
-                detachIfOversized();
-            }
-        }
-
-        @Override
-        public void put(byte[] bytes) {
-            try {
-                super.put(bytes);
-            } finally {
-                detachIfOversized();
-            }
-        }
-
-        @Override
-        public void setBuffer(byte[] bytes) {
-            try {
-                super.setBuffer(bytes);
-            } finally {
-                detachIfOversized();
-            }
+        void onBufferChanged() {
+            detachIfOversized();
         }
 
         private void detachIfOversized() {
