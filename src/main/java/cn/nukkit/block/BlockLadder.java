@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemLadder;
@@ -144,6 +145,7 @@ public class BlockLadder extends BlockTransparentMeta implements Faceable {
                 return true;
             }
         }
+        BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.LADDER_SUPPORT);
         return false;
     }
 
