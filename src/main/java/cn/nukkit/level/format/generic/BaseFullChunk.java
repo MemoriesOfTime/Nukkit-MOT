@@ -826,8 +826,18 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
+    public boolean hasEntities() {
+        return this.entities != null && this.entityIndex().hasAnyEntities();
+    }
+
+    @Override
     public boolean hasPickupEntities(boolean itemsOnly) {
         return this.entities != null && this.entityIndex().hasPickupEntities(itemsOnly);
+    }
+
+    @Override
+    public boolean hasRideableEntities() {
+        return this.entities != null && this.entityIndex().hasRideableEntities();
     }
 
     @Override

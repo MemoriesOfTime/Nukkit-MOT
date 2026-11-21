@@ -34,6 +34,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.format.EntityPresenceIndex;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.Anvil;
@@ -1914,8 +1915,11 @@ public class Level implements ChunkManager, Metadatable {
                     iter.remove();
                 }
 
-                for (Entity entity : chunk.getEntities().values()) {
-                    entity.scheduleUpdate();
+                Map<Long, Entity> chunkEntities = chunk.getEntities();
+                if (!(chunkEntities instanceof EntityPresenceIndex indexed) || indexed.hasAnyEntities()) {
+                    for (Entity entity : chunkEntities.values()) {
+                        entity.scheduleUpdate();
+                    }
                 }
 
                 if (doRandomTick && randomTickSpeed > 0) {
@@ -3654,7 +3658,11 @@ public class Level implements ChunkManager, Metadatable {
             try {
                 for (int x = minX; x <= maxX; ++x) {
                     for (int z = minZ; z <= maxZ; ++z) {
-                        for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
+                        Map<Long, Entity> chunkEntities = this.getChunkEntities(x, z, loadChunks);
+                        if (chunkEntities instanceof EntityPresenceIndex indexed && !indexed.hasAnyEntities()) {
+                            continue;
+                        }
+                        for (Entity ent : chunkEntities.values()) {
                             if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
                                 if (index < ENTITY_BUFFER.length) {
                                     ENTITY_BUFFER[index] = ent;
@@ -3714,6 +3722,10 @@ public class Level implements ChunkManager, Metadatable {
      * sharing the entries used to evict each other every tick. The live rideable
      * count check makes the common no-rideables case O(1).
      */
+    public boolean hasRideableEntities() {
+        return this.rideableEntityCount.get() > 0;
+    }
+
     public Entity[] getNearbyRideables(AxisAlignedBB bb, Entity entity) {
         if (this.rideableEntityCount.get() <= 0) {
             return EMPTY_ENTITY_ARR;
@@ -3726,7 +3738,11 @@ public class Level implements ChunkManager, Metadatable {
         int count = 0;
         for (int x = minX; x <= maxX; ++x) {
             for (int z = minZ; z <= maxZ; ++z) {
-                for (Entity ent : this.getChunkEntities(x, z, false).values()) {
+                Map<Long, Entity> chunkEntities = this.getChunkEntities(x, z, false);
+                if (chunkEntities instanceof EntityPresenceIndex indexed && !indexed.hasRideableEntities()) {
+                    continue;
+                }
+                for (Entity ent : chunkEntities.values()) {
                     if (ent != entity && ent instanceof EntityRideable && !ent.closed && ent.isAlive()
                             && ent.boundingBox.intersectsWith(bb)) {
                         if (count == result.length) {
