@@ -2571,7 +2571,10 @@ public abstract class Entity extends Location implements Metadatable {
 
     public final void scheduleUpdate() {
         if (this.published && !this.closed && !this.level.isBeingConverted) {
-            this.level.updateEntities.put(this.id, this);
+            Entity scheduled = this.level.updateEntities.putIfAbsent(this.id, this);
+            if (scheduled != null && scheduled != this) {
+                this.level.updateEntities.put(this.id, this);
+            }
         }
     }
 
