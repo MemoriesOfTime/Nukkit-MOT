@@ -14,15 +14,26 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CraftingManagerTest {
 
+    private static CraftingManager sharedManager;
     private CraftingManager manager;
 
     @BeforeAll
     static void init() {
         MockServer.init();
+        sharedManager = new CraftingManager();
     }
 
     @BeforeEach
     void setUp() {
+        manager = sharedManager;
+    }
+
+    /**
+     * 注销用例会改配方表，必须从独立实例开始。
+     * <p>
+     * Unregister tests mutate the recipe tables, so they start from a fresh instance.
+     */
+    private void useFreshManager() {
         manager = new CraftingManager();
     }
 
@@ -177,6 +188,7 @@ class CraftingManagerTest {
      */
     @Test
     void unregisterVanillaShapelessRecipe() {
+        useFreshManager();
         List<Recipe> recipesToRemove = new ArrayList<>();
         for (Recipe recipe : manager.getRecipes()) {
             if (recipe instanceof CraftingRecipe craftingRecipe && "minecraft:bundle".equals(craftingRecipe.getResult().getNamespaceId())) {
@@ -195,6 +207,7 @@ class CraftingManagerTest {
 
     @Test
     void unregisterShapedRecipe() {
+        useFreshManager();
         ShapedRecipe recipe = new ShapedRecipe(
                 Item.get(Item.GOLD_INGOT),
                 new String[]{"A"},
@@ -215,6 +228,7 @@ class CraftingManagerTest {
      */
     @Test
     void unregisterSmithingRecipe() {
+        useFreshManager();
         SmithingRecipe recipe = new SmithingRecipe(
                 "test_smithing",
                 1,
@@ -233,6 +247,7 @@ class CraftingManagerTest {
 
     @Test
     void unregisterFurnaceRecipe() {
+        useFreshManager();
         FurnaceRecipe recipe = new FurnaceRecipe(Item.get(Item.DIAMOND), Item.get(Item.BEDROCK));
         manager.registerFurnaceRecipe(recipe);
         assertTrue(manager.matchFurnaceRecipe(Item.get(Item.BEDROCK)) == recipe, "furnace recipe should be registered");
@@ -243,6 +258,7 @@ class CraftingManagerTest {
 
     @Test
     void unregisterMultiBrewingAndContainerRecipes() {
+        useFreshManager();
         MultiRecipe multi = new MultiRecipe(UUID.nameUUIDFromBytes("test_multi".getBytes()));
         manager.registerMultiRecipe(multi);
         assertTrue(manager.unregisterRecipe(multi), "multi recipe should have been unregistered");
@@ -262,6 +278,7 @@ class CraftingManagerTest {
 
     @Test
     void unregisterRemovesRecipeXp() {
+        useFreshManager();
         ShapedRecipe recipe = new ShapedRecipe(
                 Item.get(Item.GOLD_INGOT),
                 new String[]{"A"},

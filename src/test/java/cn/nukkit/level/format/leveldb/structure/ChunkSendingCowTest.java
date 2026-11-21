@@ -40,10 +40,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ChunkSendingCowTest {
     private static final DimensionData DIMENSION = new DimensionData(Level.DIMENSION_OVERWORLD, -64, 319);
+
+    /**
+     * 序列化分支只在这些版本边界变化，NetEase 调色板单独取样。
+     * <p>
+     * The serialization branches change only at these version boundaries; NetEase palettes are sampled separately.
+     */
+    private static final List<GameVersion> SNAPSHOT_VERSIONS = List.of(
+            GameVersion.V1_20_0, GameVersion.V1_20_50_NETEASE, GameVersion.V1_21_50_NETEASE,
+            GameVersion.V1_21_90, GameVersion.V1_21_130, GameVersion.V1_21_130_NETEASE,
+            GameVersion.V1_26_40, GameVersion.V1_26_50_27, GameVersion.V1_26_50);
     private static volatile Object allocationSink;
 
     @BeforeAll
@@ -323,7 +334,7 @@ class ChunkSendingCowTest {
     }
 
     @Test
-    void workerSerializationMatchesEagerSnapshotForEverySupportedVersion() throws Exception {
+    void workerSerializationMatchesEagerSnapshotForRepresentativeVersions() throws Exception {
         boolean previous = GlobalBlockPalette.useHashedBlockNetworkIds();
         var executor = Executors.newSingleThreadExecutor();
         try {
@@ -335,9 +346,7 @@ class ChunkSendingCowTest {
                 var start = new CountDownLatch(1);
                 var worker = executor.submit(() -> {
                     assertTrue(start.await(10, TimeUnit.SECONDS));
-                    for (GameVersion version : GameVersion.values()) {
-                        if (version.isNetEase() || version.getProtocol() < GameVersion.V1_20_0.getProtocol()
-                                || version.getProtocol() > GameVersion.V1_26_50.getProtocol()) continue;
+                    for (GameVersion version : SNAPSHOT_VERSIONS) {
                         for (boolean antiXray : new boolean[]{false, true}) {
                             assertArrayEquals(serialize(eager, version, antiXray), serialize(snapshot, version, antiXray),
                                     version + " hash=" + hashed + " antiXray=" + antiXray);
@@ -376,9 +385,7 @@ class ChunkSendingCowTest {
                 section.getStorages()[1].set(0, state(Block.GOLD_ORE));
                 for (var biome : live.biomes3d) biome.setBlock(0, 71);
                 var worker = executor.submit(() -> {
-                    for (GameVersion version : GameVersion.values()) {
-                        if (version.getProtocol() < GameVersion.V1_20_0.getProtocol()
-                                || version.getProtocol() > GameVersion.V1_26_50.getProtocol()) continue;
+                    for (GameVersion version : SNAPSHOT_VERSIONS) {
                         for (boolean antiXray : new boolean[]{false, true}) {
                             var plain = column(eager, version, antiXray, false);
                             for (boolean capture : new boolean[]{false, true}) {

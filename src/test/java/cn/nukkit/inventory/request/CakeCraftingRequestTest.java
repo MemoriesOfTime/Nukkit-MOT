@@ -50,12 +50,14 @@ class CakeCraftingRequestTest {
     static void init() {
         MockServer.init();
         Item.initCreativeItems();
+        // 配方表只读，整个类共享一次构建结果。
+        // The recipe tables are read-only, so one instance is built for the whole class.
+        manager = new CraftingManager();
     }
 
     @BeforeEach
     void setUp() {
         MockServer.reset();
-        manager = new CraftingManager();
 
         bindPlayer(GameVersion.V1_26_20);
 

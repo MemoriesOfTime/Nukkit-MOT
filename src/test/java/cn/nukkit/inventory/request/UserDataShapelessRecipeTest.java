@@ -1,5 +1,6 @@
 package cn.nukkit.inventory.request;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.inventory.*;
@@ -11,7 +12,6 @@ import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.v113.ProtocolInfo_v113;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class UserDataShapelessRecipeTest {
 
-    private CraftingManager manager;
+    private static CraftingManager manager;
 
     @BeforeAll
     static void init() {
@@ -32,10 +32,6 @@ class UserDataShapelessRecipeTest {
         // protocol < 137 的 DataPacket#reset() 需要 v113 包池；只放行要编码的包类，其余回退 id 可暴露映射错配。
         // DataPacket#reset() needs a v113 pool below protocol 137; only the encoded class gets a real id.
         MockServer.installLegacyPacketPool(CraftingDataPacket.class, ProtocolInfo_v113.CRAFTING_DATA_PACKET);
-    }
-
-    @BeforeEach
-    void setUp() {
         manager = new CraftingManager();
     }
 
@@ -99,9 +95,13 @@ class UserDataShapelessRecipeTest {
     }
 
     @Test
-    void craftingDataPacketBuildsForAllProtocols() {
-        // 构造函数只构建最新版本；此处强制遍历所有协议 (含 legacy < 354 路径) 走 encode()，验证 SHULKER_BOX 分支。
-        for (cn.nukkit.GameVersion version : cn.nukkit.GameVersion.getValues()) {
+    void craftingDataPacketBuildsOnEveryProtocolBranch() {
+        // 只取 CraftingDataPacket 的分支边界（含 legacy < 354）；中间版本不会新增编码分支。
+        // Only the CraftingDataPacket branch boundaries are kept (including legacy < 354); mid versions add no branch.
+        for (GameVersion version : List.of(GameVersion.V1_1_0, GameVersion.V1_11_0, GameVersion.V1_12_0,
+                GameVersion.V1_16_0, GameVersion.V1_16_100, GameVersion.V1_19_80, GameVersion.V1_20_0_23,
+                GameVersion.V1_20_80, GameVersion.V1_21_0, GameVersion.V1_21_40, GameVersion.V1_26_20_26,
+                GameVersion.V1_26_40, GameVersion.V1_26_50)) {
             assertDoesNotThrow(() -> manager.getCachedPacket(version),
                     "CraftingDataPacket must encode for " + version);
         }

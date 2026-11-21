@@ -17,10 +17,19 @@ class SubChunkPacketAllocationTest {
     private static final int HEIGHT_MAP_LENGTH = 256;
     private static final byte[] NO_DATA = new byte[0];
 
+    /**
+     * encode() 只按这些版本常量分叉，边界版本即可覆盖每条分支。
+     * <p>
+     * encode() only branches on these version constants, so the boundary versions cover every branch.
+     */
+    private static final int[] BRANCH_PROTOCOLS = {
+            ProtocolInfo.v1_17_30, ProtocolInfo.v1_18_0, ProtocolInfo.v1_18_10, ProtocolInfo.v1_20_0,
+            ProtocolInfo.v1_21_90, ProtocolInfo.v1_26_40, ProtocolInfo.v1_26_50_27, ProtocolInfo.v1_26_50
+    };
+
     @Test
     void everyProtocolBranchMatchesFormerEncoderByteForByte() {
-        for (int protocol : ProtocolInfo.SUPPORTED_PROTOCOLS) {
-            if (protocol < ProtocolInfo.v1_17_30 || protocol > ProtocolInfo.v1_26_50) continue;
+        for (int protocol : BRANCH_PROTOCOLS) {
             for (boolean cache : new boolean[]{false, true}) {
                 for (int seed = 0; seed < 8; seed++) {
                     SubChunkPacket expected = fixture(new FormerSubChunkPacket(), protocol, cache, seed);
