@@ -58,7 +58,9 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 import static cn.nukkit.utils.Utils.dynamic;
@@ -463,7 +465,203 @@ public abstract class Entity extends Location implements Metadatable {
 
     public final Map<Integer, Player> hasSpawned = new ConcurrentHashMap<>();
 
-    protected final Map<Integer, Effect> effects = new ConcurrentHashMap<>();
+    protected final Map<Integer, Effect> effects = new TrackedEffectMap();
+
+    private static final class TrackedEffectMap extends AbstractMap<Integer, Effect> implements ConcurrentMap<Integer, Effect> {
+        private final ConcurrentHashMap<Integer, Effect> backing = new ConcurrentHashMap<>();
+        private final AtomicInteger writers = new AtomicInteger();
+        // 1 = proven empty, 0 = proven non-empty, -1 = invalidated/recheck
+        private volatile int emptyState = 1;
+        private Collection<Effect> valuesView;
+        private Set<Integer> keySetView;
+        private Set<Entry<Integer, Effect>> entrySetView;
+
+        @Override
+        public boolean isEmpty() {
+            int state = emptyState;
+            if (state >= 0 && writers.get() == 0) {
+                return state == 1;
+            }
+            if (writers.get() != 0) {
+                return backing.isEmpty();
+            }
+            boolean empty = backing.isEmpty();
+            if (writers.get() == 0) {
+                emptyState = empty ? 1 : 0;
+            }
+            return empty;
+        }
+
+        @Override
+        public int size() {
+            return isEmpty() ? 0 : backing.size();
+        }
+
+        @Override
+        public Effect get(Object key) {
+            return isEmpty() ? null : backing.get(key);
+        }
+
+        @Override
+        public Effect getOrDefault(Object key, Effect defaultValue) {
+            return isEmpty() ? defaultValue : backing.getOrDefault(key, defaultValue);
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return !isEmpty() && backing.containsKey(key);
+        }
+
+        private void beginWrite() {
+            writers.incrementAndGet();
+            emptyState = -1;
+        }
+
+        private void endWrite() {
+            emptyState = -1;
+            writers.decrementAndGet();
+        }
+
+        @Override
+        public Effect put(Integer key, Effect value) {
+            beginWrite();
+            try { return backing.put(key, value); }
+            finally { endWrite(); }
+        }
+
+        @Override
+        public Effect putIfAbsent(Integer key, Effect value) {
+            beginWrite();
+            try { return backing.putIfAbsent(key, value); }
+            finally { endWrite(); }
+        }
+
+        @Override
+        public void putAll(Map<? extends Integer, ? extends Effect> map) {
+            beginWrite();
+            try { backing.putAll(map); }
+            finally { endWrite(); }
+        }
+
+        @Override
+        public Effect remove(Object key) {
+            if (isEmpty()) return null;
+            beginWrite();
+            try { return backing.remove(key); }
+            finally { endWrite(); }
+        }
+
+        @Override
+        public boolean remove(Object key, Object value) {
+            if (isEmpty()) return false;
+            beginWrite();
+            try { return backing.remove(key, value); }
+            finally { endWrite(); }
+        }
+
+        @Override
+        public Effect replace(Integer key, Effect value) {
+            if (isEmpty()) return null;
+            beginWrite();
+            try { return backing.replace(key, value); }
+            finally { endWrite(); }
+        }
+
+        @Override
+        public boolean replace(Integer key, Effect oldValue, Effect newValue) {
+            if (isEmpty()) return false;
+            beginWrite();
+            try { return backing.replace(key, oldValue, newValue); }
+            finally { endWrite(); }
+        }
+
+        @Override
+        public void clear() {
+            if (isEmpty()) return;
+            beginWrite();
+            try { backing.clear(); }
+            finally { endWrite(); }
+        }
+
+        private <T> Iterator<T> trackedIterator(Iterator<T> iterator) {
+            return new Iterator<>() {
+                @Override public boolean hasNext() { return iterator.hasNext(); }
+                @Override public T next() { return iterator.next(); }
+                @Override public void remove() {
+                    beginWrite();
+                    try { iterator.remove(); }
+                    finally { endWrite(); }
+                }
+            };
+        }
+
+        @Override
+        public Collection<Effect> values() {
+            Collection<Effect> view = this.valuesView;
+            if (view != null) return view;
+            return this.valuesView = new AbstractCollection<>() {
+                @Override public int size() { return TrackedEffectMap.this.size(); }
+                @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
+                @Override public boolean contains(Object v) { return !isEmpty() && backing.containsValue(v); }
+                @Override public void clear() { TrackedEffectMap.this.clear(); }
+                @Override public Iterator<Effect> iterator() {
+                    return isEmpty() ? Collections.emptyIterator() : trackedIterator(backing.values().iterator());
+                }
+            };
+        }
+
+        @Override
+        public Set<Integer> keySet() {
+            Set<Integer> view = this.keySetView;
+            if (view != null) return view;
+            return this.keySetView = new AbstractSet<>() {
+                @Override public int size() { return TrackedEffectMap.this.size(); }
+                @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
+                @Override public boolean contains(Object k) { return TrackedEffectMap.this.containsKey(k); }
+                @Override public boolean remove(Object k) { return TrackedEffectMap.this.remove(k) != null; }
+                @Override public void clear() { TrackedEffectMap.this.clear(); }
+                @Override public Iterator<Integer> iterator() {
+                    return isEmpty() ? Collections.emptyIterator() : trackedIterator(backing.keySet().iterator());
+                }
+            };
+        }
+
+        @Override
+        public Set<Entry<Integer, Effect>> entrySet() {
+            Set<Entry<Integer, Effect>> view = this.entrySetView;
+            if (view != null) return view;
+            return this.entrySetView = new AbstractSet<>() {
+                @Override public int size() { return TrackedEffectMap.this.size(); }
+                @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
+                @Override public boolean contains(Object o) { return !isEmpty() && backing.entrySet().contains(o); }
+                @Override public boolean remove(Object o) {
+                    return o instanceof Entry<?, ?> e && TrackedEffectMap.this.remove(e.getKey(), e.getValue());
+                }
+                @Override public void clear() { TrackedEffectMap.this.clear(); }
+                @Override public Iterator<Entry<Integer, Effect>> iterator() {
+                    if (isEmpty()) return Collections.emptyIterator();
+                    Iterator<Entry<Integer, Effect>> it = trackedIterator(backing.entrySet().iterator());
+                    return new Iterator<>() {
+                        @Override public boolean hasNext() { return it.hasNext(); }
+                        @Override public void remove() { it.remove(); }
+                        @Override public Entry<Integer, Effect> next() {
+                            Entry<Integer, Effect> e = it.next();
+                            return new SimpleEntry<>(e) {
+                                @Override public Effect setValue(Effect value) {
+                                    beginWrite();
+                                    try {
+                                        Effect prev = e.setValue(value);
+                                        super.setValue(value);
+                                        return prev;
+                                    } finally { endWrite(); }
+                                }
+                            };
+                        }
+                    };
+                }
+            };
+        }
+    }
 
     private static final ThreadLocal<EffectTickSnapshot> EFFECT_TICK_SNAPSHOT =
             ThreadLocal.withInitial(EffectTickSnapshot::new);
@@ -1077,11 +1275,11 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public Effect getEffect(int effectId) {
-        return this.effects.getOrDefault(effectId, null);
+        return this.effects.isEmpty() ? null : this.effects.getOrDefault(effectId, null);
     }
 
     public boolean hasEffect(int effectId) {
-        return this.effects.containsKey(effectId);
+        return !this.effects.isEmpty() && this.effects.containsKey(effectId);
     }
 
     /**
@@ -2862,8 +3060,14 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideBubbleColumn() {
-        double y = this.y + this.getEyeHeight();
-        return this.level.getBlockIdAt(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(y), NukkitMath.floorDouble(this.z)) == Block.BUBBLE_COLUMN;
+        int bx = NukkitMath.floorDouble(this.x);
+        int by = NukkitMath.floorDouble(this.y + this.getEyeHeight());
+        int bz = NukkitMath.floorDouble(this.z);
+        int builtin = this.getBuiltinBlockIdAt(bx, by, bz, 0);
+        if (builtin >= 0) {
+            return builtin == Block.BUBBLE_COLUMN;
+        }
+        return this.level.getBlockIdAt(bx, by, bz) == Block.BUBBLE_COLUMN;
     }
 
     /**
@@ -2872,18 +3076,10 @@ public abstract class Entity extends Location implements Metadatable {
      * Reads ordinary block IDs only through loaded built-in paths; -1 requires materialisation.
      */
     protected final int getBuiltinBlockIdAt(int x, int y, int z, int layer) {
-        Level level = this.level;
-        if (level == null || level.getClass() != Level.class || !level.isYInRange(y)) {
+        ChunkSection section = this.getBuiltinSectionAt(x, y, z);
+        if (section == null) {
             return -1;
         }
-        FullChunk chunk = this.chunk;
-        if (chunk == null || chunk.getX() != x >> 4 || chunk.getZ() != z >> 4) {
-            chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
-        }
-        if (chunk == null || chunk.getClass() != LevelDBChunk.class) {
-            return -1;
-        }
-        ChunkSection section = ((LevelDBChunk) chunk).getSection(y >> 4);
         if (section.getClass() == EmptyChunkSection.class) {
             return Block.AIR;
         }
@@ -2894,18 +3090,42 @@ public abstract class Entity extends Location implements Metadatable {
         return id >= 0 && id < Block.MAX_BLOCK_ID ? id : -1;
     }
 
+    private ChunkSection getBuiltinSectionAt(int x, int y, int z) {
+        Level level = this.level;
+        if (level == null || level.getClass() != Level.class || !level.isYInRange(y)) {
+            return null;
+        }
+        FullChunk chunk = this.chunk;
+        if (chunk == null || chunk.getX() != x >> 4 || chunk.getZ() != z >> 4) {
+            chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+        }
+        if (chunk == null || chunk.getClass() != LevelDBChunk.class) {
+            return null;
+        }
+        return ((LevelDBChunk) chunk).getSection(y >> 4);
+    }
+
     public boolean isSubmerged() {
         int blockX = NukkitMath.floorDouble(this.x);
         int blockY = NukkitMath.floorDouble(this.y + this.getEyeHeight());
         int blockZ = NukkitMath.floorDouble(this.z);
-        int id0 = this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 0);
-        if (id0 >= 0) {
-            if (id0 == Block.WATER || id0 == Block.STILL_WATER) {
-                return true;
+        ChunkSection section = this.getBuiltinSectionAt(blockX, blockY, blockZ);
+        if (section != null) {
+            if (section.getClass() == EmptyChunkSection.class) {
+                return false;
             }
-            int id1 = this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 1);
-            if (id1 >= 0) {
-                return id1 == Block.WATER || id1 == Block.STILL_WATER;
+            if (section.getClass() == LevelDBChunkSection.class) {
+                int lx = blockX & 0xF, ly = blockY & 0xF, lz = blockZ & 0xF;
+                int id0 = section.getBlockId(lx, ly, lz, 0);
+                if (id0 >= 0 && id0 < Block.MAX_BLOCK_ID) {
+                    if (id0 == Block.WATER || id0 == Block.STILL_WATER) {
+                        return true;
+                    }
+                    int id1 = section.getBlockId(lx, ly, lz, 1);
+                    if (id1 >= 0 && id1 < Block.MAX_BLOCK_ID) {
+                        return id1 == Block.WATER || id1 == Block.STILL_WATER;
+                    }
+                }
             }
         }
         Block block = this.level.getBlock(this.temporalVector.setComponents(blockX, blockY, blockZ));
@@ -3761,7 +3981,13 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isOnLadder() {
-        int blockId = this.level.getBlockIdAt(chunk, this.getFloorX(), this.getFloorY(), this.getFloorZ());
+        int fx = this.getFloorX();
+        int fy = this.getFloorY();
+        int fz = this.getFloorZ();
+        int blockId = this.getBuiltinBlockIdAt(fx, fy, fz, 0);
+        if (blockId < 0) {
+            blockId = this.level.getBlockIdAt(chunk, fx, fy, fz);
+        }
         return blockId == Block.LADDER || blockId == Block.VINES || blockId == Block.COBWEB || blockId == Block.SCAFFOLDING;
     }
 
