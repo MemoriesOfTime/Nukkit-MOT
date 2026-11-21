@@ -195,5 +195,10 @@ public class EntitySnowGolem extends EntityWalkingMob {
     public boolean isSheared() {
         return this.sheared;
     }
+
+    @Override
+    public boolean canFreeze() {
+        return false;
+    }
 }
 

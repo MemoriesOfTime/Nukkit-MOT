@@ -40,6 +40,12 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
         return inventory;
     }
 
+    @Override
+    public boolean canFreeze() {
+        PlayerInventory inventory = this.getInventory();
+        return super.canFreeze() && (inventory == null || !hasFreezeImmuneArmor(inventory.getArmorContents()));
+    }
+
     public PlayerEnderChestInventory getEnderChestInventory() {
         return enderChestInventory;
     }
@@ -412,6 +418,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
                 cause != DamageCause.SUFFOCATION &&
                 cause != DamageCause.SUICIDE &&
                 cause != DamageCause.FIRE_TICK &&
+                cause != DamageCause.FREEZING &&
                 cause != DamageCause.FALL) { // No armor damage
 
             if (armor.isUnbreakable() || armor instanceof ItemSkull) {

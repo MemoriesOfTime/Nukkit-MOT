@@ -4,6 +4,9 @@ import cn.nukkit.AdventureSettings;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.entity.mob.*;
+import cn.nukkit.entity.passive.EntityHorse;
+import cn.nukkit.entity.passive.EntityStrider;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -24,6 +27,8 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.potion.Effect;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
@@ -97,6 +102,138 @@ public class ArmorDamageReductionTest {
         assertEquals(4f, event.getDamage(), 0.001f);
         assertEquals(0.96f, event.getFinalDamage(), 0.001f);
         assertEquals(19.04f, target.getHealth(), 0.001f);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void freezingBypassesOrdinaryArmorWithoutDamagingIt(boolean vanillaArmor) {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.getInventory().setArmorContents(new Item[]{
+                Item.get(ItemID.DIAMOND_HELMET),
+                Item.get(ItemID.DIAMOND_CHESTPLATE),
+                Item.get(ItemID.DIAMOND_LEGGINGS),
+                Item.get(ItemID.DIAMOND_BOOTS)
+        });
+        var settings = MockServer.get().getServerConfig().gameFeatureSettings();
+        boolean previous = settings.vanillaArmorReduction();
+        settings.vanillaArmorReduction(vanillaArmor);
+        EntityDamageEvent event = new EntityDamageEvent(target, EntityDamageEvent.DamageCause.FREEZING, 1f);
+
+        try {
+            assertTrue(target.canFreeze(), "ordinary armor does not grant freezing immunity");
+            assertTrue(target.attack(event));
+            assertAll(
+                    () -> assertEquals(0f, event.getDamage(EntityDamageEvent.DamageModifier.ARMOR), 0.001f),
+                    () -> assertEquals(1f, event.getFinalDamage(), 0.001f),
+                    () -> assertEquals(19f, target.getHealth(), 0.001f),
+                    () -> {
+                        for (Item armor : target.getInventory().getArmorContents()) {
+                            assertEquals(0, armor.getDamage(), "freezing must not consume armor durability");
+                        }
+                    });
+        } finally {
+            settings.vanillaArmorReduction(previous);
+        }
+    }
+
+    @Test
+    void freezingStillUsesProtectionAndResistance() {
+        Level level = newMockLevel();
+        TestHuman target = new TestHuman(newMockChunk(level), baseNbt());
+        target.getInventory().setArmorContents(new Item[]{
+                prot4(ItemID.DIAMOND_HELMET),
+                prot4(ItemID.DIAMOND_CHESTPLATE),
+                prot4(ItemID.DIAMOND_LEGGINGS),
+                prot4(ItemID.DIAMOND_BOOTS)
+        });
+        EntityDamageEvent event = new EntityDamageEvent(target, EntityDamageEvent.DamageCause.FREEZING, 1f);
+        event.setDamage(-0.2f, EntityDamageEvent.DamageModifier.RESISTANCE);
+
+        assertTrue(target.attack(event));
+
+        assertEquals(0f, event.getDamage(EntityDamageEvent.DamageModifier.ARMOR), 0.001f);
+        assertEquals(0.288f, event.getFinalDamage(), 0.001f,
+                "Protection IV on four pieces and Resistance I still reduce freezing damage");
+    }
+
+    @Test
+    void freezingBypassesHorseArmor() {
+        Level level = newMockLevel();
+        EntityHorse target = new EntityHorse(newMockChunk(level), baseNbt());
+        target.setHorseArmor(Item.get(Item.DIAMOND_HORSE_ARMOR));
+        assertTrue(target.canFreeze(), "diamond horse armor does not grant freezing immunity");
+        float health = target.getHealth();
+        EntityDamageEvent event = new EntityDamageEvent(target, EntityDamageEvent.DamageCause.FREEZING, 1f);
+
+        assertTrue(target.attack(event));
+
+        assertEquals(0f, event.getDamage(EntityDamageEvent.DamageModifier.ARMOR), 0.001f);
+        assertEquals(health - 1f, target.getHealth(), 0.001f);
+    }
+
+    @Test
+    void leatherHorseArmorGrantsFreezeImmunity() {
+        Level level = newMockLevel();
+        EntityHorse target = new EntityHorse(newMockChunk(level), baseNbt());
+        assertTrue(target.canFreeze(), "unarmored horses can freeze");
+
+        target.setHorseArmor(Item.get(Item.LEATHER_HORSE_ARMOR));
+        assertFalse(target.canFreeze(), "leather horse armor grants immunity");
+
+        target.setHorseArmor(Item.get(Item.DIAMOND_HORSE_ARMOR));
+        assertTrue(target.canFreeze(), "non-leather horse armor does not grant immunity");
+    }
+
+    @Test
+    void bedrockFreezeImmuneMobsDoNotFreeze() {
+        assertAll(
+                () -> assertFalse(mock(EntitySkeleton.class, Mockito.CALLS_REAL_METHODS).canFreeze()),
+                () -> assertFalse(mock(EntityCreaking.class, Mockito.CALLS_REAL_METHODS).canFreeze()),
+                () -> assertFalse(mock(EntityEnderDragon.class, Mockito.CALLS_REAL_METHODS).canFreeze()));
+    }
+
+    @Test
+    void boggedRemainsFreezableUnlikeSkeleton() {
+        EntityBogged bogged = mock(EntityBogged.class, Mockito.CALLS_REAL_METHODS);
+        bogged.armor = new Item[4];
+        assertTrue(bogged.canFreeze(), "BE 1.26.50 does not list bogged as freeze-immune");
+
+        bogged.armor[0] = Item.get(Item.LEATHER_HELMET);
+        assertFalse(bogged.canFreeze(), "leather armor still protects bogged");
+    }
+
+    @Test
+    void freezingVulnerableMobsDealFiveDamage() {
+        assertAll(
+                () -> assertEquals(5, mock(EntityBlaze.class, Mockito.CALLS_REAL_METHODS).getFrostbiteInjury()),
+                () -> assertEquals(5, mock(EntityMagmaCube.class, Mockito.CALLS_REAL_METHODS).getFrostbiteInjury()),
+                () -> assertEquals(5, mock(EntityStrider.class, Mockito.CALLS_REAL_METHODS).getFrostbiteInjury()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3})
+    void leatherArmorProtectsHumansAndMobsInEverySlot(int armorSlot) {
+        Level level = newMockLevel();
+        TestHuman human = new TestHuman(newMockChunk(level), baseNbt());
+        BaseEntity mob = mock(BaseEntity.class, Mockito.CALLS_REAL_METHODS);
+        mob.armor = new Item[4];
+        assertTrue(human.canFreeze());
+        assertTrue(mob.canFreeze(), "empty or missing armor does not grant immunity");
+        int[] leatherArmor = {Item.LEATHER_HELMET, Item.LEATHER_CHESTPLATE,
+                Item.LEATHER_LEGGINGS, Item.LEATHER_BOOTS};
+        Item armor = Item.get(leatherArmor[armorSlot]);
+        human.getInventory().setArmorItem(armorSlot, armor, false);
+        mob.armor[armorSlot] = armor;
+
+        assertAll(
+                () -> assertFalse(human.canFreeze(), "leather armor must protect NPCs too"),
+                () -> assertFalse(mob.canFreeze(), "leather armor must protect equipped mobs too"));
+
+        human.getInventory().setArmorItem(armorSlot, Item.AIR_ITEM, false);
+        mob.armor = null;
+        assertTrue(human.canFreeze(), "removing leather armor removes immunity");
+        assertTrue(mob.canFreeze());
     }
 
     @Test

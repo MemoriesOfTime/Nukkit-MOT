@@ -178,4 +178,9 @@ public class EntityMagmaCube extends EntityJumpingMob {
     public String getName() {
         return this.hasCustomName() ? this.getNameTag() : "Magma Cube";
     }
+
+    @Override
+    public int getFrostbiteInjury() {
+        return 5;
+    }
 }

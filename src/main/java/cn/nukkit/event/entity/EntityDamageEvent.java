@@ -131,6 +131,7 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
     public boolean canBeReducedByArmor() {
         switch (this.cause) {
             case FIRE_TICK:
+            case FREEZING:
             case SUFFOCATION:
             case DROWNING:
             case HUNGER:

@@ -135,4 +135,9 @@ public class EntityCreaking extends EntityWalkingMob {
     private boolean hasHeartPosition() {
         return this.creakingHeart != null || this.namedTag.contains(TAG_HEART_X);
     }
+
+    @Override
+    public boolean canFreeze() {
+        return false;
+    }
 }

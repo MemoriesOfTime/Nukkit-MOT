@@ -113,6 +113,11 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     public abstract Vector3 updateMove(int tickDiff);
 
+    @Override
+    public boolean canFreeze() {
+        return super.canFreeze() && !hasFreezeImmuneArmor(this.armor);
+    }
+
     /** A sleeping mob catches up once per this many ticks. */
     static final int ACTIVATION_INTERVAL = 20;
     /** Recently hurt mobs stay awake so knock-back, hurt windows and panic keep the per-tick cadence. */

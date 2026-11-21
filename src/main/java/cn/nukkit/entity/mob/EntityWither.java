@@ -8,17 +8,9 @@ import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.entity.projectile.EntityBlueWitherSkull;
 import cn.nukkit.entity.projectile.EntityWitherSkull;
-import cn.nukkit.event.entity.CreatureSpawnEvent;
-import cn.nukkit.event.entity.EntityDamageByEntityEvent;
-import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
-import cn.nukkit.event.entity.ProjectileLaunchEvent;
+import cn.nukkit.event.entity.*;
 import cn.nukkit.item.Item;
-import cn.nukkit.level.Explosion;
-import cn.nukkit.level.GameRule;
-import cn.nukkit.level.Location;
-import cn.nukkit.level.Level;
-import cn.nukkit.level.Sound;
+import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
@@ -33,11 +25,7 @@ import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public class EntityWither extends EntityFlyingMob implements EntityBoss, EntitySmite {
 
@@ -500,6 +488,11 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
                 }
             }
         }
+        return false;
+    }
+
+    @Override
+    public boolean canFreeze() {
         return false;
     }
 }

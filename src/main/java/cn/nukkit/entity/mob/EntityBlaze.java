@@ -112,4 +112,9 @@ public class EntityBlaze extends EntityFlyingMob {
     public int nearbyDistanceMultiplier() {
         return 1000; // don't follow
     }
+
+    @Override
+    public int getFrostbiteInjury() {
+        return 5;
+    }
 }
