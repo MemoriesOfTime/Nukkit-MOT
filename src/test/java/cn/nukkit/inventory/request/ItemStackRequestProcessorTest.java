@@ -1050,6 +1050,7 @@ class ItemStackRequestProcessorTest {
         Player player = mockPlayer();
         Mockito.when(player.isCreative()).thenReturn(false);
         PlayerInventory inventory = new PlayerInventory(player);
+        Mockito.when(player.getInventory()).thenReturn(inventory);
 
         Item helmet = Item.get(Item.DIAMOND_HELMET, 0, 1);
         helmet.addEnchantment(Enchantment.getEnchantment(Enchantment.ID_BINDING_CURSE));
