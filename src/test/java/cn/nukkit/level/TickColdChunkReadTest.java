@@ -251,6 +251,11 @@ class TickColdChunkReadTest {
         Entity first = mock(Entity.class);
         Entity second = mock(Entity.class);
         when(chunk.getEntities()).thenReturn(Map.of(1L, first, 2L, second));
+        when(chunk.getEntitySnapshot()).thenCallRealMethod();
+        first.level = fixture.level;
+        first.chunk = chunk;
+        second.level = fixture.level;
+        second.chunk = chunk;
 
         tickChunks(fixture.level);
 
