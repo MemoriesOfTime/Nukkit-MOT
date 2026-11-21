@@ -99,14 +99,37 @@ class OverstackSplitTest {
     }
 
     @Test
-    void setItemForceChunksOverflowIntoEmptySlotsWithoutSideEffects() {
+    void setItemForcePreservesSnapshotInFullInventory() {
+        TestInventory inventory = new TestInventory(3);
+        inventory.setItemForce(1, Item.get(Item.DIRT, 0, 64));
+        inventory.setItemForce(2, Item.get(Item.SAND, 0, 64));
+        Item snapshot = Item.get(Item.STONE, 0, 150);
+        snapshot.autoAssignStackNetworkId();
+
+        inventory.setItemForce(0, snapshot);
+
+        assertEquals(150, inventory.getItem(0).getCount());
+        assertEquals(Item.STONE, inventory.getItem(0).getId());
+        assertEquals(snapshot.getDamage(), inventory.getItem(0).getDamage());
+        assertEquals(64, inventory.getItem(1).getCount());
+        assertEquals(Item.DIRT, inventory.getItem(1).getId());
+        assertEquals(64, inventory.getItem(2).getCount());
+        assertEquals(Item.SAND, inventory.getItem(2).getId());
+        assertEquals(snapshot.getStackNetId(), inventory.getItem(0).getStackNetId());
+    }
+
+    @Test
+    void setItemForceDoesNotOverwriteLaterSnapshotSlotsWithOverflow() {
         TestInventory inventory = new TestInventory(3);
 
         inventory.setItemForce(0, Item.get(Item.STONE, 0, 150));
+        inventory.setItemForce(1, Item.get(Item.DIAMOND, 0, 11));
 
-        assertEquals(64, inventory.getItem(0).getCount());
-        assertEquals(64, inventory.getItem(1).getCount());
-        assertEquals(22, inventory.getItem(2).getCount());
+        assertEquals(150, inventory.getItem(0).getCount());
+        assertEquals(Item.DIAMOND, inventory.getItem(1).getId());
+        assertEquals(11, inventory.getItem(1).getCount());
+        assertTrue(inventory.getItem(2).isNull());
+        assertEquals(161, inventory.getContents().values().stream().mapToInt(Item::getCount).sum());
     }
 
     @Test
@@ -121,13 +144,13 @@ class OverstackSplitTest {
     }
 
     @Test
-    void overriddenMaxStackSizeGetterLimitsSetItemForceChunks() {
+    void setItemForcePreservesSnapshotCountDespiteTighterSlotLimit() {
         LimitOneInventory inventory = new LimitOneInventory(2);
 
         inventory.setItemForce(0, Item.get(Item.STONE, 0, 3));
 
-        assertEquals(1, inventory.getItem(0).getCount());
-        assertEquals(1, inventory.getItem(1).getCount());
+        assertEquals(3, inventory.getItem(0).getCount());
+        assertTrue(inventory.getItem(1).isNull());
     }
 
     @Test

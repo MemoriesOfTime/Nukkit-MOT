@@ -308,13 +308,10 @@ public abstract class BaseInventory implements Inventory {
             return;
         }
         Item old = this.getItem(index);
-        Item overflow = null;
         if (item == null || item.isNull() || item.getCount() <= 0) {
             this.slots.remove(index);
         } else {
-            Item[] parts = splitOverstack(item);
-            item = parts[0];
-            overflow = parts[1];
+            // A forced write restores one slot at a time; overflow could overwrite later restores.
             if (item.getStackNetId() == 0) {
                 item.autoAssignStackNetworkId();
             }
@@ -328,7 +325,6 @@ public abstract class BaseInventory implements Inventory {
             ((BlockEntity) holder).setDirty();
         }
         this.onSlotChange(index, old, false);
-        this.routeOverflowForce(overflow);
     }
 
     /**
