@@ -145,10 +145,14 @@ class StateBlockStorageNetworkTest {
     @Test
     void allWidthsKeepExactBytesAndDoNotMutateSourceAcrossTheClientWindow() {
         List<BlockStateSnapshot> states = uniqueStates();
+        int[] widths = {1, 2, 3, 4, 5, 8, 9, 16, 17, 32, 33, 64, 65, 256, 257};
+        // 版本维度只取编码分支代表集；宽度已全量覆盖，两个维度正交。
+        // Versions are a branch-representative set while every width is still covered; the axes are orthogonal.
+        List<GameVersion> versions = protocols().toList();
         boolean originalHash = GlobalBlockPalette.useHashedBlockNetworkIds();
         int comparisons = 0;
         try {
-            for (int distinct : new int[]{1, 2, 3, 4, 5, 8, 9, 16, 17, 32, 33, 64, 65, 256, 257}) {
+            for (int distinct : widths) {
                 // Reverse first-use order; keep two duplicate aliases and unused entries at the end.
                 List<BlockStateSnapshot> palette = new ObjectArrayList<>(states.subList(0, distinct));
                 palette.add(states.get(1));
@@ -162,9 +166,7 @@ class StateBlockStorageNetworkTest {
                 StateBlockStorage storage = new StateBlockStorage(cells, palette, null, null);
                 int[] beforeWords = cells.getWords().clone();
                 List<BlockStateSnapshot> beforePalette = new ArrayList<>(palette);
-                for (GameVersion version : GameVersion.getValues()) {
-                    // Earlier chunk formats do not use this runtime-ID writer.
-                    if (version.getProtocol() < ProtocolInfo.v1_2_13) continue;
+                for (GameVersion version : versions) {
                     for (boolean hash : new boolean[]{false, true}) {
                         GlobalBlockPalette.setUseHashedBlockNetworkIds(hash);
                         for (boolean antiXray : new boolean[]{false, true}) {
@@ -182,7 +184,7 @@ class StateBlockStorageNetworkTest {
         } finally {
             GlobalBlockPalette.setUseHashedBlockNetworkIds(originalHash);
         }
-        assertTrue(comparisons > 2000, "comparisons=" + comparisons);
+        assertEquals(widths.length * versions.size() * 4, comparisons);
         System.out.println("Sized network palette byte comparisons=" + comparisons);
     }
 

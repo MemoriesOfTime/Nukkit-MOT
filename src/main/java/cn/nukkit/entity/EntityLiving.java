@@ -61,6 +61,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     protected int turtleTicks = 0;
 
+    private boolean inPowderSnow;
+
     private boolean blocking = false;
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
@@ -290,6 +292,99 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
     }
 
+    /**
+     * @return 本次更新末尾完全冻结的 tick 数，用于补偿伤害周期。
+     *         Fully frozen ticks at the end of this update, for damage catch-up.
+     */
+    protected int tickFreezingState(int tickDiff) {
+        this.inPowderSnow = this.getCollisionHelper().isInsideBlock(this.boundingBox, Block.POWDER_SNOW);
+
+        if (this.inPowderSnow && this.fireTicks > 0) {
+            this.meltPowderSnow();
+            this.extinguish();
+        }
+
+        int elapsed = Math.max(1, tickDiff);
+        int current = this.freezingTicks;
+        int target = this.inPowderSnow && this.canFreeze()
+                ? (int) Math.min(140L, (long) current + elapsed)
+                : (int) Math.max(0L, current - 2L * elapsed);
+        if (target != current) {
+            this.setFreezingTicks(target);
+        }
+        return target == 140 ? elapsed - Math.max(0, 140 - current - 1) : 0;
+    }
+
+    private void meltPowderSnow() {
+        // BE：非玩家生物需要 mobGriefing，玩家始终可以融雪。
+        // BE: non-player mobs need mobGriefing; players always melt the block.
+        if (!(this instanceof Player) && !this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
+            return;
+        }
+        for (Block block : this.getCollisionHelper().getCollisionBlocks()) {
+            if (block.getId() == Block.POWDER_SNOW) {
+                this.level.setBlock(block, Block.get(BlockID.AIR), true, true);
+            }
+        }
+    }
+
+    protected void applyFreezingDamage(int fullyFrozenTicks) {
+        if (fullyFrozenTicks <= 0 || !this.isAlive() || this.freezingTicks < 140 || !this.canFreeze()) {
+            return;
+        }
+        // BE 的 freezeDamage 只保护玩家；生物即使规则关闭也吃冰霜伤害。
+        // BE's freezeDamage rule only protects players; mobs still take freezing damage.
+        if (this instanceof Player && !this.level.getGameRules().getBoolean(GameRule.FREEZE_DAMAGE)) {
+            return;
+        }
+        // 只检查满冻结后的区间，每次补偿更新最多造成一次伤害。
+        // Only the fully frozen part of a caught-up update is eligible, with at most one hit per update.
+        if (!hitsResidue((long) this.getServer().getTick() - fullyFrozenTicks + 1, fullyFrozenTicks, 40, 0)) {
+            return;
+        }
+
+        int damage = this.getFrostbiteInjury();
+        if (damage <= 0) {
+            return;
+        }
+
+        Block feet = this.getLevelBlock();
+        if (feet != null && feet.getId() == Block.POWDER_SNOW) {
+            this.attack(new EntityDamageByBlockEvent(feet, this, DamageCause.FREEZING, damage));
+        } else {
+            this.attack(new EntityDamageEvent(this, DamageCause.FREEZING, damage));
+        }
+    }
+
+    public boolean canFreeze() {
+        return true;
+    }
+
+    protected static boolean hasFreezeImmuneArmor(Item[] armor) {
+        if (armor == null) {
+            return false;
+        }
+        for (Item item : armor) {
+            if (item == null || item.isNull()) {
+                continue;
+            }
+            int id = item.getId();
+            if (id == Item.LEATHER_HELMET || id == Item.LEATHER_CHESTPLATE
+                    || id == Item.LEATHER_LEGGINGS || id == Item.LEATHER_BOOTS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 冻结状态及方块碰撞已更新，冻结伤害尚未结算。 After collisions, before freezing damage. */
+    protected void onFreezingStateUpdated(int previousFreezingTicks) {
+    }
+
+    public boolean isInPowderSnow() {
+        return this.inPowderSnow;
+    }
+
     @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
@@ -329,9 +424,18 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
         }
 
+        int previousFreezingTicks = this.freezingTicks;
+        int fullyFrozenTicks = this.isAlive() ? this.tickFreezingState(tickDiff) : 0;
+
         boolean hasUpdate = super.entityBaseTick(tickDiff);
+        this.onFreezingStateUpdated(previousFreezingTicks);
 
         if (this.isAlive()) {
+            if (this.freezingTicks > 0) {
+                // 冻结或解冻尚未结束时，静止实体也必须保留在世界更新列表中。
+                // Stationary entities must keep ticking while freezing or thawing.
+                hasUpdate = true;
+            }
             if (this.isInsideOfSolid()) {
                 hasUpdate = true;
                 this.attack(new EntityDamageEvent(this, DamageCause.SUFFOCATION, 1));
@@ -438,6 +542,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     this.collidingWith(entity);
                 }
             }
+
+            this.applyFreezingDamage(fullyFrozenTicks);
         }
 
         return hasUpdate;

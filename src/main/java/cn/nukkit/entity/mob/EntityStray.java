@@ -258,4 +258,9 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
             }
         }
     }
+
+    @Override
+    public boolean canFreeze() {
+        return false;
+    }
 }

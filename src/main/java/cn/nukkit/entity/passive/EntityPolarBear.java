@@ -139,6 +139,11 @@ public class EntityPolarBear extends EntityWalkingMob {
     }
 
     @Override
+    public boolean canFreeze() {
+        return false;
+    }
+
+    @Override
     public boolean entityBaseTick(int tickDiff) {
         if (this.angry > 0) {
             this.angry--;

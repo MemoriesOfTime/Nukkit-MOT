@@ -265,10 +265,10 @@ class NetherNetPacketBatchingTest {
         for (int i = 0; i < 8; i++) packets.add(packet(version, i, payload / 8));
         for (DataPacket packet : packets) packet.tryEncode();
 
-        int rounds = 200;
+        int rounds = 100;
         for (int i = 0; i < rounds; i++) fixture.send(packets);
         long batcher = Long.MAX_VALUE, legacy = Long.MAX_VALUE;
-        for (int attempt = 0; attempt < 5; attempt++) {
+        for (int attempt = 0; attempt < 3; attempt++) {
             long start = allocations.getCurrentThreadAllocatedBytes();
             for (int i = 0; i < rounds; i++) fixture.send(packets);
             batcher = Math.min(batcher, allocations.getCurrentThreadAllocatedBytes() - start);

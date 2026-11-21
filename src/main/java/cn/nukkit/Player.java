@@ -2646,6 +2646,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.gamemode == SPECTATOR;
     }
 
+    @Override
+    public boolean canFreeze() {
+        return !this.isSpectator() && super.canFreeze();
+    }
+
     /**
      * Check player game mode
      *
@@ -2745,7 +2750,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         boolean netherPortal = false;
         boolean endPortal = false;
         boolean scaffolding = false;
-        boolean powderSnow = false;
 
         for (Block block : getCollisionHelper().getCollisionBlocks()) {
             switch (block.getId()) {
@@ -2757,9 +2761,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     continue;
                 case Block.SCAFFOLDING:
                     scaffolding = true;
-                    break;
-                case Block.POWDER_SNOW:
-                    powderSnow = true;
                     break;
             }
 
@@ -2912,30 +2913,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
             }
-        }
-
-        if (this.getFreezingTicks() < 140 && powderSnow) {
-            if (getFreezingTicks() == 0) {
-                this.setSprinting(false);
-            }
-            this.addFreezingTicks(1);
-            EntityFreezeEvent event = new EntityFreezeEvent(this);
-            this.server.getPluginManager().callEvent(event);
-            if (!event.isCancelled()) {
-                this.addMovementSpeedModifier(EntityMovementSpeedModifier.of(EntityMovementSpeedModifier.FREEZING, getFreezingTicks() * (float) -3.58e-4, EntityMovementSpeedModifier.Operation.ADD));
-            }
-        }
-        if (!powderSnow) {
-            if (this.getFreezingTicks() > 0) {
-                this.addFreezingTicks(-1);
-                this.addMovementSpeedModifier(EntityMovementSpeedModifier.of(EntityMovementSpeedModifier.FREEZING, getFreezingTicks() * (float) -3.58e-4, EntityMovementSpeedModifier.Operation.ADD));
-            } else {
-                this.removeMovementSpeedModifier(EntityMovementSpeedModifier.FREEZING);
-            }
-        }
-
-        if (this.getFreezingTicks() == 140 && this.getServer().getTick() % 40 == 0) {
-            this.attack(new EntityDamageEvent(this, DamageCause.FREEZING, getFrostbiteInjury()));
         }
     }
 
@@ -3843,6 +3820,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
         return super.entityBaseTick(tickDiff) || hasUpdated;
+    }
+
+    @Override
+    protected void onFreezingStateUpdated(int previousFreezingTicks) {
+        // 碰撞检查可能提前返回，仍须在此清理残留减速。
+        // Collision checks may return early; clear stale slowdown here.
+        if (!this.isAlive() || this.isSpectator() || this.getFreezingTicks() <= 0) {
+            this.removeMovementSpeedModifier(EntityMovementSpeedModifier.FREEZING);
+            return;
+        }
+
+        if (this.isInPowderSnow()) {
+            EntityFreezeEvent event = new EntityFreezeEvent(this);
+            this.server.getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                this.removeMovementSpeedModifier(EntityMovementSpeedModifier.FREEZING);
+                return;
+            }
+            if (previousFreezingTicks <= 0 && this.getFreezingTicks() > 0 && this.canFreeze()) {
+                this.setSprinting(false);
+            }
+        }
+
+        if (this.getFreezingTicks() <= 0) {
+            this.removeMovementSpeedModifier(EntityMovementSpeedModifier.FREEZING);
+            return;
+        }
+        this.addMovementSpeedModifier(EntityMovementSpeedModifier.of(EntityMovementSpeedModifier.FREEZING,
+                this.getFreezingTicks() * (float) -3.58e-4, EntityMovementSpeedModifier.Operation.ADD));
     }
 
     boolean tryAcceptClickAir() {
@@ -7968,6 +7974,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 case DROWNING:
                     message = "death.attack.drown";
+                    break;
+
+                case FREEZING:
+                    message = "death.attack.freeze";
                     break;
 
                 case CONTACT:

@@ -214,4 +214,9 @@ public class EntityBogged extends EntitySkeleton {
 
         return drops.toArray(Item.EMPTY_ARRAY);
     }
+
+    @Override
+    public boolean canFreeze() {
+        return !hasFreezeImmuneArmor(this.armor);
+    }
 }

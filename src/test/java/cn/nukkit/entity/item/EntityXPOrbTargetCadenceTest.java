@@ -105,9 +105,11 @@ class EntityXPOrbTargetCadenceTest {
         assertTrue(orb.motionX > 0);
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {50, 100, 500})
-    void denseUnclaimedOrbsDoNotRescanEveryViewerEveryTick(int count) {
+    @Test
+    void denseUnclaimedOrbsDoNotRescanEveryViewerEveryTick() {
+        // 100 个光球 × 20 个观察者已覆盖降频路径，数量不影响逐玩家的调用上限。
+        // 100 orbs x 20 viewers cover the back-off path; the orb count does not change the per-player cap.
+        int count = 100;
         Level level = mock(Level.class);
         Map<Integer, Player> viewers = new LinkedHashMap<>();
         for (int i = 1; i <= 20; i++) {

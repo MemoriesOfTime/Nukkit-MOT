@@ -259,4 +259,9 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
             }
         }
     }
+
+    @Override
+    public boolean canFreeze() {
+        return false;
+    }
 }

@@ -3177,15 +3177,9 @@ public abstract class Entity extends Location implements Metadatable {
 
         Vector3 vector = new Vector3(0, 0, 0);
         boolean portal = false;
-        boolean powderSnow = false;
 
         for (Block block : getCollisionHelper().getCollisionBlocks()) {
             if (block.getId() == Block.NETHER_PORTAL) {
-                portal = true;
-                continue;
-            }
-
-            if (block.getId() == Block.POWDER_SNOW) {
                 portal = true;
                 continue;
             }
@@ -3839,17 +3833,13 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setFreezingTicks(int ticks) {
-        if (ticks < 0) this.freezingTicks = 0;
-        else if (ticks > 140) this.freezingTicks = 140;
-        else this.freezingTicks = ticks;
-        setFreezingEffectStrength(ticks / 140f);
+        int clamped = Math.max(0, Math.min(140, ticks));
+        this.freezingTicks = clamped;
+        setFreezingEffectStrength(clamped / 140f);
     }
 
     public void addFreezingTicks(int increments) {
-        if (freezingTicks + increments < 0) this.freezingTicks = 0;
-        else if (freezingTicks + increments > 140) this.freezingTicks = 140;
-        else this.freezingTicks += increments;
-        setFreezingEffectStrength(this.freezingTicks / 140f);
+        setFreezingTicks(this.freezingTicks + increments);
     }
 
     private boolean validateAndSetIntProperty(String identifier, int value) {

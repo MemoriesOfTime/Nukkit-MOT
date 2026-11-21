@@ -165,4 +165,9 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
     protected boolean applyNameTag(Player player, Item item) {
         return false;
     }
+
+    @Override
+    public boolean canFreeze() {
+        return false;
+    }
 }

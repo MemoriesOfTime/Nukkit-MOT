@@ -3,6 +3,7 @@ package cn.nukkit.level;
 import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.Block;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.EntityData;
@@ -13,6 +14,7 @@ import cn.nukkit.entity.mob.EntityZombie;
 import cn.nukkit.entity.passive.EntityOcelot;
 import cn.nukkit.entity.passive.EntityPig;
 import cn.nukkit.entity.passive.EntitySheep;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.math.Vector3;
@@ -226,6 +228,42 @@ class EntityActivationTest {
         assertTrue(pig.isActivationAsleep());
         assertEquals(3, runs(pig, 1020, 60));
         assertEquals(1, runs(pig, 2000, 20));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 7, 19})
+    void fullyFrozenSleepingMobTakesDamageAcrossEveryActivationPhase(int phase) {
+        playerAt(0, 0);
+        EntityPig pig = spawn(EntityPig::new, 200, 0);
+        for (int attempt = 0; attempt < 20 && pig.getId() % 20 != phase; attempt++) {
+            pig = spawn(EntityPig::new, 200, 0);
+        }
+        assertEquals(phase, pig.getId() % 20, "use the naturally assigned entity ID for the requested phase");
+        pig = spy(pig);
+        when(level.getMaxBlockY()).thenReturn(255);
+        when(pig.chunk.getBlockId(8, 64, 0, 0)).thenReturn(Block.POWDER_SNOW);
+        Block snow = Block.get(Block.POWDER_SNOW, 0, level, 200, 64, 0);
+        when(level.getBlock(same(pig.chunk), eq(200), eq(64), eq(0), eq(0), eq(false))).thenReturn(snow);
+        // Rejected damage must not wake the mob via the damage grace period.
+        doReturn(false).when(pig).attack(any(EntityDamageEvent.class));
+        pig.setFreezingTicks(140);
+        int lastTick = 100_000 - phase;
+        when(server.getTick()).thenReturn(lastTick);
+        assertFalse(pig.isActivationThrottled(lastTick));
+        int updates = 0;
+
+        for (int tick = lastTick + 1, end = lastTick + 400; tick <= end; tick++) {
+            when(server.getTick()).thenReturn(tick);
+            if (!pig.isActivationThrottled(tick)) {
+                pig.entityBaseTick(tick - lastTick);
+                lastTick = tick;
+                updates++;
+            }
+        }
+
+        assertEquals(20, updates);
+        assertEquals(140, pig.getFreezingTicks());
+        verify(pig, times(10)).attack(argThat(event -> event.getCause() == EntityDamageEvent.DamageCause.FREEZING));
     }
 
     @Test

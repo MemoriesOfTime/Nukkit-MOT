@@ -5,8 +5,6 @@ import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.HandlerList;
 
 public class EntityFreezeEvent extends EntityEvent implements Cancellable {
-    private final Entity entity;
-
     private static final HandlerList handlers = new HandlerList();
 
     public static HandlerList getHandlers() {

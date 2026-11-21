@@ -113,4 +113,9 @@ public class EntityHorse extends EntityHorseBase {
     private static int getRandomVariant() {
         return VARIANTS[Utils.rand(0, VARIANTS.length - 1)];
     }
+
+    @Override
+    public boolean canFreeze() {
+        return super.canFreeze() && (!this.hasHorseArmor() || this.getHorseArmor().getId() != Item.LEATHER_HORSE_ARMOR);
+    }
 }

@@ -235,4 +235,9 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
     protected boolean canSwimIn(int block) {
         return block == BlockID.WATER || block == BlockID.STILL_WATER || block == BlockID.LAVA || block == BlockID.STILL_LAVA;
     }
+
+    @Override
+    public int getFrostbiteInjury() {
+        return 5;
+    }
 }
