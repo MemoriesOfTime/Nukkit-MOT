@@ -83,6 +83,11 @@ public class EntityEnderman extends EntityWalkingMob {
     }
 
     @Override
+    protected boolean canTakeDamage(EntityDamageEvent ev) {
+        return ev.getCause() != EntityDamageEvent.DamageCause.PROJECTILE;
+    }
+
+    @Override
     public boolean attack(EntityDamageEvent ev) {
         super.attack(ev);
 
