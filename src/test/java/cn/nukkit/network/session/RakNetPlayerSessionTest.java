@@ -1080,6 +1080,9 @@ class RakNetPlayerSessionTest {
         Field field = RakNetPlayerSession.class.getDeclaredField("encryptionKey");
         field.setAccessible(true);
         field.set(session, new SecretKeySpec(key, "AES"));
+        Field keyBytes = RakNetPlayerSession.class.getDeclaredField("encryptionKeyBytes");
+        keyBytes.setAccessible(true);
+        keyBytes.set(session, key.clone());
         return session;
     }
 

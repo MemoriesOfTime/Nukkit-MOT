@@ -59,7 +59,7 @@ public class RakNetDirectStagingTest {
     private static final Method SEND_DG=method(RakSessionCodec.class,"sendDatagram",ChannelHandlerContext.class,RakDatagramPacket.class,long.class,Map.class);
     private static final Method ACK=method(RakSessionCodec.class,"onIncomingAck",RakDatagramPacket.class,long.class);
     private static final Method NACK=method(RakSessionCodec.class,"onIncomingNack",ChannelHandlerContext.class,RakDatagramPacket.class,long.class);
-    private static final GameVersion[] VERSIONS={GameVersion.V1_20_0,GameVersion.V1_20_60,GameVersion.V1_26_20_26,GameVersion.V1_26_40,GameVersion.V1_26_50};
+    private static final GameVersion[] VERSIONS={GameVersion.V1_20_0,GameVersion.V1_20_60,GameVersion.V1_26_20_26,GameVersion.V1_26_40,GameVersion.V1_26_50,GameVersion.V1_26_60};
     private Object savedServer;
     @BeforeEach void stubServer()throws Exception{Field instance=field(Server.class,"instance");savedServer=instance.get(null);instance.set(null,mock(Server.class));}
     @AfterEach void restoreServer()throws Exception{field(Server.class,"instance").set(null,savedServer);}
@@ -148,6 +148,19 @@ public class RakNetDirectStagingTest {
             }
         System.out.println("RAK_MATRIX cases="+cases);
     }
+    @Test void encryptedFramesMatchLegacyCopiedPayloadBytes()throws Exception{
+        for(GameVersion version:new GameVersion[]{GameVersion.V1_20_0,GameVersion.V1_20_60,GameVersion.V1_26_50,GameVersion.V1_26_60})
+            for(boolean initialized:new boolean[]{false,true}){
+                Fixture fixture=new Fixture(version,initialized,CompressionProvider.NONE,true);long counter=0;
+                Cipher legacyCipher=EncryptionUtils.createCipher(true,true,fixture.key);
+                for(int size:new int[]{0,1,4096,65536}){
+                    byte[] input=data(size);ByteBuf frame=fixture.send(input);
+                    try{assertArrayEquals(legacyEncryptedFrame(fixture,input,counter++,legacyCipher),bytes(frame),
+                            "encrypted wire bytes changed for protocol="+version.getProtocol()+", initialized="+initialized+", size="+size);}
+                    finally{frame.release();}
+                }
+            }
+    }
     @Test void queuedCachedInputRemainsIndependent()throws Exception{
         Fixture fixture=new Fixture(GameVersion.V1_26_50,true,CompressionProvider.ZLIB_RAW,true);byte[] shared=data(65536);ByteBuf frame=fixture.send(shared);fixture.verify(shared,frame);byte[] saved=bytes(frame);Arrays.fill(shared,(byte)0);
         try(Transit transit=new Transit(frame)){assertArrayEquals(saved,transit.rebuilt);transit.ackAll();assertArrayEquals(saved,allFrameBytes(transit.backing));corpus("delayed-copy",saved);}
@@ -188,6 +201,18 @@ public class RakNetDirectStagingTest {
     public static AutoCloseable benchmarkServer()throws Exception{Field instance=field(Server.class,"instance");Object previous=instance.get(null);instance.set(null,mock(Server.class));return ()->instance.set(null,previous);}
     private static byte[] allFrameBytes(ByteBuf buffer){byte[] value=new byte[buffer.writerIndex()];buffer.getBytes(0,value);return value;}
     private static byte[] bytes(ByteBuf buffer){byte[] bytes=new byte[buffer.readableBytes()];buffer.getBytes(buffer.readerIndex(),bytes);return bytes;}
+    private static byte[] legacyEncryptedFrame(Fixture fixture,byte[] payload,long counter,Cipher cipher)throws Exception{
+        boolean prefix=fixture.initialized&&fixture.version.getProtocol()>=ProtocolInfo.v1_20_60;
+        byte[] fullPayload=new byte[payload.length+(prefix?1:0)];
+        if(prefix)fullPayload[0]=fixture.compression.getPrefix();
+        System.arraycopy(payload,0,fullPayload,prefix?1:0,payload.length);
+        MessageDigest digest=MessageDigest.getInstance("SHA-256");
+        digest.update(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(counter).array());
+        digest.update(fullPayload);digest.update(fixture.key.getEncoded());byte[] trailer=Arrays.copyOf(digest.digest(),8);
+        ByteBuffer encrypted=ByteBuffer.allocate(fullPayload.length+trailer.length);
+        cipher.update(ByteBuffer.wrap(fullPayload),encrypted);cipher.update(ByteBuffer.wrap(trailer),encrypted);
+        byte[] wire=new byte[1+encrypted.position()];wire[0]=(byte)0xfe;encrypted.flip();encrypted.get(wire,1,wire.length-1);return wire;
+    }
     private static byte[] data(int size){byte[] bytes=new byte[size];for(int i=0;i<size;i++)bytes[i]=(byte)(i*31+7);return bytes;}
     private static void corpus(String name,byte[] bytes)throws Exception{String expected=System.getProperty("p08.expectedCorpus");if(expected!=null)assertArrayEquals(Files.readAllBytes(Path.of(expected,name+".bin")),bytes);String output=System.getProperty("p08.corpus");if(output!=null){Files.createDirectories(Path.of(output));Files.write(Path.of(output,name+".bin"),bytes);}}
     private static Method method(Class<?> type,String name,Class<?>...args){for(Class<?> current=type;current!=null;current=current.getSuperclass())try{Method result=current.getDeclaredMethod(name,args);result.setAccessible(true);return result;}catch(NoSuchMethodException ignored){}throw new IllegalStateException(name);}
