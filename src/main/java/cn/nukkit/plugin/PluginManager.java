@@ -583,7 +583,8 @@ public class PluginManager {
                     break;
                 }
             }
-            this.registerEvent(eventClass, listener, eh.priority(), new MethodEventExecutor(method), plugin, eh.ignoreCancelled());
+            this.registerEvent(eventClass, listener, eh.priority(),
+                    MethodEventExecutor.compile(listener.getClass(), method), plugin, eh.ignoreCancelled());
         }
     }
 
