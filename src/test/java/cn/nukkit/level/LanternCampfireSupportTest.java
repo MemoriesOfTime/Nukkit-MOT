@@ -234,6 +234,7 @@ class LanternCampfireSupportTest {
 
         Fixture() {
             field("server", server);
+            field("automaticBlockBreakTrace", new AutomaticBlockBreakTrace());
             field("vibrationManager", mock(VibrationManager.class));
             level.gameRules = GameRules.getDefault();
             when(server.getPluginManager()).thenReturn(plugins);

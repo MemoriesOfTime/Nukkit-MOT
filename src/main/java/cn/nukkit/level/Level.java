@@ -18,6 +18,7 @@ import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.passive.EntityIronGolem;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.weather.EntityLightning;
+import cn.nukkit.event.block.AutomaticBlockDropsEvent;
 import cn.nukkit.event.block.BlockBreakEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
@@ -594,6 +595,7 @@ public class Level implements ChunkManager, Metadatable {
     private static final AtomicInteger callbackIdCounter = new AtomicInteger();
     private final Int2ObjectMap<BiConsumer<Block, Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
+    private final AutomaticBlockBreakTrace automaticBlockBreakTrace = new AutomaticBlockBreakTrace();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -2829,6 +2831,8 @@ public class Level implements ChunkManager, Metadatable {
         blockPrevious.level = this;
         blockPrevious.layer = layer;
 
+        automaticBlockBreakTrace.record(blockPrevious, block);
+
         try {
             for (BiConsumer<Block, Block> callback : this.callbackBlockSet.values()) {
                 try {
@@ -3039,6 +3043,53 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void dropItem(Vector3 source, Item item, Vector3 motion, boolean dropAround, int delay) {
+        this.spawnDroppedItem(source, item, motion, dropAround, delay);
+    }
+
+    /**
+     * 生成一件由自动移除的方块直接造成的掉落，并派发可取消的 AutomaticBlockDropsEvent。
+     * 这是 useBreakOn 终批之外唯一的归因入口；活跃玩家破坏链内的掉落会标记为玩家来源。
+     * <p>Drops an item directly caused by an automatic block removal and exposes it through a
+     * cancellable AutomaticBlockDropsEvent. This is the only attribution entry besides the
+     * useBreakOn terminal batch; drops inside an active player chain are tagged as player-authored.
+     */
+    public void dropItemFromAutomaticBlock(Block source, Item item) {
+        Player chainOrigin = automaticBlockBreakTrace.currentOrigin();
+        AutomaticBlockDropsEvent.Cause cause = chainOrigin == null
+                ? AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK
+                : AutomaticBlockDropsEvent.Cause.PLAYER_BREAK;
+        this.dropItemFromBlock(source, item, chainOrigin, cause);
+    }
+
+    /**
+     * 生成一次方块交互的产物，不归因于任何活跃的破坏链。
+     * <p>Drops an interaction's output without attributing it to an active block-break chain.
+     */
+    public void dropItemFromBlockInteraction(Block source, Item item) {
+        this.dropItemFromBlock(source, item, null, AutomaticBlockDropsEvent.Cause.BLOCK_INTERACTION);
+    }
+
+    private void dropItemFromBlock(
+            Block source, Item item, @Nullable Player chainOrigin, AutomaticBlockDropsEvent.Cause cause) {
+        Vector3 position = source.add(0.5, 0.5, 0.5);
+        Item[] batch = keepsChainDrops(chainOrigin) ? new Item[] {item} : Item.EMPTY_ARRAY;
+        Item[] drops = fireAutomaticBlockDrops(source, batch, Block.EMPTY_ARRAY, false, cause);
+        for (Item drop : drops) {
+            this.spawnDroppedItem(position, drop, null, false, 10);
+        }
+    }
+
+    /**
+     * 玩家链沿用玩家自己的掉落规则：创造模式不产出物品，自动链始终保留掉落。
+     * <p>Player chains keep the player's own drop rules (creative yields nothing); automatic chains
+     * always keep their drops.
+     */
+    private static boolean keepsChainDrops(@Nullable Player chainOrigin) {
+        return chainOrigin == null || chainOrigin.isSurvival() || chainOrigin.isAdventure();
+    }
+
+    private void spawnDroppedItem(
+            Vector3 source, Item item, Vector3 motion, boolean dropAround, int delay) {
         if (item.getId() != 0 && item.getCount() > 0) {
             if (motion == null) {
                 if (dropAround) {
@@ -3070,6 +3121,17 @@ public class Level implements ChunkManager, Metadatable {
 
             itemEntity.spawnToAll();
         }
+    }
+
+    private Item[] fireAutomaticBlockDrops(
+            Block source, Item[] drops, Block[] changedBlocks, boolean outermostBreak,
+            AutomaticBlockDropsEvent.Cause cause) {
+        AutomaticBlockDropsEvent event =
+                new AutomaticBlockDropsEvent(source, drops, changedBlocks, outermostBreak, cause);
+        this.server.getPluginManager().callEvent(event);
+        return event.isCancelled() || event.getDrops() == null
+                ? new Item[0]
+                : event.getDrops();
     }
 
     public EntityItem dropAndGetItem(Vector3 source, Item item) {
@@ -3149,12 +3211,27 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Item useBreakOn(Vector3 vector, BlockFace face, Item item, Player player, boolean createParticles) {
+        return this.useBreakOn(vector, face, item, player, createParticles, null);
+    }
+
+    /**
+     * 使用交互指定的掉落处理瞬时破坏，保留玩家权限和事件校验，不改写挖掘计时；工具损耗由调用方处理。
+     * <p>Breaks a block instantly with interaction-specific drops, retaining player permission and event checks
+     * without changing the mining timer; the caller handles tool wear.
+     */
+    public Item useBreakOnFromBlockInteraction(Vector3 vector, Item item, Player player, Item[] drops) {
+        return this.useBreakOn(vector, null, item, player, true, Objects.requireNonNull(drops, "drops"));
+    }
+
+    private Item useBreakOn(Vector3 vector, BlockFace face, Item item, Player player,
+                            boolean createParticles, @Nullable Item[] interactionDrops) {
         if (player != null && player.getGamemode() > Player.ADVENTURE) {
             return null;
         }
         Block target = this.getBlock(vector);
         Item[] drops;
         int dropExp = target.getDropExp();
+        boolean instantBreak = interactionDrops != null;
 
         if (item == null) {
             item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
@@ -3197,16 +3274,19 @@ public class Level implements ChunkManager, Metadatable {
             double requiredSeconds = breakTime - graceSeconds;
 
             Item[] eventDrops;
-            if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
+            if (interactionDrops != null) {
+                eventDrops = player.isSurvival() || player.isAdventure() ? interactionDrops : Item.EMPTY_ARRAY;
+            } else if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
                 eventDrops = new Item[]{target.toItem()};
             } else {
                 eventDrops = target.getDrops(player, item);
             }
             // lastBreak < 0 表示首次挖掘（初始值 -1），直接放行；否则验证已等待足够时间。
             // 直接比较已用时间与阈值而不构造截止时间：高等级挖掘疲劳会把阈值推到 long 溢出。
-            boolean fastBreak = player.lastBreak >= 0
+            boolean fastBreak = !instantBreak && player.lastBreak >= 0
                     && (System.currentTimeMillis() - player.lastBreak) < requiredSeconds * 1000;
-            BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops, player.isCreative(), fastBreak);
+            BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops,
+                    instantBreak || player.isCreative(), fastBreak);
 
             if ((player.isSurvival() || player.isAdventure()) && !target.isBreakable(item)) {
                 ev.setCancelled();
@@ -3221,12 +3301,16 @@ public class Level implements ChunkManager, Metadatable {
                 return null;
             }
 
-            player.lastBreak = System.currentTimeMillis();
+            if (!instantBreak) {
+                player.lastBreak = System.currentTimeMillis();
+            }
 
             drops = ev.getDrops();
             dropExp = ev.getDropExp();
         } else if (!target.isBreakable(item)) {
             return null;
+        } else if (interactionDrops != null) {
+            drops = interactionDrops;
         } else if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
             drops = new Item[]{target.toItem()};
         } else {
@@ -3238,21 +3322,57 @@ public class Level implements ChunkManager, Metadatable {
             this.addParticle(new DestroyBlockParticle(target.add(0.5), target), players.values());
         }
 
-        BlockEntity blockEntity = this.getBlockEntity(target);
-        if (blockEntity != null) {
-            blockEntity.onBreak();
-            blockEntity.close();
+        AutomaticBlockBreakTrace.Scope automaticBreak = automaticBlockBreakTrace.enter(player);
+        try {
+            BlockEntity blockEntity = this.getBlockEntity(target);
+            if (blockEntity != null) {
+                blockEntity.onBreak();
+                blockEntity.close();
 
-            this.updateComparatorOutputLevel(target);
+                this.updateComparatorOutputLevel(target);
+            }
+
+            target.onBreak(item, player);
+        } finally {
+            automaticBreak.close();
         }
 
-        target.onBreak(item, player);
+        if (!instantBreak) {
+            item.useOn(target);
+            if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
+                this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
+                this.addParticle(new ItemBreakParticle(target, item));
+                item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+            }
+        }
 
-        item.useOn(target);
-        if (item.isTool() && item.getDamage() >= item.getMaxDurability()) {
-            this.addSoundToViewers(target, cn.nukkit.level.Sound.RANDOM_BREAK);
-            this.addParticle(new ItemBreakParticle(target, item));
-            item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+        Player chainOrigin = automaticBreak.getOrigin();
+        AutomaticBlockDropsEvent.Cause cause = chainOrigin == null
+                ? AutomaticBlockDropsEvent.Cause.AUTOMATIC_BREAK
+                : AutomaticBlockDropsEvent.Cause.PLAYER_BREAK;
+
+        if (player == null) {
+            // 玩家链内的嵌套破坏沿用玩家的掉落规则：创造模式不产出物品；纯自动链不受影响。
+            // Nested breaks inside a player chain keep the player's drop rules (creative yields
+            // nothing); purely automatic chains are unaffected.
+            Item[] batch = keepsChainDrops(chainOrigin) ? drops : Item.EMPTY_ARRAY;
+            drops = fireAutomaticBlockDrops(
+                    target,
+                    batch,
+                    automaticBreak.changedBlocks(),
+                    automaticBreak.isOutermost(),
+                    cause);
+        } else {
+            // BlockBreakEvent has already filtered the player's primary drop batch. The empty
+            // terminal event only completes durable provenance for every secondary cell changed
+            // by Block.onBreak; direct secondary drops fire their own events through
+            // dropItemFromAutomaticBlock.
+            fireAutomaticBlockDrops(
+                    target,
+                    Item.EMPTY_ARRAY,
+                    automaticBreak.changedBlocks(),
+                    automaticBreak.isOutermost(),
+                    cause);
         }
 
         if (this.gameRules.getBoolean(GameRule.DO_TILE_DROPS)
@@ -3871,7 +3991,19 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
+        Block previous = automaticBlockBreakTrace.isActive()
+                ? this.getBlock(x, y, z, layer)
+                : null;
         this.getChunk(x >> 4, z >> 4, true).setBlockId(x & 0x0f, y, z & 0x0f, layer, id & Block.ID_MASK);
+        if (previous != null) {
+            Block current = Block.get(id & Block.ID_MASK, previous.getDamage());
+            current.x = x;
+            current.y = y;
+            current.z = z;
+            current.level = this;
+            current.layer = layer;
+            automaticBlockBreakTrace.record(previous, current);
+        }
         addBlockChange(x, y, z);
         temporalVector.setComponents(x, y, z);
         for (ChunkLoader loader : this.getChunkLoaders(x >> 4, z >> 4)) {
@@ -3891,9 +4023,22 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         BaseFullChunk chunk = this.getChunk(x >> 4, z >> 4, true);
+        Block previous = automaticBlockBreakTrace.isActive()
+                ? this.getBlock(x, y, z, layer)
+                : null;
         boolean changed = chunk.setBlockAtLayer(x & 0x0f, y, z & 0x0f, layer, id & Block.ID_MASK, data & Block.DATA_MASK);
         if (!changed) {
             return false;
+        }
+
+        if (previous != null) {
+            Block current = Block.get(id & Block.ID_MASK, data & Block.DATA_MASK);
+            current.x = x;
+            current.y = y;
+            current.z = z;
+            current.level = this;
+            current.layer = layer;
+            automaticBlockBreakTrace.record(previous, current);
         }
 
         addBlockChange(x, y, z);

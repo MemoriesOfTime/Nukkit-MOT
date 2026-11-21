@@ -4,26 +4,22 @@ import cn.nukkit.MockServer;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
-import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.LevelProvider;
-import cn.nukkit.math.Vector3;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
 import cn.nukkit.utils.MainLogger;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.parallel.Isolated;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.parallel.Isolated;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -157,6 +153,7 @@ public final class NativeBlockSetCallbackFaultIsolationTest {
 
         private Fixture() throws ReflectiveOperationException {
             field(level, "callbackBlockSet", callbacks);
+            field(level, "automaticBlockBreakTrace", new AutomaticBlockBreakTrace());
             field(level, "provider", provider);
             doCallRealMethod().when(level).addCallbackBlockSet(
                     org.mockito.ArgumentMatchers.<BiConsumer<Block, Block>>any());

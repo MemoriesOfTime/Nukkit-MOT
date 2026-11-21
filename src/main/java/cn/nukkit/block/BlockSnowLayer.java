@@ -87,9 +87,6 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
             if (this.level.getBlockIdAt(this.getFloorX(), this.getFloorY(), this.getFloorZ()) == SNOW_LAYER && !this.canSurvive()) {
                 this.level.useBreakOn(this, null, null, true);
-                if (this.level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
-                    this.level.dropItem(this, Item.get(Item.SNOWBALL));
-                }
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if (this.getLevel().getBlockLightAt((int) this.x, (int) this.y, (int) this.z) >= 10) {
@@ -102,6 +99,20 @@ public class BlockSnowLayer extends BlockFallableMeta {
             }
         }
         return 0;
+    }
+
+    /**
+     * 失支撑的雪层先移除，再在同一破坏链收尾前掉落雪球。
+     * <p>Removes unsupported snow before dropping a snowball, within the same break chain.
+     */
+    @Override
+    public boolean onBreak(Item item, Player player) {
+        boolean dropSnowball = player == null && (item == null || item.isNull()) && !this.canSurvive();
+        boolean removed = super.onBreak(item, player);
+        if (removed && dropSnowball && this.level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
+            this.level.dropItemFromAutomaticBlock(this, Item.get(Item.SNOWBALL));
+        }
+        return removed;
     }
 
     @Override
@@ -158,16 +169,20 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (item.isShovel() && (player.gamemode & 0x2) == 0) {
+        int gamemode = player == null ? Player.SURVIVAL : player.gamemode;
+        if (item.isShovel() && (gamemode & 0x2) == 0) {
+            Item[] drops = this.getDrops(item.clone().clearNamedTag());
+            if (this.level.useBreakOnFromBlockInteraction(this, item.clone(), player, drops) == null) {
+                return false;
+            }
             item.useOn(this);
-            this.level.useBreakOn(this, item.clone().clearNamedTag(), null, true);
             return true;
-        } else if (item.getId() == SNOW_LAYER && (player.gamemode & 0x2) == 0) {
+        } else if (item.getId() == SNOW_LAYER && (gamemode & 0x2) == 0) {
             if ((this.getDamage() & 0x7) != 0x7) {
                 this.setDamage(this.getDamage() + 1);
                 this.level.setBlock(this ,this, true);
 
-                if ((player.gamemode & 0x1) == 0) {
+                if ((gamemode & 0x1) == 0) {
                     item.count--;
                 }
                 return true;
