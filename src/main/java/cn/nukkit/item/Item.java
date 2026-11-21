@@ -1231,6 +1231,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         String numericIdGroup = matcher.group(4);
+        boolean explicitNamespace = name != null && matcher.group(1) != null;
         if (name != null) {
             String namespaceGroup = matcher.group(1);
             String namespacedId;
@@ -1272,7 +1273,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return get(flattenedEntry[0], meta.orElse(flattenedEntry[1]));
             }
 
-            if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
+            if (namespaceGroup != null && !namespaceGroup.equals("minecraft")) {
                 return Item.AIR_ITEM.clone();
             }
         } else if (numericIdGroup != null) {
@@ -1296,7 +1297,22 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             } catch (Exception ignore1) {
             }
         }
+        // An explicit "minecraft:" name reaches this legacy constant fallback only after every
+        // registry missed it. Keep it only when the result has a runtime item mapping; otherwise a
+        // block-only constant (e.g. PALE_OAK_DOOR -> -990) would become an item no client can see.
+        if (explicitNamespace && id != 0 && !isRegisteredLegacyItem(id, meta.orElse(0))) {
+            return Item.AIR_ITEM.clone();
+        }
         return get(id, meta.orElse(0));
+    }
+
+    private static boolean isRegisteredLegacyItem(int id, int meta) {
+        try {
+            return RuntimeItems.getMapping(GameVersion.getLastVersion()).isRegistered(id, meta);
+        } catch (IllegalStateException notInitialized) {
+            // Before the runtime item tables are loaded keep the historical lookup result.
+            return true;
+        }
     }
 
     public static Item fromJson(Map<String, Object> data) {
