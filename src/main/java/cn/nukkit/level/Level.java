@@ -137,6 +137,7 @@ public class Level implements ChunkManager, Metadatable {
 
     // Lower values use less memory
     public static final int MAX_BLOCK_CACHE = 1024;
+    private static final double THUNDER_CHUNK_PROBABILITY = 1.0 / 100_000.0;
 
     // The blocks that can randomly tick
     private static final boolean[] randomTickBlocks = new boolean[Block.MAX_BLOCK_ID];
@@ -1402,9 +1403,7 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             if (this.isThundering()) {
-                for (Map.Entry<Long, ? extends FullChunk> entry : getChunks().entrySet()) {
-                    performThunder(entry.getKey(), entry.getValue());
-                }
+                this.performThunderForLoadedChunks();
             }
         }
 
@@ -1615,8 +1614,32 @@ public class Level implements ChunkManager, Metadatable {
         return entity.onUpdate(currentTick);
     }
 
-    private void performThunder(long index, FullChunk chunk) {
-        performThunder(index, chunk, Utils.random.nextInt(100000));
+    void performThunderForLoadedChunks() {
+        LevelProvider provider = this.requireProvider();
+        long[] hashes = provider.getLoadedChunkHashes();
+        int next = 0;
+        while (next < hashes.length) {
+            int selected = nextThunderChunkIndex(next, hashes.length,
+                    THUNDER_CHUNK_PROBABILITY, Utils.random.nextDouble());
+            if (selected == hashes.length) return;
+
+            long hash = hashes[selected];
+            FullChunk chunk = provider.getLoadedChunk(hash);
+            if (chunk != null) this.performThunder(hash, chunk, 0);
+            next = selected + 1;
+        }
+    }
+
+    static int nextThunderChunkIndex(int start, int endExclusive, double probability, double sample) {
+        if (!(probability > 0.0 && probability < 1.0) || !(sample >= 0.0 && sample < 1.0)
+                || start < 0 || endExclusive < start) {
+            throw new IllegalArgumentException("Invalid geometric thunder selection input");
+        }
+        if (start == endExclusive) return endExclusive;
+        long failures = (long) Math.floor(Math.log1p(-sample) / Math.log1p(-probability));
+        int remaining = endExclusive - start;
+        if (failures >= remaining) return endExclusive;
+        return start + (int) failures;
     }
 
     // Separate the roll from its effects so the rare path can be tested deterministically.
