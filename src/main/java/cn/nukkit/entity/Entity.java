@@ -532,6 +532,8 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected float absorption = 0;
 
+    private float clientAbsorptionCapacity;
+
     protected float ySize = 0;
     public boolean keepMovement = false;
 
@@ -2592,10 +2594,33 @@ public abstract class Entity extends Location implements Metadatable {
         return absorption;
     }
 
+    // Bound per-point 1.26 HUD slots while retaining custom capacities above vanilla's 16 points.
+    private static final float MAX_1_26_ABSORPTION_CAPACITY = 32.0f;
+
+    private static Attribute clientAbsorptionAttribute(float absorption, float capacity, int protocol) {
+        Attribute attribute = Attribute.getAttribute(Attribute.ABSORPTION);
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            float value = Float.isNaN(absorption) ? 0.0f
+                    : Math.max(0.0f, Math.min(MAX_1_26_ABSORPTION_CAPACITY, absorption));
+            float maxValue = Math.max(16.0f, Math.min(MAX_1_26_ABSORPTION_CAPACITY, capacity));
+            attribute.setMaxValue(maxValue);
+            return attribute.setValue(value);
+        }
+        return attribute.setValue(absorption);
+    }
+
     public void setAbsorption(float absorption) {
         if (absorption != this.absorption || (this instanceof Player player && player.protocol >= ProtocolInfo.v1_21_60)) {
             this.absorption = absorption;
-            if (this instanceof Player player) player.setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
+            if (this instanceof Player player) {
+                if (player.protocol >= ProtocolInfo.v1_26_0 && !Float.isNaN(absorption)) {
+                    this.clientAbsorptionCapacity = absorption > 0.0f
+                            ? Math.max(this.clientAbsorptionCapacity,
+                                    Math.min(MAX_1_26_ABSORPTION_CAPACITY, absorption))
+                            : 0.0f;
+                }
+                player.setAttribute(clientAbsorptionAttribute(absorption, this.clientAbsorptionCapacity, player.protocol));
+            }
         }
     }
 
