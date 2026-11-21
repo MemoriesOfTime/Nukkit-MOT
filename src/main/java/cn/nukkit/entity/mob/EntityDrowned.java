@@ -21,7 +21,7 @@ import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 
 public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
@@ -68,7 +68,7 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
     public void attackEntity(Entity player) {
         if (this.attackDelay > 23 && player.distanceSquared(this) <= 1) {
             this.attackDelay = 0;
-            HashMap<EntityDamageEvent.DamageModifier, Float> damage = new HashMap<>();
+            EnumMap<EntityDamageEvent.DamageModifier, Float> damage = new EnumMap<>(EntityDamageEvent.DamageModifier.class);
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (player instanceof Player) {
