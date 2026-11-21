@@ -78,6 +78,7 @@ public abstract class Fuel {
         duration.put(Item.SPRUCE_CHEST_BOAT, (short) 1200);
         duration.put(Item.CHERRY_CHEST_BOAT, (short) 1200);
         duration.put(Item.PALE_OAK_CHEST_BOAT, (short) 1200);
+        duration.put(Item.POPLAR_CHEST_BOAT, (short) 1200);
         duration.put(Item.BAMBOO_CHEST_RAFT, (short) 1200);
         duration.put(Item.BLAZE_ROD, (short) 2400);
         duration.put(Item.BROWN_MUSHROOM_BLOCK, (short) 300);
@@ -93,7 +94,8 @@ public abstract class Fuel {
                 Item.MANGROVE_BUTTON,
                 Item.BAMBOO_BUTTON,
                 Item.CHERRY_BUTTON,
-                Item.PALE_OAK_BUTTON);
+                Item.PALE_OAK_BUTTON,
+                Item.POPLAR_BUTTON);
         duration.put(Item.WOODEN_DOOR, (short) 200);
         duration.put(Item.SPRUCE_DOOR, (short) 200);
         duration.put(Item.BIRCH_DOOR, (short) 200);
@@ -160,6 +162,17 @@ public abstract class Fuel {
                 Item.PALE_OAK_TRAPDOOR,
                 Item.PALE_OAK_WOOD,
                 Item.STRIPPED_PALE_OAK_WOOD,
+                Item.POPLAR_LOG,
+                Item.STRIPPED_POPLAR_LOG,
+                Item.POPLAR_PLANKS,
+                Item.POPLAR_STAIRS,
+                Item.POPLAR_SLAB,
+                Item.POPLAR_PRESSURE_PLATE,
+                Item.POPLAR_FENCE,
+                Item.POPLAR_FENCE_GATE,
+                Item.POPLAR_TRAPDOOR,
+                Item.POPLAR_WOOD,
+                Item.STRIPPED_POPLAR_WOOD,
                 Item.SPRUCE_PRESSURE_PLATE,
                 Item.BIRCH_PRESSURE_PLATE,
                 Item.JUNGLE_PRESSURE_PLATE,
@@ -178,7 +191,8 @@ public abstract class Fuel {
                 Item.TALL_DRY_GRASS,
                 Item.MANGROVE_PROPAGULE,
                 Item.CHERRY_SAPLING,
-                Item.PALE_OAK_SAPLING);
+                Item.PALE_OAK_SAPLING,
+                Item.POPLAR_SAPLING);
         duration.put(Item.SIGN, (short) 200);
         duration.put(Item.ACACIA_SIGN, (short) 200);
         duration.put(Item.BIRCH_SIGN, (short) 200);
@@ -189,6 +203,7 @@ public abstract class Fuel {
         duration.put(Item.BAMBOO_SIGN, (short) 200);
         duration.put(Item.CHERRY_SIGN, (short) 200);
         duration.put(Item.PALE_OAK_SIGN, (short) 200);
+        duration.put(Item.POPLAR_SIGN, (short) 200);
         registerBlocks((short) 200,
                 Item.OAK_HANGING_SIGN,
                 Item.SPRUCE_HANGING_SIGN,
@@ -200,11 +215,13 @@ public abstract class Fuel {
                 Item.BAMBOO_HANGING_SIGN,
                 Item.CHERRY_HANGING_SIGN,
                 Item.PALE_OAK_HANGING_SIGN,
+                Item.POPLAR_HANGING_SIGN,
                 Item.PALE_OAK_DOOR);
         registerStringItems((short) 200,
                 ItemNamespaceId.BAMBOO_DOOR_NAMESPACE_ID,
                 ItemNamespaceId.CHERRY_DOOR,
                 ItemNamespaceId.MANGROVE_DOOR,
+                ItemNamespaceId.POPLAR_DOOR_NAMESPACE_ID,
                 ItemNamespaceId.WOODEN_SPEAR);
         registerStringItems((short) 300, ItemNamespaceId.CHISELED_BOOKSHELF_NAMESPACE_ID);
     }

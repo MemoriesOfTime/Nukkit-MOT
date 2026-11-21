@@ -8,6 +8,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -29,6 +30,13 @@ import java.util.regex.Pattern;
  * MR-JAR exception: versioned classes under {@code src/main/java21} (virtual-thread overrides)
  * compile separately at release = MR_JAR_VERSION into META-INF/versions/21 in both builds;
  * the exception itself must stay consistent across pom/Gradle and match real class files.
+ * <p>
+ * IDE 编译产物不参与产物断言：IntelliJ 会注入 @NotNull 断言，并把 {@code src/main/java21}
+ * 直接编译进主输出目录（覆盖 release 17 的基线类），产物布局只能由构建工具生成。
+ * <p>
+ * IDE-compiled output is exempt from the artifact assertions: IntelliJ injects @NotNull
+ * assertions and compiles {@code src/main/java21} straight into the main output directory,
+ * overwriting the release-17 base class; only build-tool output has a meaningful layout.
  */
 public class JavaReleaseConsistencyTest {
 
@@ -72,17 +80,22 @@ public class JavaReleaseConsistencyTest {
 
         // 与实际编译产物核对；本测试在哪个构建系统下运行，就在验证哪个系统的输出
         // Cross-checks the real compiled output; whichever build runs this test validates itself
-        if (mavenRelease > 0 && gradleRelease > 0 && mavenRelease == gradleRelease) {
-            assertClassFileMajor("cn/nukkit/Nukkit.class", mavenRelease, errors);
-            assertClassFileMajor("cn/nukkit/JavaReleaseConsistencyTest.class", mavenRelease, errors);
-        }
+        if (isIdeCompiledOutput()) {
+            System.out.println("=== 跳过 classpath 字节码断言：检测到 IDE 编译产物（IntelliJ 会注入 @NotNull 断言并把 "
+                    + "src/main/java21 编译进主输出目录），请用 mvn clean test / gradle clean test 验证构建产物 ===");
+        } else {
+            if (mavenRelease > 0 && gradleRelease > 0 && mavenRelease == gradleRelease) {
+                assertClassFileMajor("cn/nukkit/Nukkit.class", mavenRelease, errors);
+                assertClassFileMajor("cn/nukkit/JavaReleaseConsistencyTest.class", mavenRelease, errors);
+            }
 
-        // MR 版本化类真实存在且 major = 例外 release；缺失即说明当前构建的 MR 接线被破坏
-        // Versioned class must really exist with the exception release; absence means the
-        // current build's MR wiring is broken
-        if (mavenMrRelease == gradleMrRelease && mavenMrRelease > 0) {
-            assertClassFileMajor(MR_CLASS_RESOURCE, mavenMrRelease, errors);
-            assertClassFileMajor(MR_BASE_CLASS_RESOURCE, mavenRelease > 0 ? mavenRelease : gradleRelease, errors);
+            // MR 版本化类真实存在且 major = 例外 release；缺失即说明当前构建的 MR 接线被破坏
+            // Versioned class must really exist with the exception release; absence means the
+            // current build's MR wiring is broken
+            if (mavenMrRelease == gradleMrRelease && mavenMrRelease > 0) {
+                assertClassFileMajor(MR_CLASS_RESOURCE, mavenMrRelease, errors);
+                assertClassFileMajor(MR_BASE_CLASS_RESOURCE, mavenRelease > 0 ? mavenRelease : gradleRelease, errors);
+            }
         }
 
         System.out.println("=== Java release 一致性: Maven=" + mavenRelease
@@ -275,6 +288,30 @@ public class JavaReleaseConsistencyTest {
                         "%s major=%d（Java %d）与 release=%d（期望 major=%d）不符，构建产物字节码版本漂移%n",
                         classResource, major, major - CLASS_MAJOR_OFFSET, release, release + CLASS_MAJOR_OFFSET));
             }
+        }
+    }
+
+    /**
+     * classpath 产物是否来自 IDE 编译：IntelliJ 注入 {@code $$$reportNull$$$0} 断言，
+     * 并把 {@code src/main/java21} 编译成与基线实现完全相同的字节码。
+     * <p>
+     * Whether the classpath was built by an IDE: IntelliJ emits {@code $$$reportNull$$$0}
+     * assertion helpers and compiles {@code src/main/java21} into bytes identical to the base impl.
+     */
+    private boolean isIdeCompiledOutput() throws IOException {
+        byte[] scheduler = readClassBytes("cn/nukkit/scheduler/ServerScheduler.class");
+        if (scheduler != null
+                && new String(scheduler, StandardCharsets.ISO_8859_1).contains("$$$reportNull$$$")) {
+            return true;
+        }
+        byte[] base = readClassBytes(MR_BASE_CLASS_RESOURCE);
+        byte[] versioned = readClassBytes(MR_CLASS_RESOURCE);
+        return base != null && versioned != null && Arrays.equals(base, versioned);
+    }
+
+    private byte[] readClassBytes(String classResource) throws IOException {
+        try (InputStream in = JavaReleaseConsistencyTest.class.getClassLoader().getResourceAsStream(classResource)) {
+            return in == null ? null : in.readAllBytes();
         }
     }
 

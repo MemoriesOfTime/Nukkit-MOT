@@ -91,14 +91,6 @@ public class MultiReleaseJarTest {
         assertEquals(true, Thread.class.getMethod("isVirtual").invoke(thread), "任务应运行在虚拟线程上");
     }
 
-    @Test
-    public void testVersionedClassLayoutOnClasspath() throws Exception {
-        // 两个实现类都存在，版本化类 major=65、基线类 major=61（接线在 JavaReleaseConsistencyTest 也有守卫）
-        // Both impl classes exist; versioned major=65, base major=61
-        assertClassMajor(IMPL_CLASS.replace('.', '/') + ".class", 61);
-        assertClassMajor(VERSIONED_IMPL_RESOURCE, 65);
-    }
-
     /**
      * 基线与 versions/21 的同名实现类方法签名一致（编译期父类契约之外的运行时复核）：
      * 提取两份 class 文件常量池中的方法名/描述符片段对比。
@@ -145,15 +137,6 @@ public class MultiReleaseJarTest {
             out.putNextEntry(new ZipEntry(resource));
             in.transferTo(out);
             out.closeEntry();
-        }
-    }
-
-    private void assertClassMajor(String resource, int expectedMajor) throws Exception {
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(resource)) {
-            assertNotNull(in, "classpath 缺少 " + resource);
-            byte[] header = in.readNBytes(8);
-            int major = ((header[6] & 0xFF) << 8) | (header[7] & 0xFF);
-            assertEquals(expectedMajor, major, resource + " 字节码版本");
         }
     }
 

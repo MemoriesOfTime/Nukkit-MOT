@@ -107,8 +107,8 @@ public final class ExplosionPaletteTypedStateTest {
             case 618 -> 15844;
             case 622 -> 15824;
             case 1001 -> 20082;
-            case 2168 -> 20082;
-            case 2193 -> 20050;
+            case 2168 -> 22235;
+            case 2193 -> 22075;
             default -> throw new AssertionError("Unreviewed palette protocol " + protocol);
         };
     }

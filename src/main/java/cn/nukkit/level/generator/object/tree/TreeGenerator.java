@@ -21,7 +21,9 @@ public abstract class TreeGenerator extends cn.nukkit.level.generator.object.Bas
             case Item.AIR, Item.LEAVES, Item.GRASS, Item.DIRT, Item.LOG, Item.LOG2, Item.SAPLING, Item.VINE,
                     Item.DIRT_WITH_ROOTS, Item.AZALEA_LEAVES, Item.AZALEA_LEAVES_FLOWERED,
                     Item.CHERRY_LEAVES, Item.CHERRY_LOG, Item.CHERRY_SAPLING,
-                    Item.PALE_OAK_LEAVES, Item.PALE_OAK_LOG, Item.PALE_OAK_SAPLING -> true;
+                    Item.PALE_OAK_LEAVES, Item.PALE_OAK_LOG, Item.PALE_OAK_SAPLING,
+                    Item.ORANGE_POPLAR_LEAVES, Item.RED_POPLAR_LEAVES, Item.YELLOW_POPLAR_LEAVES,
+                    Item.POPLAR_LOG, Item.POPLAR_SAPLING -> true;
             default -> false;
         };
     }

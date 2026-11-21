@@ -262,14 +262,16 @@ public class BlockLeaves extends BlockTransparentMeta {
 
     protected boolean isLeaves(int id) {
         return switch (id) {
-            case LEAVES, LEAVES2, AZALEA_LEAVES, AZALEA_LEAVES_FLOWERED, MANGROVE_LEAVES, CHERRY_LEAVES -> true;
+            case LEAVES, LEAVES2, AZALEA_LEAVES, AZALEA_LEAVES_FLOWERED, MANGROVE_LEAVES, CHERRY_LEAVES,
+                    ORANGE_POPLAR_LEAVES, RED_POPLAR_LEAVES, YELLOW_POPLAR_LEAVES -> true;
             default -> false;
         };
     }
 
     protected boolean isLog(int id, int damage) {
         return switch (id) {
-            case LOG, LOG2, MANGROVE_LOG, CHERRY_LOG, MANGROVE_WOOD, CHERRY_WOOD -> true;
+            case LOG, LOG2, MANGROVE_LOG, CHERRY_LOG, MANGROVE_WOOD, CHERRY_WOOD,
+                    POPLAR_LOG, POPLAR_WOOD -> true;
             case WOOD_BARK -> (damage & BlockWoodBark.STRIPPED_BIT) == 0;
             default -> false;
         };

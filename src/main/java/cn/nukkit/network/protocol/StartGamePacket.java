@@ -14,26 +14,18 @@ import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.NbtMapDeserializer;
 import cn.nukkit.utils.Utils;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 import lombok.Value;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.nbt.NBTInputStream;
 import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.nbt.NbtUtils;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.lang.reflect.Type;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @Log4j2
 @ToString
@@ -50,14 +42,21 @@ public class StartGamePacket extends DataPacket {
     private static final byte[] EMPTY_UUID;
 
     /**
-     * v2192 起 vanilla 数据驱动方块属性需随 StartGame 下发（block_properties_2193.json，2192 预览与 2193 正式共用）。
+     * v2192 起 vanilla 数据驱动方块属性需随 StartGame 下发（data_driven_blocks_2193.nbt，BDS 抓包快照，
+     * 2192 预览与 2193 正式共用同一份数据，按正式版号归档）。必须以 NBT 原格式存储：布尔字段是
+     * TAG_Byte、秒数是 TAG_Float，若从 JSON 重建（Int/Double）会改变 NBT 字节布局，客户端按字节读
+     * 属性流时错位，double slab 的 is_double 丢失导致渲染成半块。
      * <p>
-     * Since v2192 the vanilla data-driven block properties must be sent in StartGame (block_properties_2193.json,
-     * shared by the 2192 preview and the 2193 stable release).
+     * Since v2192 the vanilla data-driven block properties must be sent in StartGame
+     * (data_driven_blocks_2193.nbt, a BDS capture shared by the 2192 preview and the 2193 stable
+     * release, archived under the stable number). The NBT must be kept verbatim: boolean fields
+     * are TAG_Byte and destroy-time values TAG_Float; rebuilding from JSON (Int/Double) shifts
+     * the NBT byte layout, so the client misreads the property stream and double slabs lose
+     * is_double, rendering as half blocks.
      * <p>
      * Adapted from NukkitPetteriM1Edition (<a href="https://github.com/PetteriM1/NukkitPetteriM1Edition">Nukkit PM1E</a>)
      */
-    private static final List<BlockPropertyData> vanillaBlockProperties;
+    private static final List<Map.Entry<String, NbtMap>> vanillaBlockProperties;
 
     // Private, protocol-independent network NBT. Preserve JSON order and keep custom data dynamic.
     private static final byte[] vanillaBlockPropertyBytes;
@@ -70,17 +69,19 @@ public class StartGamePacket extends DataPacket {
 
     static {
         EMPTY_UUID = Binary.writeUUID(new UUID(0, 0));
-        try (Reader reader = new InputStreamReader(Objects.requireNonNull(
-                StartGamePacket.class.getClassLoader().getResourceAsStream("block_properties_2193.json")), StandardCharsets.UTF_8)) {
-            Type type = new TypeToken<List<BlockPropertyData>>() {}.getType();
-            vanillaBlockProperties = new GsonBuilder()
-                    .registerTypeAdapter(NbtMap.class, new NbtMapDeserializer())
-                    .create()
-                    .fromJson(reader, type);
+        try (NBTInputStream reader = NbtUtils.createGZIPReader(
+                Objects.requireNonNull(StartGamePacket.class.getClassLoader().getResourceAsStream("data_driven_blocks_2193.nbt"),
+                        "data_driven_blocks_2193.nbt is missing"))) {
+            NbtMap properties = (NbtMap) reader.readTag();
+            List<Map.Entry<String, NbtMap>> entries = new ObjectArrayList<>(properties.size());
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                entries.add(Map.entry(entry.getKey(), (NbtMap) entry.getValue()));
+            }
+            vanillaBlockProperties = entries;
             BinaryStream compiled = new BinaryStream();
-            for (BlockPropertyData data : vanillaBlockProperties) {
-                compiled.putString(data.name);
-                compiled.putNbtTag(data.properties);
+            for (Map.Entry<String, NbtMap> entry : entries) {
+                compiled.putString(entry.getKey());
+                compiled.putNbtTag(entry.getValue());
             }
             vanillaBlockPropertyBytes = compiled.getBuffer();
         } catch (IOException e) {
@@ -463,9 +464,9 @@ public class StartGamePacket extends DataPacket {
                     this.put(vanillaBlockPropertyBytes);
                 } else {
                     // Packet subclasses retain their existing virtual string/NBT writer hooks.
-                    for (BlockPropertyData data : vanillaBlockProperties) {
-                        this.putString(data.name);
-                        this.putNbtTag(data.properties);
+                    for (Map.Entry<String, NbtMap> entry : vanillaBlockProperties) {
+                        this.putString(entry.getKey());
+                        this.putNbtTag(entry.getValue());
                     }
                 }
                 if (hasCustomBlocks) {

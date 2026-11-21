@@ -93,6 +93,46 @@ class RuntimeBlockStatesNewBlocksTest {
             expected.put("minecraft:waxed_weathered_lightning_rod", 12);
             expected.put("minecraft:waxed_oxidized_lightning_rod", 12);
         }
+        if (!netease && version >= 2168) {
+            // 1.26.40 白杨系列；楼梯/栅栏按版本差异补高位 meta 别名（40 / 16 条）
+            expected.put("minecraft:poplar_button", 12);
+            expected.put("minecraft:poplar_door", 32);
+            expected.put("minecraft:poplar_fence", 16);
+            expected.put("minecraft:poplar_fence_gate", 16);
+            expected.put("minecraft:poplar_hanging_sign", 384);
+            expected.put("minecraft:stripped_poplar_log", 3);
+            expected.put("minecraft:poplar_log", 3);
+            expected.put("minecraft:poplar_planks", 1);
+            expected.put("minecraft:poplar_pressure_plate", 16);
+            expected.put("minecraft:poplar_slab", 2);
+            expected.put("minecraft:poplar_double_slab", 2);
+            expected.put("minecraft:poplar_stairs", 40);
+            expected.put("minecraft:poplar_standing_sign", 16);
+            expected.put("minecraft:poplar_trapdoor", 16);
+            expected.put("minecraft:poplar_wall_sign", 6);
+            expected.put("minecraft:stripped_poplar_wood", 3);
+            expected.put("minecraft:poplar_wood", 3);
+            expected.put("minecraft:poplar_sapling", 2);
+            expected.put("minecraft:orange_poplar_leaves", 4);
+            expected.put("minecraft:red_poplar_leaves", 4);
+            expected.put("minecraft:yellow_poplar_leaves", 4);
+            expected.put("minecraft:poplar_shelf", 32);
+        }
+        if (!netease && version >= 2193) {
+            // 1.26.50 羊毛台阶 / 楼梯 / 双台阶（16 色）
+            String[] coloredFamilies = {
+                    "white", "light_gray", "gray", "black", "brown", "red", "orange", "yellow",
+                    "lime", "green", "cyan", "light_blue", "blue", "purple", "magenta", "pink"
+            };
+            for (String color : coloredFamilies) {
+                expected.put("minecraft:" + color + "_wool_slab", 2);
+                expected.put("minecraft:" + color + "_wool_double_slab", 2);
+                expected.put("minecraft:" + color + "_wool_stairs", 40);
+                expected.put("minecraft:" + color + "_concrete_slab", 2);
+                expected.put("minecraft:" + color + "_concrete_double_slab", 2);
+                expected.put("minecraft:" + color + "_concrete_stairs", 40);
+            }
+        }
         return expected;
     }
 

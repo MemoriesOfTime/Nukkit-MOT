@@ -482,7 +482,8 @@
     "6": "minecraft:mangrove_boat",
     "7": "minecraft:bamboo_raft",
     "8": "minecraft:cherry_boat",
-    "9": "minecraft:pale_oak_boat"
+    "9": "minecraft:pale_oak_boat",
+    "10": "minecraft:poplar_boat"
   },
   "minecraft:bucket": {
     "0": "minecraft:bucket",

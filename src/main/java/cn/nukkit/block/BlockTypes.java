@@ -50,7 +50,40 @@ public final class BlockTypes {
             BlockID.POLISHED_TUFF_SLAB,
             BlockID.TUFF_BRICK_SLAB,
             BlockID.PALE_OAK_SLAB,
-            BlockID.RESIN_BRICK_SLAB
+            BlockID.RESIN_BRICK_SLAB,
+            BlockID.POPLAR_SLAB,
+            BlockID.WHITE_WOOL_SLAB,
+            BlockID.LIGHT_GRAY_WOOL_SLAB,
+            BlockID.GRAY_WOOL_SLAB,
+            BlockID.BLACK_WOOL_SLAB,
+            BlockID.BROWN_WOOL_SLAB,
+            BlockID.RED_WOOL_SLAB,
+            BlockID.ORANGE_WOOL_SLAB,
+            BlockID.YELLOW_WOOL_SLAB,
+            BlockID.LIME_WOOL_SLAB,
+            BlockID.GREEN_WOOL_SLAB,
+            BlockID.CYAN_WOOL_SLAB,
+            BlockID.LIGHT_BLUE_WOOL_SLAB,
+            BlockID.BLUE_WOOL_SLAB,
+            BlockID.PURPLE_WOOL_SLAB,
+            BlockID.MAGENTA_WOOL_SLAB,
+            BlockID.PINK_WOOL_SLAB,
+            BlockID.WHITE_CONCRETE_SLAB,
+            BlockID.LIGHT_GRAY_CONCRETE_SLAB,
+            BlockID.GRAY_CONCRETE_SLAB,
+            BlockID.BLACK_CONCRETE_SLAB,
+            BlockID.BROWN_CONCRETE_SLAB,
+            BlockID.RED_CONCRETE_SLAB,
+            BlockID.ORANGE_CONCRETE_SLAB,
+            BlockID.YELLOW_CONCRETE_SLAB,
+            BlockID.LIME_CONCRETE_SLAB,
+            BlockID.GREEN_CONCRETE_SLAB,
+            BlockID.CYAN_CONCRETE_SLAB,
+            BlockID.LIGHT_BLUE_CONCRETE_SLAB,
+            BlockID.BLUE_CONCRETE_SLAB,
+            BlockID.PURPLE_CONCRETE_SLAB,
+            BlockID.MAGENTA_CONCRETE_SLAB,
+            BlockID.PINK_CONCRETE_SLAB
     };
 
     private static final short[] STAIRS_IDS = {
@@ -109,7 +142,40 @@ public final class BlockTypes {
             BlockID.POLISHED_TUFF_STAIRS,
             BlockID.TUFF_BRICK_STAIRS,
             BlockID.PALE_OAK_STAIRS,
-            BlockID.RESIN_BRICK_STAIRS
+            BlockID.RESIN_BRICK_STAIRS,
+            BlockID.POPLAR_STAIRS,
+            BlockID.WHITE_WOOL_STAIRS,
+            BlockID.LIGHT_GRAY_WOOL_STAIRS,
+            BlockID.GRAY_WOOL_STAIRS,
+            BlockID.BLACK_WOOL_STAIRS,
+            BlockID.BROWN_WOOL_STAIRS,
+            BlockID.RED_WOOL_STAIRS,
+            BlockID.ORANGE_WOOL_STAIRS,
+            BlockID.YELLOW_WOOL_STAIRS,
+            BlockID.LIME_WOOL_STAIRS,
+            BlockID.GREEN_WOOL_STAIRS,
+            BlockID.CYAN_WOOL_STAIRS,
+            BlockID.LIGHT_BLUE_WOOL_STAIRS,
+            BlockID.BLUE_WOOL_STAIRS,
+            BlockID.PURPLE_WOOL_STAIRS,
+            BlockID.MAGENTA_WOOL_STAIRS,
+            BlockID.PINK_WOOL_STAIRS,
+            BlockID.WHITE_CONCRETE_STAIRS,
+            BlockID.LIGHT_GRAY_CONCRETE_STAIRS,
+            BlockID.GRAY_CONCRETE_STAIRS,
+            BlockID.BLACK_CONCRETE_STAIRS,
+            BlockID.BROWN_CONCRETE_STAIRS,
+            BlockID.RED_CONCRETE_STAIRS,
+            BlockID.ORANGE_CONCRETE_STAIRS,
+            BlockID.YELLOW_CONCRETE_STAIRS,
+            BlockID.LIME_CONCRETE_STAIRS,
+            BlockID.GREEN_CONCRETE_STAIRS,
+            BlockID.CYAN_CONCRETE_STAIRS,
+            BlockID.LIGHT_BLUE_CONCRETE_STAIRS,
+            BlockID.BLUE_CONCRETE_STAIRS,
+            BlockID.PURPLE_CONCRETE_STAIRS,
+            BlockID.MAGENTA_CONCRETE_STAIRS,
+            BlockID.PINK_CONCRETE_STAIRS
     };
 
     private static final short[] PRESSURE_PLATE_IDS = {
@@ -128,6 +194,7 @@ public final class BlockTypes {
             BlockID.BAMBOO_PRESSURE_PLATE,
             BlockID.CHERRY_PRESSURE_PLATE,
             BlockID.PALE_OAK_PRESSURE_PLATE,
+            BlockID.POPLAR_PRESSURE_PLATE,
             BlockID.POLISHED_BLACKSTONE_PRESSURE_PLATE
     };
 
@@ -145,6 +212,7 @@ public final class BlockTypes {
             BlockID.BAMBOO_BUTTON,
             BlockID.CHERRY_BUTTON,
             BlockID.PALE_OAK_BUTTON,
+            BlockID.POPLAR_BUTTON,
             BlockID.POLISHED_BLACKSTONE_BUTTON
     };
 
@@ -155,6 +223,7 @@ public final class BlockTypes {
             BlockID.BAMBOO_FENCE,
             BlockID.CHERRY_FENCE,
             BlockID.PALE_OAK_FENCE,
+            BlockID.POPLAR_FENCE,
             BlockID.CRIMSON_FENCE,
             BlockID.WARPED_FENCE
     };
@@ -172,7 +241,8 @@ public final class BlockTypes {
             BlockID.MANGROVE_FENCE_GATE,
             BlockID.BAMBOO_FENCE_GATE,
             BlockID.CHERRY_FENCE_GATE,
-            BlockID.PALE_OAK_FENCE_GATE
+            BlockID.PALE_OAK_FENCE_GATE,
+            BlockID.POPLAR_FENCE_GATE
     };
 
     private static final short[] TRAPDOOR_IDS = {
@@ -189,6 +259,7 @@ public final class BlockTypes {
             BlockID.BAMBOO_TRAPDOOR,
             BlockID.CHERRY_TRAPDOOR,
             BlockID.PALE_OAK_TRAPDOOR,
+            BlockID.POPLAR_TRAPDOOR,
             BlockID.COPPER_TRAPDOOR,
             BlockID.EXPOSED_COPPER_TRAPDOOR,
             BlockID.WEATHERED_COPPER_TRAPDOOR,
@@ -215,6 +286,7 @@ public final class BlockTypes {
             BlockID.BAMBOO_DOOR,
             BlockID.CHERRY_DOOR_BLOCK,
             BlockID.PALE_OAK_DOOR,
+            BlockID.POPLAR_DOOR,
             BlockID.COPPER_DOOR,
             BlockID.EXPOSED_COPPER_DOOR,
             BlockID.WEATHERED_COPPER_DOOR,

@@ -27,12 +27,15 @@ class ServerSchedulerTest {
     class QueueScheduling {
 
         private ServerScheduler scheduler;
+        /** 生产 API 把 plugin 标注为 @NotNull，IDE 编译会注入断言拒绝 null；测试用 mock 保留原有语义 */
+        private Plugin owner;
 
         @BeforeEach
         void createScheduler() {
             // Synchronous tasks need no running Server. AsyncPool starts no workers
             // until a task is submitted, and these tests never submit async tasks.
             scheduler = new ServerScheduler();
+            owner = mock(Plugin.class);
             scheduler.mainThreadHeartbeat(1);
         }
 
@@ -46,9 +49,9 @@ class ServerSchedulerTest {
         @Test
         void tasksWithTheSameDeadlineRunOnceInSubmissionOrder() {
             List<String> calls = new ArrayList<>();
-            TaskHandler first = scheduler.scheduleDelayedTask(null, () -> calls.add("first"), 4);
-            TaskHandler second = scheduler.scheduleDelayedTask(null, () -> calls.add("second"), 4);
-            TaskHandler third = scheduler.scheduleDelayedTask(null, () -> calls.add("third"), 4);
+            TaskHandler first = scheduler.scheduleDelayedTask(owner, () -> calls.add("first"), 4);
+            TaskHandler second = scheduler.scheduleDelayedTask(owner, () -> calls.add("second"), 4);
+            TaskHandler third = scheduler.scheduleDelayedTask(owner, () -> calls.add("third"), 4);
 
             scheduler.mainThreadHeartbeat(2);
             scheduler.mainThreadHeartbeat(3);
@@ -66,9 +69,9 @@ class ServerSchedulerTest {
         @Test
         void taskSubmittedInsideCallbackWaitsForTheNextHeartbeat() {
             List<String> calls = new ArrayList<>();
-            scheduler.scheduleTask(null, () -> {
+            scheduler.scheduleTask(owner, () -> {
                 calls.add("outer");
-                scheduler.scheduleTask(null, () -> calls.add("nested"));
+                scheduler.scheduleTask(owner, () -> calls.add("nested"));
             });
 
             scheduler.mainThreadHeartbeat(2);
@@ -132,9 +135,9 @@ class ServerSchedulerTest {
         @Test
         void cancelledDelayedTaskDoesNotRunOrDisplaceItsBucketNeighbours() {
             List<String> calls = new ArrayList<>();
-            scheduler.scheduleDelayedTask(null, () -> calls.add("first"), 3);
-            TaskHandler cancelled = scheduler.scheduleDelayedTask(null, () -> calls.add("cancelled"), 3);
-            scheduler.scheduleDelayedTask(null, () -> calls.add("last"), 3);
+            scheduler.scheduleDelayedTask(owner, () -> calls.add("first"), 3);
+            TaskHandler cancelled = scheduler.scheduleDelayedTask(owner, () -> calls.add("cancelled"), 3);
+            scheduler.scheduleDelayedTask(owner, () -> calls.add("last"), 3);
             scheduler.mainThreadHeartbeat(2);
             scheduler.cancelTask(cancelled.getTaskId());
 
@@ -147,9 +150,9 @@ class ServerSchedulerTest {
         @Test
         void largeIntegerTickJumpDrainsAllExpiredBucketsExactlyOnce() {
             List<String> calls = new ArrayList<>();
-            scheduler.scheduleDelayedTask(null, () -> calls.add("first"), 2);
-            scheduler.scheduleDelayedTask(null, () -> calls.add("second"), 4);
-            scheduler.scheduleDelayedTask(null, () -> calls.add("third"), 6);
+            scheduler.scheduleDelayedTask(owner, () -> calls.add("first"), 2);
+            scheduler.scheduleDelayedTask(owner, () -> calls.add("second"), 4);
+            scheduler.scheduleDelayedTask(owner, () -> calls.add("third"), 6);
             scheduler.mainThreadHeartbeat(2);
             assertTrue(calls.isEmpty());
 
@@ -170,12 +173,13 @@ class ServerSchedulerTest {
         void smallIntegerTickGapRunsEveryDueBucketAndKeepsEqualTickFifo() {
             ServerScheduler scheduler = new ServerScheduler();
             List<String> calls = new ArrayList<>();
+            Plugin owner = mock(Plugin.class);
             try {
                 scheduler.mainThreadHeartbeat(1);
-                scheduler.scheduleDelayedTask(null, () -> calls.add("tick3-first"), 2);
-                scheduler.scheduleDelayedTask(null, () -> calls.add("tick3-second"), 2);
-                scheduler.scheduleDelayedTask(null, () -> calls.add("tick4"), 3);
-                scheduler.scheduleDelayedTask(null, () -> calls.add("tick5"), 4);
+                scheduler.scheduleDelayedTask(owner, () -> calls.add("tick3-first"), 2);
+                scheduler.scheduleDelayedTask(owner, () -> calls.add("tick3-second"), 2);
+                scheduler.scheduleDelayedTask(owner, () -> calls.add("tick4"), 3);
+                scheduler.scheduleDelayedTask(owner, () -> calls.add("tick5"), 4);
                 scheduler.mainThreadHeartbeat(2);
                 assertEquals(List.of(), calls);
 
@@ -207,8 +211,9 @@ class ServerSchedulerTest {
             try {
                 scheduler.mainThreadHeartbeat(1);
                 scheduler.scheduleDelayedRepeatingTask(repeating, 2, 1);
-                scheduler.scheduleDelayedTask(null, () -> { }, 3);
-                scheduler.scheduleDelayedTask(null, () -> { }, 4);
+                Plugin owner = mock(Plugin.class);
+                scheduler.scheduleDelayedTask(owner, () -> { }, 3);
+                scheduler.scheduleDelayedTask(owner, () -> { }, 4);
                 scheduler.mainThreadHeartbeat(2);
                 scheduler.mainThreadHeartbeat(4);
                 assertEquals(List.of(3), calls);
@@ -356,7 +361,7 @@ class ServerSchedulerTest {
         public void testVirtualRequiresAsynchronous() {
             scheduler = new ServerScheduler();
             assertThrows(cn.nukkit.utils.PluginException.class,
-                    () -> scheduler.scheduleTask(null, () -> { }, false, true),
+                    () -> scheduler.scheduleTask(mock(Plugin.class), () -> { }, false, true),
                     "virtual && !asynchronous 应拒绝注册");
         }
     }

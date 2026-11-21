@@ -399,6 +399,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[BAMBOO_CHEST_RAFT] = ItemChestRaftBamboo.class; //648
             list[CHERRY_CHEST_BOAT] = ItemChestBoatCherry.class; //649
             list[PALE_OAK_CHEST_BOAT] = ItemChestBoatPaleOak.class; //650
+            list[POPLAR_CHEST_BOAT] = ItemChestBoatPoplar.class; //651
 
             list[GLOW_BERRIES] = ItemGlowBerries.class; //654
             list[RECORD_RELIC] = ItemRecordRelic.class; //701
@@ -439,6 +440,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[BAMBOO_SIGN] = ItemBambooSign.class; //1006
             list[CHERRY_SIGN] = ItemCherrySign.class; //1007 //TODO rename to ItemSignCherry
             list[PALE_OAK_SIGN] = ItemSignPaleOak.class; //1008
+            list[POPLAR_SIGN] = ItemSignPoplar.class; //1009
 
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
@@ -456,6 +458,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemDoorMangrove.class);
             registerNamespacedIdItem(ItemDoorBamboo.class);
             registerNamespacedIdItem(ItemDoorCherry.class);
+            registerNamespacedIdItem(ItemDoorPoplar.class);
             registerNamespacedIdItem(ItemChiseledBookshelf.class);
             registerNamespacedIdItem(ItemCrafter.class);
             //TODO 修改类名格式为ItemSmithingTemplateXXX
@@ -618,7 +621,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
 
         // Only load the latest version; runtime filtering via isSupportedOn per protocol
-        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_111, CREATIVE_ITEMS);
+        registerCreativeItemsNew(GameVersion.V1_26_60, GameVersion.V1_26_60, CREATIVE_ITEMS);
 
         isInitializingCreativeItems = false;
         creativeItemsInitialized = true;

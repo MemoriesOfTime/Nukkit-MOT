@@ -74,6 +74,7 @@ public class ItemBoat extends Item {
             case 7 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_50;
             case 8 -> protocolId.getProtocol() >= ProtocolInfo.v1_19_80;
             case 9 -> protocolId.getProtocol() >= ProtocolInfo.v1_21_50;
+            case 10 -> protocolId.getProtocol() >= ProtocolInfo.v1_26_40;
             default -> this.getDamage() >= 0 && this.getDamage() <= 5;
         };
     }

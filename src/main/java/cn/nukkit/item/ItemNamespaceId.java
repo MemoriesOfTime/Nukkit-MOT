@@ -13,6 +13,7 @@ public interface ItemNamespaceId {
     String MANGROVE_DOOR = "minecraft:mangrove_door";
     String BAMBOO_DOOR_NAMESPACE_ID = "minecraft:bamboo_door";
     String CHERRY_DOOR = "minecraft:cherry_door";
+    String POPLAR_DOOR_NAMESPACE_ID = "minecraft:poplar_door";
 
     String CHISELED_BOOKSHELF_NAMESPACE_ID = "minecraft:chiseled_bookshelf";
     String CRAFTER_NAMESPACE_ID = "minecraft:crafter";
