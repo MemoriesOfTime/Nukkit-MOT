@@ -94,7 +94,8 @@ public class InventoryTransaction {
 
             if (!source.isCreative()) {
                 int slot = slotChangeAction.getSlot();
-                if (slot == 36 || slot == 37 || slot == 38 || slot == 39) {
+                if (slotChangeAction.getInventory() == source.getInventory()
+                        && (slot == 36 || slot == 37 || slot == 38 || slot == 39)) {
                     if (sourceItem.hasEnchantment(Enchantment.ID_BINDING_CURSE)) {
                         invalid = true;
                         Server.getInstance().getLogger().debug("Failed to add SlotChangeAction for " + source.getName() + ": armor has binding curse");
@@ -319,7 +320,8 @@ public class InventoryTransaction {
             if (action instanceof SlotChangeAction) {
                 if (!source.isCreative()) {
                     int slot = ((SlotChangeAction) action).getSlot();
-                    if (slot == 36 || slot == 37 || slot == 38 || slot == 39) {
+                    if (((SlotChangeAction) action).getInventory() == source.getInventory()
+                            && (slot == 36 || slot == 37 || slot == 38 || slot == 39)) {
                         if (action.getSourceItem().hasEnchantment(Enchantment.ID_BINDING_CURSE)) {
                             this.sendInventories();
                             return false;
