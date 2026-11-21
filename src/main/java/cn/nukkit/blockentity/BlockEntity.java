@@ -202,6 +202,15 @@ public abstract class BlockEntity extends Position {
         return false;
     }
 
+    /**
+     * Whether a scheduled update must run outside the level's chunk ticking range.
+     * Plugins may override this for explicit background work. This does not load or pin
+     * the chunk, schedule updates, or bypass validity checks and onUpdate's return value.
+     */
+    public boolean alwaysTick() {
+        return false;
+    }
+
     public final void scheduleUpdate() {
         if (this.level.isBeingConverted) {
             return;

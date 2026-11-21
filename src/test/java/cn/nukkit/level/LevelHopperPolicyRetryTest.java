@@ -249,6 +249,7 @@ public class LevelHopperPolicyRetryTest {
         level.gameRules.refresh();
         doCallRealMethod().when(level).scheduleBlockEntityUpdate(any(BlockEntity.class));
         doCallRealMethod().when(level).doTick(anyInt());
+        doCallRealMethod().when(level).tickBlockEntities();
         Method scheduler = Level.class.getDeclaredMethod("doTick", int.class);
 
         BaseFullChunk chunk = mock(BaseFullChunk.class);
