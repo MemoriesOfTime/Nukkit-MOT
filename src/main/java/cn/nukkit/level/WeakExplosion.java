@@ -35,6 +35,7 @@ public class WeakExplosion extends Explosion {
     private final Position source;
     private final double size;
     private final ExplosionSource sourceObject;
+    private final Entity excludedEntity;
     private boolean doesDamage = true;
     private List<Block> affectedBlocks = new ArrayList<>();
 
@@ -42,12 +43,23 @@ public class WeakExplosion extends Explosion {
         this(center, size, new ExplosionSource.EntitySource(sourceObject));
     }
 
+    /** Keep damage attribution separate from the physical projectile excluded from the blast. */
+    public WeakExplosion(Position center, double size, Entity sourceObject, Entity excludedEntity) {
+        this(center, size, new ExplosionSource.EntitySource(sourceObject), excludedEntity);
+    }
+
     protected WeakExplosion(Position center, double size, ExplosionSource sourceObject) {
+        this(center, size, sourceObject,
+                sourceObject instanceof ExplosionSource.EntitySource es ? es.entity() : null);
+    }
+
+    private WeakExplosion(Position center, double size, ExplosionSource sourceObject, Entity excludedEntity) {
         super(center, size, sourceObject);
         this.level = center.getLevel();
         this.source = center;
         this.size = Math.max(size, 0);
         this.sourceObject = sourceObject;
+        this.excludedEntity = excludedEntity;
     }
 
     @Override
@@ -151,8 +163,7 @@ public class WeakExplosion extends Explosion {
         double maxZ = NukkitMath.ceilDouble(this.source.z + explosionSize + 1);
         AxisAlignedBB explosionBB = new SimpleAxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
 
-        Entity[] list = this.level.getNearbyEntities(explosionBB,
-                this.sourceObject instanceof ExplosionSource.EntitySource es ? es.entity() : null);
+        Entity[] list = this.level.getNearbyEntities(explosionBB, this.excludedEntity);
 
         for (Entity entity : list) {
             double distance = entity.distance(this.source) / explosionSize;

@@ -5,6 +5,8 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.level.GameRule;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.WeakExplosion;
 import cn.nukkit.level.format.FullChunk;
@@ -15,6 +17,9 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
     public static final int NETWORK_ID = 85;
 
     private boolean canExplode;
+    private boolean resolvingImpact;
+    private boolean reflecting;
+    private boolean impactAccepted;
 
     public Player directionChanged;
 
@@ -66,12 +71,12 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     @Override
     public boolean onUpdate(int currentTick) {
-        if (this.closed) {
+        if (this.closed || this.reflecting || this.resolvingImpact) {
             return false;
         }
 
-        if (this.age > 1200 || this.isCollided || this.hadCollision) {
-            if (this.isCollided && this.canExplode) {
+        if (this.age > 1200 || this.impactAccepted || this.isCollided || this.hadCollision) {
+            if ((this.impactAccepted || this.isCollided) && this.canExplode) {
                 this.explode();
             } else {
                 this.close();
@@ -85,39 +90,114 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     @Override
     public void onCollideWithEntity(Entity entity) {
-        ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
-        this.server.getPluginManager().callEvent(hitEvent);
-        if (hitEvent.isCancelled()) {
+        if (this.closed || this.impactAccepted || this.isCollided || this.hadCollision || this.resolvingImpact
+                || this.reflecting || entity == this.directionChanged) {
             return;
         }
+        this.resolvingImpact = true;
+        try {
+            ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
+            this.server.getPluginManager().callEvent(hitEvent);
+            if (hitEvent.isCancelled() || this.closed || this.impactAccepted || this.isCollided || this.hadCollision
+                    || entity == this.directionChanged) {
+                return;
+            }
 
-        float damage = this.getResultDamage();
-        EntityDamageEvent ev;
-        if (this.shootingEntity == null) {
-            ev = new EntityDamageByEntityEvent(this, entity, EntityDamageEvent.DamageCause.PROJECTILE, damage);
-        } else {
-            ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, EntityDamageEvent.DamageCause.PROJECTILE, damage);
-        }
+            // Seal this physical source before damage/combustion listeners can reenter it.
+            this.impactAccepted = true;
+            this.isCollided = true;
+            float damage = this.getResultDamage();
+            EntityDamageEvent ev;
+            if (this.shootingEntity == null) {
+                ev = new EntityDamageByEntityEvent(this, entity, EntityDamageEvent.DamageCause.PROJECTILE, damage);
+            } else {
+                ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, EntityDamageEvent.DamageCause.PROJECTILE, damage);
+            }
 
-        entity.attack(ev);
-        this.isCollided = true;
-        EntityCombustByEntityEvent combustEvent = new EntityCombustByEntityEvent(this, entity, 5);
-        this.server.getPluginManager().callEvent(combustEvent);
-        if (!combustEvent.isCancelled()) {
-            entity.setOnFire(combustEvent.getDuration());
+            entity.attack(ev);
+            EntityCombustByEntityEvent combustEvent = new EntityCombustByEntityEvent(this, entity, 5);
+            this.server.getPluginManager().callEvent(combustEvent);
+            if (!combustEvent.isCancelled()) {
+                entity.setOnFire(combustEvent.getDuration());
+            }
+        } finally {
+            this.resolvingImpact = false;
         }
     }
 
     @Override
     public boolean attack(EntityDamageEvent source) {
-        if (this.directionChanged == null && source instanceof EntityDamageByEntityEvent) {
-            if (((EntityDamageByEntityEvent) source).getDamager() instanceof Player player) {
-                this.directionChanged = player;
-                this.setMotion(((EntityDamageByEntityEvent) source).getDamager().getLocation().getDirectionVector());
-            }
+        if (source.isCancelled() || !canReflect() || !(source instanceof EntityDamageByEntityEvent damage)
+                || !(damage.getDamager() instanceof Player player)) {
+            return false;
         }
+        Level world = this.level;
+        if (!validDeflector(player, world)) {
+            return false;
+        }
+        this.reflecting = true;
+        try {
+            this.server.getPluginManager().callEvent(source);
+            if (source.isCancelled() || !availableReflectionSource() || !validDeflector(player, world)) {
+                return false;
+            }
+            if (!Double.isFinite(player.yaw) || !Double.isFinite(player.pitch)) {
+                return false;
+            }
+            Vector3 motion = player.getLocation().getDirectionVector();
+            if (!finiteMotion(motion)) {
+                return false;
+            }
+            // Existing custom fireballs retain their virtual motion implementation.
+            if (this.getClass() != EntityGhastFireBall.class) {
+                if (!this.setMotion(motion) || !availableReflectionSource() || !validDeflector(player, world)
+                        || !Double.isFinite(this.motionX) || !Double.isFinite(this.motionY) || !Double.isFinite(this.motionZ)) {
+                    return false;
+                }
+                this.directionChanged = player;
+                this.shootingEntity = player;
+                return true;
+            }
+            // Dispatch native setMotion's event before committing motion and attribution together.
+            if (this.server.callEntityMotionEv && !this.justCreated) {
+                EntityMotionEvent event = new EntityMotionEvent(this, motion);
+                this.server.getPluginManager().callEvent(event);
+                if (event.isCancelled()) {
+                    return false;
+                }
+            }
+            if (!availableReflectionSource() || !validDeflector(player, world) || !finiteMotion(motion)) {
+                return false;
+            }
+            this.motionX = motion.x;
+            this.motionY = motion.y;
+            this.motionZ = motion.z;
+            this.directionChanged = player;
+            this.shootingEntity = player;
+            if (!this.justCreated) {
+                this.updateMovement();
+            }
+            return true;
+        } finally {
+            this.reflecting = false;
+        }
+    }
 
-        return true;
+    private boolean canReflect() {
+        return !this.reflecting && availableReflectionSource();
+    }
+
+    private boolean availableReflectionSource() {
+        return !this.closed && !this.impactAccepted && !this.isCollided && !this.hadCollision && !this.resolvingImpact;
+    }
+
+    private boolean validDeflector(Player player, Level world) {
+        return this.level == world && world != null && !player.closed && player.isOnline()
+                && player.isAlive() && !player.isSpectator() && player.getLevel() == world;
+    }
+
+    private static boolean finiteMotion(Vector3 motion) {
+        return Double.isFinite(motion.x) && Double.isFinite(motion.y) && Double.isFinite(motion.z);
     }
 
     @Override
@@ -131,7 +211,7 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
             EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, 1.2);
             this.server.getPluginManager().callEvent(ev);
             if (!ev.isCancelled()) {
-                WeakExplosion explosion = new WeakExplosion(this, (float) ev.getForce(), this.shootingEntity);
+                WeakExplosion explosion = new WeakExplosion(this, (float) ev.getForce(), this.shootingEntity, this);
                 if (ev.isBlockBreaking() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
                     explosion.explodeA();
                 }
