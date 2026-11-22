@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
  * @since 1.5
  */
 public class ConcurrentAutoLongTable implements Serializable {
+    private static final int STRIPE_SHIFT = 3;
 
     // --- public interface ---
 
@@ -122,7 +123,7 @@ public class ConcurrentAutoLongTable implements Serializable {
     private static int hash() {
         //int h = (int)Thread.currentThread().getId();
         int h = System.identityHashCode(Thread.currentThread());
-        return h << 3;                // Pad out cache lines.  The goal is to avoid cache-line contention
+        return h << STRIPE_SHIFT;                // Pad out cache lines.  The goal is to avoid cache-line contention
     }
 
     // --- CAT -----------------------------------------------------------------
@@ -199,7 +200,10 @@ public class ConcurrentAutoLongTable implements Serializable {
         public long sum() {
             long sum = _next == null ? 0 : _next.sum(); // Recursively get cached sum
             final long[] t = _t;
-            for (long cnt : t) sum += cnt;
+            // hash() leaves the padding cells untouched.
+            for (int index = 0; index < t.length; index += 1 << STRIPE_SHIFT) {
+                sum += t[index];
+            }
             return sum;
         }
 
