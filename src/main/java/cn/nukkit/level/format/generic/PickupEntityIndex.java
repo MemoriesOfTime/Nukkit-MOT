@@ -64,6 +64,14 @@ final class PickupEntityIndex extends AbstractMap<Long, Entity> implements Concu
         return hasKind(KIND_RIDEABLE);
     }
 
+    void scheduleUpdates() {
+        if (hasAnyEntities()) {
+            for (Entity entity : backing.values()) {
+                entity.scheduleUpdate();
+            }
+        }
+    }
+
     private boolean hasKind(int mask) {
         long stamp = revision.get();
         if (writers.get() != 0) return true;

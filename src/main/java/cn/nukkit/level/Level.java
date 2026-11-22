@@ -1915,12 +1915,7 @@ public class Level implements ChunkManager, Metadatable {
                     iter.remove();
                 }
 
-                Map<Long, Entity> chunkEntities = chunk.getEntities();
-                if (!(chunkEntities instanceof EntityPresenceIndex indexed) || indexed.hasAnyEntities()) {
-                    for (Entity entity : chunkEntities.values()) {
-                        entity.scheduleUpdate();
-                    }
-                }
+                BaseFullChunk.scheduleEntityUpdates(chunk);
 
                 if (doRandomTick && randomTickSpeed > 0) {
                     if (this.useSections) {

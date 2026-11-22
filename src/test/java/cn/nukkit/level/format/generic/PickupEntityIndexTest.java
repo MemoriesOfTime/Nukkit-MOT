@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -94,6 +95,55 @@ class PickupEntityIndexTest {
         index.put(1L, item);
         assertTrue(index.hasPickupEntities(true));
         index.values().clear();
+        assertFalse(index.hasPickupEntities(false));
+    }
+
+    @Test
+    void schedulingKeepsThePublicEntityOrderIncludingTheZeroKey() {
+        TestChunk chunk = new TestChunk();
+        EntityItem zero = mock(EntityItem.class);
+        EntityXPOrb orb = mock(EntityXPOrb.class);
+        Entity mob = mock(Entity.class);
+        when(zero.getId()).thenReturn(0L);
+        when(orb.getId()).thenReturn(42L);
+        when(mob.getId()).thenReturn(7L);
+        chunk.addEntity(orb);
+        chunk.addEntity(mob);
+        chunk.addEntity(zero);
+        List<Entity> expected = List.copyOf(chunk.getEntities().values());
+        assertEquals(3, expected.size());
+
+        BaseFullChunk.scheduleEntityUpdates(chunk);
+
+        var order = inOrder(zero, orb, mob);
+        for (Entity entity : expected) {
+            order.verify(entity).scheduleUpdate();
+            verify(entity, times(1)).scheduleUpdate();
+        }
+        assertEquals(expected, List.copyOf(chunk.getEntities().values()));
+    }
+
+    @Test
+    void valuesIteratorRemovalKeepsItsCapturedKeyWhenTheValueWasReplaced() {
+        PickupEntityIndex index = new PickupEntityIndex(new Long2ObjectNonBlockingMap<>());
+        EntityItem item = mock(EntityItem.class);
+        EntityXPOrb orb = mock(EntityXPOrb.class);
+        index.put(0L, item);
+        index.put(2L, item);
+        Iterator<Entity> values = index.values().iterator();
+        assertThrows(IllegalStateException.class, values::remove);
+        assertSame(item, values.next());
+        index.put(0L, orb);
+        assertTrue(index.hasPickupEntities(false));
+
+        values.remove();
+
+        assertFalse(index.containsKey(0L));
+        assertSame(item, index.get(2L));
+        assertTrue(index.hasPickupEntities(true));
+        assertThrows(IllegalStateException.class, values::remove);
+        assertSame(item, values.next());
+        values.remove();
         assertFalse(index.hasPickupEntities(false));
     }
 

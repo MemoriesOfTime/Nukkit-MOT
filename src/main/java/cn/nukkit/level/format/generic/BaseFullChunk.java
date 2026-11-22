@@ -11,6 +11,7 @@ import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.EntityPresenceIndex;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.leveldb.serializer.EntityNbtAdapter;
@@ -811,6 +812,18 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public Map<Long, Entity> getEntities() {
         return entities == null ? Collections.emptyMap() : entityIndex();
+    }
+
+    /** Schedules resident entities in the chunk map's existing iteration order. */
+    public static void scheduleEntityUpdates(FullChunk chunk) {
+        Map<Long, Entity> entities = chunk.getEntities();
+        if (entities instanceof PickupEntityIndex indexed) {
+            indexed.scheduleUpdates();
+        } else if (!(entities instanceof EntityPresenceIndex indexed) || indexed.hasAnyEntities()) {
+            for (Entity entity : entities.values()) {
+                entity.scheduleUpdate();
+            }
+        }
     }
 
     private PickupEntityIndex entityIndex() {
