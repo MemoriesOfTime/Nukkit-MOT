@@ -10,6 +10,21 @@ import java.util.Map;
 public class EntityRanges {
     private static final Map<Class<?>, Integer> FOLLOW_RANGES = new HashMap<>();
 
+    // The registry is populated once; ClassValue also permits custom entity class unloading.
+    private static final ClassValue<Integer> FOLLOW_RANGE = new ClassValue<>() {
+        @Override
+        protected Integer computeValue(Class<?> type) {
+            for (Class<?> current = type; current != null && current != Object.class;
+                    current = current.getSuperclass()) {
+                Integer value = FOLLOW_RANGES.get(current);
+                if (value != null) {
+                    return value;
+                }
+            }
+            return 16;
+        }
+    };
+
     // Upper bounds of known pure/bounded MOT predicates. Skeleton, Stray,
     // Piglin and Pillager mutate state even on rejection: keep their old cuboid.
     // ClassValue resolves the declaring
@@ -91,7 +106,7 @@ public class EntityRanges {
      * @return radius (default 16)
      */
     public static int getFollowRange(Entity entity) {
-        return getAttribute(entity);
+        return FOLLOW_RANGE.get(entity.getClass());
     }
 
     /**
@@ -116,24 +131,4 @@ public class EntityRanges {
         return predicateRange < 0 ? legacyRange : Math.min(legacyRange, predicateRange);
     }
 
-    private static int getAttribute(Entity entity) {
-        Class<?> entityClass = entity.getClass();
-
-        Integer value = FOLLOW_RANGES.get(entityClass);
-        if (value != null) {
-            return value;
-        }
-
-        Class<?> currentClass = entityClass.getSuperclass();
-        while (currentClass != null && currentClass != Object.class) {
-            value = FOLLOW_RANGES.get(currentClass);
-            if (value != null) {
-                return value;
-            }
-            currentClass = currentClass.getSuperclass();
-        }
-
-        return 16;
-    }
 }
-
