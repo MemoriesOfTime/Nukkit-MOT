@@ -15,6 +15,7 @@ import com.sun.management.ThreadMXBean;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.lang.management.ManagementFactory;
@@ -104,6 +105,7 @@ class StateBlockStorageScratchPackingTest {
         assertEquals(prefixCount, stream.getCount(), "Failed write must rewind partial header/words");
     }
 
+    @Tag("perf")
     @Test
     void uncachedAndCachedWritesAvoidTransientPaletteAndWordAllocations() throws Exception {
         if (isBinaryStreamInstrumentedByAgent()) {
