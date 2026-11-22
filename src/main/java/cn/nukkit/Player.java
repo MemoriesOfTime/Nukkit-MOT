@@ -9272,6 +9272,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return getChunkCacheFromData(GameVersion.byProtocol(protocol, false), chunkX, chunkZ, subChunkCount, payload, dimension);
     }
 
+    private static final int MAX_CACHED_CHUNK_PACKET_BYTES = 1024 * 1024;
+    private static final ThreadLocal<LevelChunkPacket> CHUNK_CACHE_PACKET = new ThreadLocal<>();
+
     /**
      * Get chunk cache from data
      *
@@ -9285,40 +9288,56 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static BatchPacket getChunkCacheFromData(GameVersion gameVersion, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
         int protocol = gameVersion.getProtocol();
 
-        LevelChunkPacket pk = new LevelChunkPacket();
-        pk.chunkX = chunkX;
-        pk.chunkZ = chunkZ;
-        pk.dimension = dimension;
-        pk.subChunkCount = subChunkCount;
-        pk.data = payload;
-        pk.protocol = protocol;
-        pk.gameVersion = gameVersion;
-        pk.tryEncode();
-
-        byte[] buf = pk.getBuffer();
-        int lengthPrefixBytes = 1;
-        for (int remaining = buf.length; (remaining >>>= 7) != 0; ) {
-            lengthPrefixBytes++;
+        LevelChunkPacket pk = CHUNK_CACHE_PACKET.get();
+        if (pk != null) {
+            CHUNK_CACHE_PACKET.set(null);
+        } else {
+            pk = new LevelChunkPacket();
         }
-        // This stream owns an exact batch and is never reused after compression.
-        BinaryStream batched = new BinaryStream(new byte[lengthPrefixBytes + buf.length]).reset();
-        batched.putUnsignedVarInt(buf.length);
-        batched.put(buf);
+        BinaryStream batched = ThreadCache.acquireBinaryStream();
         try {
-            byte[] owned = batched.getBufferUnsafe();
-            // Preserve trimmed bytes if a future writer changes the capacity.
-            byte[] bytes = batched.getCount() == owned.length ? owned : batched.getBuffer();
+            pk.chunkX = chunkX;
+            pk.chunkZ = chunkZ;
+            pk.dimension = dimension;
+            pk.subChunkCount = subChunkCount;
+            pk.cacheEnabled = false;
+            pk.requestSubChunks = false;
+            pk.subChunkLimit = 0;
+            pk.blobIds = null;
+            pk.data = payload;
+            pk.clientBiomeUpdate = false;
+            pk.protocol = protocol;
+            pk.gameVersion = gameVersion;
+            pk.isEncoded = false;
+            pk.tryEncode();
+
+            byte[] pkBuf = pk.getBufferUnsafe();
+            int pkLen = pk.getCount();
+            batched.reset();
+            batched.reserve(5 + pkLen);
+            batched.putUnsignedVarInt(pkLen);
+            batched.put(pkBuf, 0, pkLen);
+
             BatchPacket compress = new BatchPacket();
             if (Server.getInstance().useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
-                compress.payload = SnappyCompression.compress(bytes);
+                compress.payload = SnappyCompression.compress(batched.getBuffer());
             } else if (protocol >= ProtocolInfo.v1_16_0) {
-                compress.payload = Zlib.deflateRaw(bytes, Server.getInstance().networkCompressionLevel);
+                compress.payload = Zlib.deflateRaw(batched, Server.getInstance().networkCompressionLevel);
             } else {
-                compress.payload = Zlib.deflatePre16Packet(bytes, Server.getInstance().networkCompressionLevel);
+                compress.payload = Zlib.deflatePre16Packet(batched.getBuffer(), Server.getInstance().networkCompressionLevel);
             }
             return compress;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        } finally {
+            ThreadCache.releaseBinaryStream(batched);
+            byte[] pkRaw = pk.getBufferUnsafe();
+            pk.data = null;
+            pk.blobIds = null;
+            pk.reset();
+            if (pkRaw != null && pkRaw.length <= MAX_CACHED_CHUNK_PACKET_BYTES && CHUNK_CACHE_PACKET.get() == null) {
+                CHUNK_CACHE_PACKET.set(pk);
+            }
         }
     }
 

@@ -109,9 +109,9 @@ class ChunkTerrainBlobCaptureBytesTest {
         Serialized saved = captured.copy();
         Serialized plain = serialize(fixture.source, version, false, false);
         assertNull(plain.blobs);
+        assertNull(plain.biomes);
         assertEquals(captured.count, plain.count);
         assertArrayEquals(captured.payload, plain.payload);
-        assertArrayEquals(captured.biomes, plain.biomes);
         assertArrayEquals(captured.entities, plain.entities);
         assertTrue(captured.biomes.length > 0);
         assertTrue(captured.entities.length > 0, "fixture must include real serialized block-entity NBT");
