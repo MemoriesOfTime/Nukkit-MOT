@@ -247,7 +247,7 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
 
         try {
             this.drainDeferredInbound();
-            List<DataPacket> toBatch = new ObjectArrayList<>();
+            List<DataPacket> toBatch = null;
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
                 if (packet instanceof DisconnectPacket) {
@@ -264,18 +264,21 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                     }
                     return; // Disconnected
                 } else if (packet instanceof BatchPacket) {
-                    if (!toBatch.isEmpty()) {
+                    if (toBatch != null && !toBatch.isEmpty()) {
                         this.sendPackets(toBatch);
                         toBatch.clear();
                     }
 
                     this.sendPacket(((BatchPacket) packet).payload);
                 } else {
+                    if (toBatch == null) {
+                        toBatch = new ObjectArrayList<>();
+                    }
                     toBatch.add(packet);
                 }
             }
 
-            if (!toBatch.isEmpty()) {
+            if (toBatch != null && !toBatch.isEmpty()) {
                 this.sendPackets(toBatch);
             }
         } catch (Throwable e) {
@@ -310,7 +313,8 @@ public class NetherNetPlayerSession extends SimpleChannelInboundHandler<ByteBuf>
                 && this.queuedInboundBytes.get() <= RakNetPlayerSession.INBOUND_LOW_WATER_BYTES) {
             this.inboundThrottled = false;
         }
-        return new RakNetPlayerSession.InboundDrain(handled, handledBytes);
+        return handled == 0 ? RakNetPlayerSession.InboundDrain.EMPTY
+                : new RakNetPlayerSession.InboundDrain(handled, handledBytes);
     }
 
     private void sendPackets(Collection<DataPacket> packets) {

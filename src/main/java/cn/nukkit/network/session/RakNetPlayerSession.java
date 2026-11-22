@@ -436,7 +436,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                 && this.queuedInboundBytes.get() <= INBOUND_LOW_WATER_BYTES) {
             this.inboundThrottled = false;
         }
-        return new InboundDrain(handled, handledBytes);
+        return handled == 0 ? InboundDrain.EMPTY : new InboundDrain(handled, handledBytes);
     }
 
     private void sendPackets(Collection<DataPacket> packets) {
@@ -1000,6 +1000,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     public record InboundDrain(int packets, long bytes) {
+        static final InboundDrain EMPTY = new InboundDrain(0, 0L);
     }
 
     /** Called only on the event loop. Never decrypt retained payloads a second time. */
