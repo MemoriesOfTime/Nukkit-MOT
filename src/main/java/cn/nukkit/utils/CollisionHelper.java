@@ -174,11 +174,11 @@ public record CollisionHelper(Entity entity, CollisionHelper.ScanCache scanCache
             double scanMaxX = boundingBox.getMaxX() + expandX;
             double scanMaxY = boundingBox.getMaxY() + expandY;
             double scanMaxZ = boundingBox.getMaxZ() + expandZ;
-            if (cache.matchesExpanded(boundingBox, scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ)) {
-                Block[] blocks = this.getExpandedCollisionCandidates(boundingBox,
-                        scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ);
-                return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, true);
-            }
+            // holdsExpanded checks the complete geometry after the live context getters. Repeating
+            // that check here adds work to every warm hit; a moved native box uses the same miss path.
+            Block[] blocks = this.getExpandedCollisionCandidates(boundingBox,
+                    scanMinX, scanMinY, scanMinZ, scanMaxX, scanMaxY, scanMaxZ);
+            return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, true);
         }
         Block[] blocks = this.getCollisionCandidates(boundingBox.grow(expandX, expandY, expandZ), boundingBox);
         return filterCollisionBlocks(blocks, boundingBox, expandX, expandY, expandZ, true);
