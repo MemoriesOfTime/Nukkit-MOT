@@ -19,6 +19,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
@@ -70,6 +71,7 @@ public class LevelDBProvider implements LevelProvider {
     private static final byte CONNECTION_FIX_VERSION = 2;
     private static final byte[] CONN_FIX_DONE = new byte[]{CONNECTION_FIX_VERSION};
     private static final byte[] CONN_FIX_PENDING = new byte[]{0};
+    private static final String LEVEL_NAME_TAG = "LevelName";
 
     protected final Long2ObjectMap<BaseFullChunk> chunks = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
 
@@ -80,6 +82,10 @@ public class LevelDBProvider implements LevelProvider {
     protected final String path;
 
     protected CompoundTag levelData;
+    private final Object levelNameLock = new Object();
+    // Only privately parsed metadata can keep a name shortcut. An alias can replace
+    // or remove its name tag through ordinary CompoundTag APIs and collection views.
+    private volatile StringTag ownedLevelName;
     private Vector3 spawn;
     private Long cachedSeed;
 
@@ -155,6 +161,10 @@ public class LevelDBProvider implements LevelProvider {
             // Check reservation before reading/writing level.dat or attempting a second DB open.
             prepared = PreparedLevelDB.forConstructor(path);
             this.levelData = prepared == null ? readLevelData(dirPath) : prepared.metadata();
+            if (prepared == null && getClass() == LevelDBProvider.class
+                    && this.levelData.get(LEVEL_NAME_TAG) instanceof StringTag nameTag) {
+                this.ownedLevelName = nameTag;
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -295,7 +305,7 @@ public class LevelDBProvider implements LevelProvider {
                 .putInt("Generator", generatorType)
                 .putString("generatorName", Generator.getGeneratorName(generator))
                 .putString("generatorOptions", options.getOrDefault("preset", ""))
-                .putString("LevelName", name)
+                .putString(LEVEL_NAME_TAG, name)
                 .putLong("RandomSeed", seed)
                 .putInt("SpawnX", spawnPosition.getFloorX())
                 .putInt("SpawnY", spawnPosition.getFloorY())
@@ -1800,7 +1810,8 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public String getName() {
-        return this.levelData.getString("LevelName");
+        StringTag name = this.ownedLevelName;
+        return name == null ? this.levelData.getString(LEVEL_NAME_TAG) : name.data;
     }
 
     @Override
@@ -1901,14 +1912,20 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     public void setLevelData(CompoundTag levelData, GameRules gameRules) {
-        this.levelData = levelData;
+        synchronized (this.levelNameLock) {
+            this.levelData = levelData;
+            this.ownedLevelName = null;
+        }
 
         this.setGameRules(gameRules);
     }
 
     @Override
     public void setGameRules(GameRules rules) {
-        rules.writeBedrockNBT(this.levelData);
+        // A custom writer receives the live CompoundTag and may keep it.
+        CompoundTag data = rules != null && rules.getClass() != GameRules.class
+                ? exposeLevelData() : this.levelData;
+        rules.writeBedrockNBT(data);
     }
 
     private int lastPosition = 0;
@@ -1925,13 +1942,34 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     public CompoundTag getLevelData() {
-        return levelData;
+        return exposeLevelData();
+    }
+
+    private CompoundTag exposeLevelData() {
+        if (this.ownedLevelName == null) {
+            return this.levelData;
+        }
+        synchronized (this.levelNameLock) {
+            this.ownedLevelName = null;
+            return this.levelData;
+        }
     }
 
     @Override
     public void updateLevelName(String name) {
+        synchronized (this.levelNameLock) {
+            StringTag current = this.ownedLevelName;
+            if (current != null) {
+                if (!current.data.equals(name)) {
+                    StringTag replacement = new StringTag(LEVEL_NAME_TAG, name);
+                    this.levelData.put(LEVEL_NAME_TAG, replacement);
+                    this.ownedLevelName = replacement;
+                }
+                return;
+            }
+        }
         if (!this.getName().equals(name)) {
-            this.levelData.putString("LevelName", name);
+            this.levelData.putString(LEVEL_NAME_TAG, name);
         }
     }
 
