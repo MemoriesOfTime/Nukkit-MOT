@@ -126,6 +126,7 @@ public class BinaryStream {
     public void setBuffer(byte[] buffer) {
         this.buffer = buffer;
         this.count = buffer == null ? -1 : buffer.length;
+        this.onBufferChanged();
     }
 
     public void setBuffer(byte[] buffer, int offset) {
@@ -206,6 +207,23 @@ public class BinaryStream {
 
         System.arraycopy(bytes, 0, this.buffer, this.count, bytes.length);
         this.count += bytes.length;
+    }
+
+    public void put(byte[] bytes, int offset, int length) {
+        if (bytes == null) {
+            return;
+        }
+        Objects.checkFromIndexSize(offset, length, bytes.length);
+        if (!directByteWrite) {
+            this.put(Arrays.copyOfRange(bytes, offset, offset + length));
+            return;
+        }
+        if (length == 0) {
+            return;
+        }
+        this.ensureCapacity(Math.addExact(this.count, length));
+        System.arraycopy(bytes, offset, this.buffer, this.count, length);
+        this.count += length;
     }
 
     public long getLong() {
@@ -621,6 +639,108 @@ public class BinaryStream {
         this.putLInt(image.width);
         this.putLInt(image.height);
         this.putByteArray(image.data);
+    }
+
+    /**
+     * Estimates the encoded byte size of {@link #putSkin(GameVersion, Skin)} so callers
+     * such as {@code PlayerListPacket} and {@code PlayerSkinPacket} can reserve the target
+     * buffer upfront instead of geometrically doubling multi-megabyte byte arrays.
+     */
+    public static int estimatedSkinSize(GameVersion gameVersion, Skin skin) {
+        if (skin == null || gameVersion == null) {
+            return 0;
+        }
+        int protocol = gameVersion.getProtocol();
+        long size = estimatedStringBytes(skin.getSkinId()) + 64L;
+        if (protocol < ProtocolInfo.v1_13_0) {
+            boolean useSteve = skin.isPersona();
+            SerializedImage skinImage = skin.getSkinData();
+            int skinLen = skinImage != null && skinImage.data != null ? skinImage.data.length : 0;
+            if (!useSteve && protocol < ProtocolInfo.v1_2_13) {
+                useSteve = skinLen != Skin.SINGLE_SKIN_SIZE;
+            }
+            int steveLen = steveSkinDecoded != null ? steveSkinDecoded.length : Skin.DOUBLE_SKIN_SIZE;
+            size += (useSteve ? steveLen : skinLen) + 5L;
+            if (protocol >= ProtocolInfo.v1_2_13) {
+                SerializedImage cape = skin.getCapeData();
+                size += (cape != null && cape.data != null ? cape.data.length : 0) + 5L;
+            }
+            size += 36L + (useSteve ? Skin.STEVE_GEOMETRY_OLD.length() + 5L : estimatedStringBytes(skin.getGeometryData()));
+            return saturatedCapacity(size);
+        }
+
+        if (protocol >= ProtocolInfo.v1_16_210 && protocol < ProtocolInfo.v1_26_60) {
+            size += estimatedStringBytes(skin.getPlayFabId());
+        }
+        size += estimatedStringBytes(skin.getSkinResourcePatch());
+        size += estimatedImageBytes(skin.getSkinData());
+
+        List<SkinAnimation> animations = skin.getAnimations();
+        if (animations != null) {
+            for (SkinAnimation animation : animations) {
+                if (animation != null) {
+                    size += estimatedImageBytes(animation.image) + 16L;
+                }
+            }
+        }
+
+        size += estimatedImageBytes(skin.getCapeData());
+        size += estimatedStringBytes(skin.getGeometryData());
+        if (protocol >= ProtocolInfo.v1_17_30) {
+            size += estimatedStringBytes(skin.getGeometryDataEngineVersion());
+        }
+        size += estimatedStringBytes(skin.getAnimationData());
+        size += estimatedStringBytes(skin.getCapeId());
+        size += estimatedStringBytes(skin.getFullSkinId());
+
+        if (protocol >= ProtocolInfo.v1_14_60) {
+            size += estimatedStringBytes(skin.getArmSize());
+            size += estimatedStringBytes(skin.getSkinColor());
+            List<PersonaPiece> pieces = skin.getPersonaPieces();
+            if (pieces != null) {
+                for (PersonaPiece piece : pieces) {
+                    if (piece != null) {
+                        size += estimatedStringBytes(piece.id) + estimatedStringBytes(piece.productId) + 64L;
+                    }
+                }
+            }
+            List<PersonaPieceTint> tints = skin.getTintColors();
+            if (tints != null) {
+                for (PersonaPieceTint tint : tints) {
+                    if (tint != null) {
+                        int colors = tint.colors != null ? tint.colors.size() : 0;
+                        size += 64L + colors * 20L;
+                    }
+                }
+            }
+            if (protocol >= ProtocolInfo.v1_26_40) {
+                size += 10L + estimatedStringBytes(skin.getProfileHash());
+            }
+        }
+        return saturatedCapacity(size);
+    }
+
+    public static int estimatedStringBytes(String value) {
+        if (value == null || value.isEmpty()) {
+            return 5;
+        }
+        int len = value.length();
+        if (len <= 64) {
+            return len * 3 + 5;
+        }
+        long est = (long) len + (len >>> 4) + 16L;
+        return est > MAX_ARRAY_SIZE ? MAX_ARRAY_SIZE : (int) est;
+    }
+
+    private static long estimatedImageBytes(SerializedImage image) {
+        return 13L + (image != null && image.data != null ? image.data.length : 0);
+    }
+
+    private static int saturatedCapacity(long size) {
+        if (size <= 0L) {
+            return 0;
+        }
+        return size > MAX_ARRAY_SIZE ? MAX_ARRAY_SIZE : (int) size;
     }
 
     // v2168: skin 字段类型转换辅助 / v2168 skin field-type conversion helpers
@@ -2638,6 +2758,10 @@ public class BinaryStream {
             newCapacity = hugeCapacity(minCapacity);
         }
         this.buffer = Arrays.copyOf(buffer, newCapacity);
+        this.onBufferChanged();
+    }
+
+    void onBufferChanged() {
     }
 
     private static int hugeCapacity(int minCapacity) {

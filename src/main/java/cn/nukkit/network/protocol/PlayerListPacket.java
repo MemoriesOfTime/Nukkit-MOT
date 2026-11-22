@@ -30,6 +30,7 @@ public class PlayerListPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        this.reserve(this.estimatedPayloadBytes());
         if (this.protocol >= ProtocolInfo.v1_26_40) {
             this.putUnsignedVarInt(this.entries.length);
             for (Entry entry : this.entries) {
@@ -128,6 +129,43 @@ public class PlayerListPacket extends DataPacket {
                     }
             }
         }
+    }
+
+    private int estimatedPayloadBytes() {
+        if (this.entries == null || this.entries.length == 0) {
+            return 8;
+        }
+        if (this.type == TYPE_REMOVE) {
+            long bytes = 8L + (long) this.entries.length * 20L;
+            return bytes > Integer.MAX_VALUE - 64 ? Integer.MAX_VALUE - 64 : (int) bytes;
+        }
+        boolean netEaseBloom = this.gameVersion != null && this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_20_60;
+        long total = 16L;
+        for (Entry entry : this.entries) {
+            if (entry == null) {
+                continue;
+            }
+            total += 64L
+                    + estimatedStringBytes(entry.name)
+                    + estimatedStringBytes(entry.xboxUserId)
+                    + estimatedStringBytes(entry.platformChatId);
+            if (entry.skin != null) {
+                if (this.protocol >= ProtocolInfo.v1_26_60) {
+                    total += estimatedStringBytes(entry.skin.getPlayFabId());
+                }
+                if (this.protocol < ProtocolInfo.v1_13_0 || this.protocol >= 388) {
+                    total += estimatedSkinSize(this.gameVersion, entry.skin);
+                }
+                if (netEaseBloom) {
+                    byte[] bloom = entry.skin.getBloomData();
+                    total += 13L + (bloom != null ? bloom.length : 0);
+                }
+            } else if (netEaseBloom) {
+                total += 13L;
+            }
+        }
+        long maxReserve = (long) Integer.MAX_VALUE - 64L;
+        return total > maxReserve ? (int) maxReserve : (int) total;
     }
 
     @Override
