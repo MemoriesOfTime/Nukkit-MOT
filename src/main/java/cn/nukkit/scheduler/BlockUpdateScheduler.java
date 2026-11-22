@@ -8,6 +8,7 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockUpdateEntry;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import java.util.Collections;
@@ -27,7 +28,7 @@ public class BlockUpdateScheduler {
     // PNX localizes the scheduler to a chunk. Keep MOT's world timeline, but index each
     // chunk's queued buckets so a save only visits its 18x18 snapshot area.
     // Guarded by this; no block callback runs while holding the index lock.
-    private final Map<Long, Map<Long, Set<BlockUpdateEntry>>> chunkUpdates = new HashMap<>();
+    private final Long2ObjectOpenHashMap<Map<Long, Set<BlockUpdateEntry>>> chunkUpdates = new Long2ObjectOpenHashMap<>();
 
     private Set<BlockUpdateEntry> pendingUpdates;
 
@@ -114,9 +115,10 @@ public class BlockUpdateScheduler {
         long chunkCount = ((long) maxChunkX - minChunkX + 1) * ((long) maxChunkZ - minChunkZ + 1);
         if (chunkCount > chunkUpdates.size()) {
             // Preserve the general AABB API without walking every coordinate of a huge area.
-            for (Map.Entry<Long, Map<Long, Set<BlockUpdateEntry>>> chunk : chunkUpdates.entrySet()) {
-                int x = Level.getHashX(chunk.getKey());
-                int z = Level.getHashZ(chunk.getKey());
+            for (var iterator = chunkUpdates.long2ObjectEntrySet().fastIterator(); iterator.hasNext(); ) {
+                var chunk = iterator.next();
+                int x = Level.getHashX(chunk.getLongKey());
+                int z = Level.getHashZ(chunk.getLongKey());
                 if (x >= minChunkX && x <= maxChunkX && z >= minChunkZ && z <= maxChunkZ) {
                     collectPending(chunk.getValue(), boundingBox, set);
                 }
