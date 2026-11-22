@@ -147,6 +147,7 @@ public class StateBlockStorage {
      */
     private volatile int version;
     private boolean networkCacheable = true;
+    private volatile RandomTickPaletteMemo randomTickPaletteMemo;
 
     //用于兼容1.13以下版本
     private byte[] blockIds;
@@ -1124,17 +1125,56 @@ public class StateBlockStorage {
         if (this.getClass() != StateBlockStorage.class) {
             return true;
         }
-        // Large or long-lived palettes cost more to inspect than the usual three samples.
-        // Keep those on the existing path rather than trading three reads for a full scan.
-        if (this.palette.size() > 16) {
-            return true;
+        return randomTickPaletteStatus() != RandomTickPaletteStatus.INERT;
+    }
+
+    enum RandomTickPaletteStatus { INERT, ACTIVE, RETRY }
+
+    private record RandomTickPaletteMemo(int version, long epoch, long stamp, RandomTickPaletteStatus status) {}
+
+    // Exact storages only. RETRY is conservative for this tick and must not seed the section memo.
+    RandomTickPaletteStatus randomTickPaletteStatus() {
+        long epoch = Level.getRandomTickPaletteEpoch();
+        RandomTickPaletteMemo memo = this.randomTickPaletteMemo;
+        if (memo != null && memo.version == this.version && memo.epoch == epoch
+                && this.cellsLock.validate(memo.stamp)) {
+            return memo.status;
         }
-        for (int i = 0; i < this.palette.size(); i++) {
-            if (Level.isRandomTickBlock(this.palette.get(i).getLegacyId())) {
-                return true;
+
+        long stamp = this.cellsLock.tryReadLock();
+        if (stamp == 0) {
+            return RandomTickPaletteStatus.RETRY;
+        }
+        try {
+            int paletteSize = this.palette.size();
+            boolean cacheable = this.networkCacheable;
+            boolean active = paletteSize > 256 || (!cacheable && paletteSize > 16);
+            for (int i = 0; !active && i < paletteSize; i++) {
+                BlockStateSnapshot state = this.palette.get(i);
+                if (state == null) {
+                    return RandomTickPaletteStatus.ACTIVE;
+                }
+                int id = state.getLegacyId();
+                active = Level.isRandomTickBlock(id);
+                // Borrowed lists and virtual or unresolved IDs can change without a storage write.
+                cacheable = cacheable && state.getClass() == BlockStateSnapshot.class
+                        && id != -1 && state.getPinnedLegacyId() == id;
+                // The larger scan is useful only when its negative can be certified and reused.
+                if (!cacheable && paletteSize > 16) {
+                    active = true;
+                }
             }
+            if (epoch != Level.getRandomTickPaletteEpoch()) {
+                return RandomTickPaletteStatus.RETRY;
+            }
+            RandomTickPaletteStatus status = active ? RandomTickPaletteStatus.ACTIVE : RandomTickPaletteStatus.INERT;
+            if (active || cacheable) {
+                this.randomTickPaletteMemo = new RandomTickPaletteMemo(this.version, epoch, stamp, status);
+            }
+            return status;
+        } finally {
+            this.cellsLock.unlockRead(stamp);
         }
-        return false;
     }
 
     public static int elementIndex(int x, int y, int z) {

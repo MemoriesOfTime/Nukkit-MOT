@@ -76,16 +76,15 @@ class RandomTickPaletteTest {
     }
 
     @Test void largePalettesFallBackInsteadOfAddingAnUnboundedScan() {
-        int[] boundary = new int[16];
+        int[] boundary = new int[256];
         java.util.Arrays.fill(boundary, BlockID.STONE);
-        assertFalse(storage(boundary).mayHaveRandomTickBlocks());
-        boundary[15] = BlockID.GRASS;
-        assertTrue(storage(boundary).mayHaveRandomTickBlocks());
-        int[] ids = new int[17];
+        assertFalse(storage(boundary).copy().mayHaveRandomTickBlocks());
+        assertTrue(storage(boundary).mayHaveRandomTickBlocks(), "unowned large palettes remain conservative");
+        boundary[255] = BlockID.GRASS;
+        assertTrue(storage(boundary).copy().mayHaveRandomTickBlocks());
+        int[] ids = new int[257];
         java.util.Arrays.fill(ids, BlockID.STONE);
-        assertTrue(storage(ids).mayHaveRandomTickBlocks());
-        ids[16] = BlockID.GRASS;
-        assertTrue(storage(ids).mayHaveRandomTickBlocks());
+        assertTrue(storage(ids).copy().mayHaveRandomTickBlocks());
     }
 
     @Test void onlyLayerZeroIsSampledAndReplacingStorageIsVisibleImmediately() {
@@ -222,7 +221,7 @@ class RandomTickPaletteTest {
     }
 
     @ParameterizedTest @ValueSource(ints = {-4, 19})
-    void freshCanonicalLargeInertNbtRetainsConservativeFallback(int y) {
+    void freshCanonicalLargeInertNbtSkipsRandomSamples(int y) {
         List<BlockStateSnapshot> palette = new ArrayList<>();
         for (int i = 0; i < 17; i++) palette.add(BlockStateMapping.get().getState(Block.STONE, 0));
         StateBlockStorage source = new StateBlockStorage(BitArrayVersion.V5.createPalette(4096), palette, null, null);
@@ -231,7 +230,7 @@ class RandomTickPaletteTest {
         read(decoded, encoded);
         assertEquals(Block.STONE << Block.DATA_BITS, decoded.get(0));
         assertArrayEquals(encoded, encode(decoded));
-        assertTrue(section(y, decoded).mayHaveRandomTickBlocks(), "NBT load alone does not compact or certify large random-inert data");
+        assertFalse(section(y, decoded).mayHaveRandomTickBlocks(), "the loaded palette contains only inert states");
     }
 
     private static StateBlockStorage storage(int... ids) {
