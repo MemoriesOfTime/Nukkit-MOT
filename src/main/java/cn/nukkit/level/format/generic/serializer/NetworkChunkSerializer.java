@@ -162,7 +162,6 @@ public class NetworkChunkSerializer {
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
 
-        byte[] biomePalettes = serialize3DBiomes(chunk, chunkData.getGameVersion(), maxDimensionSections);
         stream.reset();
 
         // Overworld has negative coordinates, But the anvil world does not support it
@@ -185,7 +184,11 @@ public class NetworkChunkSerializer {
             }
         }
 
-        stream.put(biomePalettes);
+        int biomeStart = stream.getCount();
+        write3DBiomes(stream, chunk, chunkData.getGameVersion(), maxDimensionSections);
+        byte[] biomePalettes = blobSink != null
+                ? Arrays.copyOfRange(stream.getBufferUnsafe(), biomeStart, stream.getCount())
+                : null;
         stream.putByte((byte) 0); // Border blocks
 
         chunkData.setChunkSections(writtenSections);
@@ -197,7 +200,6 @@ public class NetworkChunkSerializer {
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
 
-        byte[] biomePalettes = serialize3DBiomes(chunk, chunkData.getGameVersion(), 25);
         stream.reset();
 
         // Overworld has negative coordinates, But the anvil world does not support it
@@ -219,25 +221,27 @@ public class NetworkChunkSerializer {
             }
         }
 
-        stream.put(biomePalettes);
+        int biomeStart = stream.getCount();
+        write3DBiomes(stream, chunk, chunkData.getGameVersion(), 25);
+        byte[] biomePalettes = blobSink != null
+                ? Arrays.copyOfRange(stream.getBufferUnsafe(), biomeStart, stream.getCount())
+                : null;
         stream.putByte((byte) 0); // Border blocks
 
         chunkData.setChunkSections(writtenSections);
         return biomePalettes;
     }
 
-    private static byte[] serialize3DBiomes(BaseFullChunk chunk, GameVersion protocolId, int maxDimensionSections) {
+    private static void write3DBiomes(BinaryStream stream, BaseFullChunk chunk, GameVersion protocolId, int maxDimensionSections) {
         if (chunk.has3dBiomes()) {
-            BinaryStream binaryStream = ThreadCache.binaryStream.get().reset();
             for (int y = 0; y < maxDimensionSections; y++) {
                 PalettedBlockStorage storage = chunk.getBiomeStorage(y);
-                storage.writeTo(binaryStream, id -> Biome.getBiomeIdOrCorrect(protocolId, id));
+                storage.writeTo(stream, id -> Biome.getBiomeIdOrCorrect(protocolId, id));
             }
-            return binaryStream.getBuffer();
         } else {
             // In 1.18 3D biome palettes were introduced. However, current world format
             // used internally doesn't support them, so we need to convert from legacy 2D
-            return convert2DBiomesTo3D(protocolId, chunk, maxDimensionSections);
+            writeConverted2DBiomesTo3D(stream, protocolId, chunk, maxDimensionSections);
         }
     }
 
@@ -284,7 +288,10 @@ public class NetworkChunkSerializer {
         }
     }
 
-    private static byte[] convert2DBiomesTo3D(GameVersion protocolId, BaseFullChunk chunk, int sections) {
+    private static void writeConverted2DBiomesTo3D(BinaryStream stream, GameVersion protocolId, BaseFullChunk chunk, int sections) {
+        if (sections <= 0) {
+            return;
+        }
         int defaultBiome = chunk.getBiomeId(0, 0);
         PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, defaultBiome));
         for (int x = 0; x < 16; x++) {
@@ -299,15 +306,19 @@ public class NetworkChunkSerializer {
             }
         }
 
-        BinaryStream stream = ThreadCache.binaryStream.get().reset();
+        int firstStart = stream.getCount();
         palette.writeTo(stream, id -> Biome.getBiomeIdOrCorrect(protocolId, id));
-        byte[] bytes = stream.getBuffer();
-        stream.reset();
-
-        for (int i = 0; i < sections; i++) {
-            stream.put(bytes);
+        int sectionBytes = stream.getCount() - firstStart;
+        if (sections > 1 && sectionBytes > 0) {
+            stream.reserve(Math.multiplyExact(sectionBytes, sections - 1));
+            byte[] buffer = stream.getBufferUnsafe();
+            int pos = stream.getCount();
+            for (int i = 1; i < sections; i++) {
+                System.arraycopy(buffer, firstStart, buffer, pos, sectionBytes);
+                pos += sectionBytes;
+            }
+            stream.setCount(pos);
         }
-        return stream.getBuffer();
     }
 
     @AllArgsConstructor
