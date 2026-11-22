@@ -102,6 +102,7 @@ import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 import cn.nukkit.scoreboard.scorer.PlayerScorer;
 import cn.nukkit.utils.*;
+import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -1849,7 +1850,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastOrderYaw = this.yaw;
 
         loadQueue.clear();
-        Long2ObjectOpenHashMap<Boolean> lastChunk = new Long2ObjectOpenHashMap<>(this.usedChunks);
+        LongSet lastChunk = snapshotUsedChunkKeys();
 
         int centerX = (int) this.x >> 4;
         int centerZ = (int) this.z >> 4;
@@ -1909,7 +1910,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         for (long l : inFov) this.loadQueue.add(l);
         for (long l : outFov) this.loadQueue.add(l);
 
-        LongIterator keys = lastChunk.keySet().iterator();
+        LongIterator keys = lastChunk.iterator();
         while (keys.hasNext()) {
             index = keys.nextLong();
             this.unloadChunk(Level.getHashX(index), Level.getHashZ(index));
@@ -1927,6 +1928,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         return true;
+    }
+
+    private LongSet snapshotUsedChunkKeys() {
+        if (this.usedChunks.getClass() != Long2ObjectNonBlockingMap.class) {
+            return new Long2ObjectOpenHashMap<>(this.usedChunks).keySet();
+        }
+
+        Long2ObjectNonBlockingMap<Boolean> chunks = (Long2ObjectNonBlockingMap<Boolean>) this.usedChunks;
+        // A set uses the same initial capacity and slot traversal order for the same keys.
+        LongOpenHashSet snapshot = new LongOpenHashSet(chunks.size());
+        LongIterator keys = chunks.fastKeyIterator();
+        while (keys.hasNext()) {
+            snapshot.add(keys.nextLong());
+        }
+        return snapshot;
     }
 
     private void sendChunkPublisherUpdate(NetworkChunkPublisherUpdatePacket packet) {
@@ -1953,7 +1969,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void classifyChunkForFov(long index, int dx, int dz, double dirX, double dirZ, double cosFov,
-                                     LongArrayList inFov, LongArrayList outFov, Long2ObjectOpenHashMap<Boolean> lastChunk) {
+                                     LongArrayList inFov, LongArrayList outFov, LongSet lastChunk) {
         if (this.usedChunks.get(index) != Boolean.TRUE) {
             if (isChunkInFov(dx, dz, dirX, dirZ, cosFov)) {
                 inFov.add(index);
