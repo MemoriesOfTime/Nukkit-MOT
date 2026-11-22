@@ -45,9 +45,7 @@ public abstract class BaseInventory implements Inventory {
 
     protected final String title;
 
-    private final Int2ObjectOpenHashMap<Item> fastSlots = new Int2ObjectOpenHashMap<>(2);
-
-    public final Map<Integer, Item> slots = this.fastSlots;
+    public final Map<Integer, Item> slots = new Int2ObjectOpenHashMap<>(2);
 
     protected final Set<Player> viewers = new HashSet<>();
 
@@ -115,9 +113,42 @@ public abstract class BaseInventory implements Inventory {
         return title;
     }
 
+    private Item slotGet(int index) {
+        Map<Integer, Item> map = this.slots;
+        return map instanceof Int2ObjectOpenHashMap<Item> fast ? fast.get(index) : map.get(index);
+    }
+
+    private Item slotGetOrDefault(int index, Item fallback) {
+        Map<Integer, Item> map = this.slots;
+        return map instanceof Int2ObjectOpenHashMap<Item> fast ? fast.getOrDefault(index, fallback) : map.getOrDefault(index, fallback);
+    }
+
+    private boolean slotContainsKey(int index) {
+        Map<Integer, Item> map = this.slots;
+        return map instanceof Int2ObjectOpenHashMap<Item> fast ? fast.containsKey(index) : map.containsKey(index);
+    }
+
+    private void slotPut(int index, Item value) {
+        Map<Integer, Item> map = this.slots;
+        if (map instanceof Int2ObjectOpenHashMap<Item> fast) {
+            fast.put(index, value);
+        } else {
+            map.put(index, value);
+        }
+    }
+
+    private void slotRemove(int index) {
+        Map<Integer, Item> map = this.slots;
+        if (map instanceof Int2ObjectOpenHashMap<Item> fast) {
+            fast.remove(index);
+        } else {
+            map.remove(index);
+        }
+    }
+
     @Override
     public Item getItem(int index) {
-        Item original = this.fastSlots.get(index);
+        Item original = this.slotGet(index);
         if (original != null) {
             // Ensure every non-empty stack carries a valid stackNetworkId for SAI.
             if (!original.isNull() && original.getStackNetId() == 0) {
@@ -131,7 +162,7 @@ public abstract class BaseInventory implements Inventory {
     @Override
     @ApiStatus.Internal
     public Item getUnclonedItem(int index) {
-        Item item = this.fastSlots.get(index);
+        Item item = this.slotGet(index);
         if (item != null) {
             if (!item.isNull() && item.getStackNetId() == 0) {
                 item.autoAssignStackNetworkId();
@@ -143,8 +174,9 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public Item getItemFast(int index) {
-        Item item = this.fastSlots.getOrDefault(index, air);
-        if (item != air && !item.isNull() && item.getStackNetId() == 0) {
+        Item fallback = this.air != null ? this.air : new ItemBlock(Block.get(BlockID.AIR, null), 0, 0);
+        Item item = this.slotGetOrDefault(index, fallback);
+        if (item != fallback && item != null && !item.isNull() && item.getStackNetId() == 0) {
             item.autoAssignStackNetworkId();
         }
         return item;
@@ -179,7 +211,7 @@ public abstract class BaseInventory implements Inventory {
         List<Item> deferredOverflow = new ArrayList<>();
         for (int i = 0; i < this.size; ++i) {
             if (!items.containsKey(i)) {
-                if (this.fastSlots.containsKey(i)) {
+                if (this.slotContainsKey(i)) {
                     this.clear(i);
                 }
             } else {
@@ -238,7 +270,7 @@ public abstract class BaseInventory implements Inventory {
         item = parts[0];
 
         Item old = this.getItem(index);
-        this.fastSlots.put(index, item.clone());
+        this.slotPut(index, item.clone());
         this.onSlotChange(index, old, send);
         this.routeOverflow(parts[1]);
         return true;
@@ -313,7 +345,7 @@ public abstract class BaseInventory implements Inventory {
         Item old = this.getItem(index);
         Item overflow = null;
         if (item == null || item.isNull() || item.getCount() <= 0) {
-            this.fastSlots.remove(index);
+            this.slotRemove(index);
         } else {
             Item[] parts = splitOverstack(item);
             item = parts[0];
@@ -324,7 +356,7 @@ public abstract class BaseInventory implements Inventory {
             if (item instanceof ItemBundle bundle) {
                 ensureUniqueBundleId(index, bundle);
             }
-            this.fastSlots.put(index, item.clone());
+            this.slotPut(index, item.clone());
         }
         InventoryHolder holder = this.getHolder();
         if (holder instanceof BlockEntity) {
@@ -596,7 +628,7 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public boolean clear(int index, boolean send) {
-        Item old = this.fastSlots.get(index);
+        Item old = this.slotGet(index);
         if (old != null) {
             Item item = new ItemBlock(Block.get(BlockID.AIR), null, 0);
             InventoryHolder holder = this.getHolder();
@@ -615,9 +647,9 @@ public abstract class BaseInventory implements Inventory {
             }
 
             if (item.getId() != Item.AIR) {
-                this.fastSlots.put(index, item.clone());
+                this.slotPut(index, item.clone());
             } else {
-                this.fastSlots.remove(index);
+                this.slotRemove(index);
             }
 
             this.onSlotChange(index, old, send);

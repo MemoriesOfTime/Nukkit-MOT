@@ -6,7 +6,9 @@ import cn.nukkit.item.ItemBlock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.Map;
+import org.objenesis.ObjenesisStd;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -57,6 +59,29 @@ class InventorySlotMapTest {
         BaseInventory inventory = new TestInventory();
         assertIndependentEmptyItems(inventory.getItem(0), inventory.getItem(0));
         assertIndependentEmptyItems(inventory.getUnclonedItem(0), inventory.getUnclonedItem(0));
+    }
+
+    @Test
+    void reflectivelyReplacedSlotsMapRemainsOperationalWithoutConstructorInit() throws ReflectiveOperationException {
+        TestInventory inventory = new ObjenesisStd().newInstance(TestInventory.class);
+        var slotsField = BaseInventory.class.getField("slots");
+        slotsField.setAccessible(true);
+        slotsField.set(inventory, new HashMap<Integer, Item>());
+        inventory.setSize(40);
+
+        Item helmet = Item.get(Item.DIAMOND_HELMET, 0, 1);
+        helmet.setStackNetId(0);
+        inventory.slots.put(36, helmet);
+
+        assertEquals(Item.DIAMOND_HELMET, inventory.getItem(36).getId());
+        assertTrue(helmet.getStackNetId() > 0);
+        assertSame(helmet, inventory.getItemFast(36));
+        assertTrue(inventory.getItemFast(37).isNull());
+
+        inventory.setItemForce(37, Item.get(Item.DIAMOND_CHESTPLATE, 0, 1));
+        assertEquals(Item.DIAMOND_CHESTPLATE, inventory.slots.get(37).getId());
+        inventory.setItemForce(37, Item.get(Item.AIR));
+        assertFalse(inventory.slots.containsKey(37));
     }
 
     private static void assertIndependentEmptyItems(Item first, Item second) {
