@@ -1575,14 +1575,20 @@ public class Level implements ChunkManager, Metadatable {
 
     /** Materialize keys before callbacks, retaining fresh lookups and the old size-bound snapshot. */
     void tickEntities(int currentTick) {
-        if (this.updateEntities.isEmpty()) return;
+        int count = this.updateEntities.size();
+        // Concurrent additions and removals can temporarily make the striped sum non-positive.
+        if (count <= 0) return;
         long[] keys = this.entityTickKeys;
         PlayerRangeMap playerRanges = this.getPlayers() instanceof PlayerRangeMap map ? map : null;
         if (playerRanges != null) playerRanges.beginTick();
         // A callback may reenter: the nested update must never overwrite the outer snapshot.
         this.entityTickKeys = null;
         try {
-            int count = this.updateEntities.size();
+            // A subclass's getPlayers() can modify the update list before capture.
+            if (this.getClass() != Level.class) {
+                count = this.updateEntities.size();
+                if (count <= 0) return;
+            }
             if (keys == null || keys.length < count) keys = new long[count];
             var iterator = this.updateEntities.fastKeyIterator();
             int copied = 0;

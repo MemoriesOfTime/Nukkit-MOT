@@ -1,6 +1,7 @@
 package cn.nukkit.level;
 
 import cn.nukkit.MockServer;
+import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
@@ -14,6 +15,7 @@ import sun.misc.Unsafe;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -124,6 +126,59 @@ class LevelEntityTickSnapshotTest {
         map.shrink = true;
         f.level.doTick(11);
         assertEquals(List.of("1:11"), f.calls);
+    }
+
+    @Test void subclassCanScheduleFromPlayerLookupBeforeSnapshot() throws Exception {
+        PlayerLookupLevel level = allocate(PlayerLookupLevel.class);
+        set(level, "updateEntities", new Long2ObjectNonBlockingMap<Entity>());
+        set(level, "players", new PlayerRangeMap());
+        List<String> calls = new ArrayList<>();
+        CountingEntity first = allocate(CountingEntity.class);
+        first.key = 1;
+        first.calls = calls;
+        first.action = tick -> true;
+        level.updateEntities.put(1, first);
+        CountingEntity scheduled = allocate(CountingEntity.class);
+        scheduled.key = 2;
+        scheduled.calls = calls;
+        scheduled.action = tick -> true;
+        level.scheduledFromLookup = scheduled;
+
+        level.tickEntities(10);
+
+        assertEquals(List.of("1:10", "2:10"), calls);
+    }
+
+    @Test void transientNegativeEstimateDoesNotAllocateOrDropScheduledEntities() throws Exception {
+        Fixture f = new Fixture();
+        var queue = new Long2ObjectNonBlockingMap<Entity>() {
+            private boolean firstSample = true;
+            @Override public int size() {
+                if (firstSample) {
+                    firstSample = false;
+                    return -1;
+                }
+                return super.size();
+            }
+        };
+        set(f.level, "updateEntities", queue);
+        f.add(1, tick -> true);
+
+        f.level.tickEntities(10);
+        assertTrue(f.calls.isEmpty());
+        f.level.tickEntities(11);
+        assertEquals(List.of("1:11"), f.calls);
+    }
+
+    static final class PlayerLookupLevel extends Level {
+        CountingEntity scheduledFromLookup;
+        PlayerLookupLevel() {
+            super(null, null, null, null);
+        }
+        @Override public Map<Long, Player> getPlayers() {
+            updateEntities.put(scheduledFromLookup.key, scheduledFromLookup);
+            return super.getPlayers();
+        }
     }
 
     static class ShrinkingMap extends Long2ObjectNonBlockingMap<Entity> {
