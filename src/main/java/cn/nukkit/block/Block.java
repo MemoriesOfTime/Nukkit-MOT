@@ -31,6 +31,8 @@ import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Objects;
@@ -73,6 +75,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     @SuppressWarnings("unchecked")
     private static Int2ObjectOpenHashMap<Block>[] statePrototypes = null;
     private static Object[] statePrototypeLocks = null;
+    private static Block[][] fastStatePrototypes = null;
+    private static final VarHandle STATE_PROTOTYPE_ROWS = MethodHandles.arrayElementVarHandle(Block[][].class);
+    private static final VarHandle STATE_PROTOTYPE_ELEMENTS = MethodHandles.arrayElementVarHandle(Block[].class);
+    private static final Block UNSUPPORTED_STATE_PROTOTYPE = new BlockUnknown(-1);
 
     // ID-level jump semantics, built lazily after init(). Two two-bit fields per id:
     // solidity and passability, each YES / NO / UNKNOWN; plus one FLOWABLE bit.
@@ -107,6 +113,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             metaConstructors = new Constructor[MAX_BLOCK_ID];
             statePrototypes = new Int2ObjectOpenHashMap[MAX_BLOCK_ID];
             statePrototypeLocks = new Object[MAX_BLOCK_ID];
+            fastStatePrototypes = new Block[MAX_BLOCK_ID][];
 
             Blocks.init();
 
@@ -348,6 +355,39 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         Int2ObjectOpenHashMap<Block> prototypes = statePrototypes[id];
         if (prototypes == null) {
             return defaultBlock;
+        }
+
+        if (meta >= 0 && meta < DATA_SIZE) {
+            Block[] fastPrototypes = (Block[]) STATE_PROTOTYPE_ROWS.getAcquire(fastStatePrototypes, id);
+            if (fastPrototypes != null) {
+                Block cached = (Block) STATE_PROTOTYPE_ELEMENTS.getAcquire(fastPrototypes, meta);
+                if (cached != null) {
+                    return cached == UNSUPPORTED_STATE_PROTOTYPE ? null : cached;
+                }
+            }
+
+            synchronized (statePrototypeLocks[id]) {
+                fastPrototypes = (Block[]) STATE_PROTOTYPE_ROWS.getAcquire(fastStatePrototypes, id);
+                if (fastPrototypes == null) {
+                    fastPrototypes = new Block[DATA_SIZE];
+                    STATE_PROTOTYPE_ROWS.setRelease(fastStatePrototypes, id, fastPrototypes);
+                }
+                Block cached = (Block) STATE_PROTOTYPE_ELEMENTS.getAcquire(fastPrototypes, meta);
+                if (cached == null) {
+                    cached = prototypes.get(meta);
+                    if (cached == null) {
+                        cached = instantiatePrototype(id, meta);
+                        if (cached != null) {
+                            prototypes.put(meta, cached);
+                        } else {
+                            cached = UNSUPPORTED_STATE_PROTOTYPE;
+                        }
+                    }
+                    // Each entry publishes the fully detached prototype independently of its row.
+                    STATE_PROTOTYPE_ELEMENTS.setRelease(fastPrototypes, meta, cached);
+                }
+                return cached == UNSUPPORTED_STATE_PROTOTYPE ? null : cached;
+            }
         }
 
         synchronized (statePrototypeLocks[id]) {

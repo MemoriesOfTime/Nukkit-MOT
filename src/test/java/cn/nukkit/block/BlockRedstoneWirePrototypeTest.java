@@ -195,7 +195,7 @@ class BlockRedstoneWirePrototypeTest {
         original.assertRestored();
     }
 
-    @Test void partialScopeInstallationFailureRestoresAllSixSlotReferences() throws Exception {
+    @Test void partialScopeInstallationFailureRestoresAllSlotReferences() throws Exception {
         Snapshot original=new Snapshot(); IllegalStateException failure=new IllegalStateException("scope installation failure");
         assertSame(failure,assertThrows(IllegalStateException.class,() -> new RegistryScope(original,() -> { throw failure; })));
         original.assertRestored();
@@ -253,31 +253,35 @@ class BlockRedstoneWirePrototypeTest {
     }
 
     @SuppressWarnings({"rawtypes","unchecked"})
-    private static final class Snapshot {
+    static final class Snapshot {
         final Class[] classes=Block.list; final boolean[] hasMeta=Block.hasMeta;
         final Block[] defaults; final Constructor[] constructors;
-        final Int2ObjectOpenHashMap<Block>[] caches; final Object[] locks;
+        final Int2ObjectOpenHashMap<Block>[] caches; final Object[] locks; final Block[][] fastCaches;
         final Class originalClass; final boolean originalHasMeta; final Block originalDefault;
         final Constructor originalConstructor; final Int2ObjectOpenHashMap<Block> originalCache; final Object originalLock;
+        final Block[] originalFastCache;
         Snapshot() throws Exception {
             defaults=(Block[])field("defaultStateList"); constructors=(Constructor[])field("metaConstructors");
             caches=(Int2ObjectOpenHashMap<Block>[])field("statePrototypes"); locks=(Object[])field("statePrototypeLocks");
+            fastCaches=(Block[][])field("fastStatePrototypes");
             int id=Block.REDSTONE_WIRE; originalClass=classes[id]; originalHasMeta=hasMeta[id]; originalDefault=defaults[id];
             originalConstructor=constructors[id]; originalCache=caches[id]; originalLock=locks[id];
+            originalFastCache=fastCaches[id];
         }
         private static Object field(String name) throws Exception { Field field=Block.class.getDeclaredField(name); field.setAccessible(true); return field.get(null); }
         void restore() {
             int id=Block.REDSTONE_WIRE; classes[id]=originalClass; hasMeta[id]=originalHasMeta; defaults[id]=originalDefault;
-            constructors[id]=originalConstructor; caches[id]=originalCache; locks[id]=originalLock;
+            constructors[id]=originalConstructor; caches[id]=originalCache; locks[id]=originalLock; fastCaches[id]=originalFastCache;
         }
         void assertRestored() {
             int id=Block.REDSTONE_WIRE; assertSame(originalClass,classes[id]); assertEquals(originalHasMeta,hasMeta[id]);
             assertSame(originalDefault,defaults[id]); assertSame(originalConstructor,constructors[id]);
             assertSame(originalCache,caches[id]); assertSame(originalLock,locks[id]);
+            assertSame(originalFastCache,fastCaches[id]);
         }
     }
 
-    private static final class RegistryScope implements AutoCloseable {
+    static final class RegistryScope implements AutoCloseable {
         final Snapshot original; final Block[] defaults; final Constructor[] constructors;
         final Int2ObjectOpenHashMap<Block> cache=new Int2ObjectOpenHashMap<>();
         RegistryScope(Snapshot original) throws Exception { this(original,() -> {}); }
@@ -287,7 +291,7 @@ class BlockRedstoneWirePrototypeTest {
             Block canonical=new BlockRedstoneWire(); Object lock=new Object(); int id=Block.REDSTONE_WIRE;
             try {
                 original.classes[id]=BlockRedstoneWire.class; original.hasMeta[id]=true; defaults[id]=canonical;
-                constructors[id]=constructor; original.caches[id]=cache;
+                constructors[id]=constructor; original.caches[id]=cache; original.fastCaches[id]=null;
                 afterPartialInstall.run(); original.locks[id]=lock;
             } catch (RuntimeException | Error failure) { original.restore(); throw failure; }
         }
