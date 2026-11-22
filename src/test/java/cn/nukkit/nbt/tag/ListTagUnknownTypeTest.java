@@ -2,20 +2,21 @@ package cn.nukkit.nbt.tag;
 
 import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.stream.NBTOutputStream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ListTagUnknownTypeTest {
     @ParameterizedTest
-    @ValueSource(ints = {-128, -1, 12, 13, 99, 127})
+    @ValueSource(ints = {-128, -1, 13, 99, 127})
     void unknownNonEmptyElementTypeIsRejectedBeforeZeroWidthElements(int type) throws Exception {
         // Three elements prove the no-progress path without stressing the JVM on an unfixed build.
         for (ByteOrder order : new ByteOrder[]{ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN}) {
@@ -29,7 +30,7 @@ class ListTagUnknownTypeTest {
 
     @Test
     void everyUnsupportedByteRejectsEmptyAndHugeLengths() throws Exception {
-        for (int type = Tag.TAG_Int_Array + 1; type <= 255; type++) {
+        for (int type = Tag.TAG_Long_Array + 1; type <= 255; type++) {
             for (int size : new int[]{0, Integer.MAX_VALUE}) {
                 for (ByteOrder order : new ByteOrder[]{ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN}) {
                     for (boolean network : new boolean[]{false, true}) {
@@ -45,7 +46,7 @@ class ListTagUnknownTypeTest {
 
     @Test
     void legalEmptyAndEndListsRetainExistingBehavior() throws Exception {
-        for (int type = Tag.TAG_End; type <= Tag.TAG_Int_Array; type++) {
+        for (int type = Tag.TAG_End; type <= Tag.TAG_Long_Array; type++) {
             try (NBTInputStream input = input(type, 0, ByteOrder.BIG_ENDIAN, false)) {
                 ListTag<?> list = new ListTag<>();
                 list.load(input, 0);

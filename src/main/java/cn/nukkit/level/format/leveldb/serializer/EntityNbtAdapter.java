@@ -397,6 +397,9 @@ public final class EntityNbtAdapter {
         if (tag instanceof IntArrayTag intArrayTag) {
             return intArrayTag.data == null ? new int[0] : Arrays.copyOf(intArrayTag.data, intArrayTag.data.length);
         }
+        if (tag instanceof LongArrayTag longArrayTag) {
+            return longArrayTag.data == null ? new long[0] : Arrays.copyOf(longArrayTag.data, longArrayTag.data.length);
+        }
         return null;
     }
 
