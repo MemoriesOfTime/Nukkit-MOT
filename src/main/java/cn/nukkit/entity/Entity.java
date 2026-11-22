@@ -60,7 +60,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 import static cn.nukkit.utils.Utils.dynamic;
@@ -469,27 +468,15 @@ public abstract class Entity extends Location implements Metadatable {
 
     private static final class TrackedEffectMap extends AbstractMap<Integer, Effect> implements ConcurrentMap<Integer, Effect> {
         private final ConcurrentHashMap<Integer, Effect> backing = new ConcurrentHashMap<>();
-        private final AtomicInteger writers = new AtomicInteger();
-        // 1 = proven empty, 0 = proven non-empty, -1 = invalidated/recheck
-        private volatile int emptyState = 1;
+        // Only a pristine map can prove emptiness without consulting the concurrent backing map.
+        private volatile boolean mayHaveEntries;
         private Collection<Effect> valuesView;
         private Set<Integer> keySetView;
         private Set<Entry<Integer, Effect>> entrySetView;
 
         @Override
         public boolean isEmpty() {
-            int state = emptyState;
-            if (state >= 0 && writers.get() == 0) {
-                return state == 1;
-            }
-            if (writers.get() != 0) {
-                return backing.isEmpty();
-            }
-            boolean empty = backing.isEmpty();
-            if (writers.get() == 0) {
-                emptyState = empty ? 1 : 0;
-            }
-            return empty;
+            return !mayHaveEntries || backing.isEmpty();
         }
 
         @Override
@@ -512,125 +499,89 @@ public abstract class Entity extends Location implements Metadatable {
             return !isEmpty() && backing.containsKey(key);
         }
 
-        private void beginWrite() {
-            writers.incrementAndGet();
-            emptyState = -1;
-        }
-
-        private void endWrite() {
-            emptyState = -1;
-            writers.decrementAndGet();
+        private void beforeInsert() {
+            if (!mayHaveEntries) mayHaveEntries = true;
         }
 
         @Override
         public Effect put(Integer key, Effect value) {
-            beginWrite();
-            try { return backing.put(key, value); }
-            finally { endWrite(); }
+            beforeInsert();
+            return backing.put(key, value);
         }
 
         @Override
         public Effect putIfAbsent(Integer key, Effect value) {
-            beginWrite();
-            try { return backing.putIfAbsent(key, value); }
-            finally { endWrite(); }
+            beforeInsert();
+            return backing.putIfAbsent(key, value);
         }
 
         @Override
         public void putAll(Map<? extends Integer, ? extends Effect> map) {
-            beginWrite();
-            try { backing.putAll(map); }
-            finally { endWrite(); }
+            beforeInsert();
+            backing.putAll(map);
         }
 
         @Override
         public Effect remove(Object key) {
-            if (isEmpty()) return null;
-            beginWrite();
-            try { return backing.remove(key); }
-            finally { endWrite(); }
+            return isEmpty() ? null : backing.remove(key);
         }
 
         @Override
         public boolean remove(Object key, Object value) {
-            if (isEmpty()) return false;
-            beginWrite();
-            try { return backing.remove(key, value); }
-            finally { endWrite(); }
+            return !isEmpty() && backing.remove(key, value);
         }
 
         @Override
         public Effect replace(Integer key, Effect value) {
-            if (isEmpty()) return null;
-            beginWrite();
-            try { return backing.replace(key, value); }
-            finally { endWrite(); }
+            return isEmpty() ? null : backing.replace(key, value);
         }
 
         @Override
         public boolean replace(Integer key, Effect oldValue, Effect newValue) {
-            if (isEmpty()) return false;
-            beginWrite();
-            try { return backing.replace(key, oldValue, newValue); }
-            finally { endWrite(); }
+            return !isEmpty() && backing.replace(key, oldValue, newValue);
         }
 
         @Override
         public void clear() {
-            if (isEmpty()) return;
-            beginWrite();
-            try { backing.clear(); }
-            finally { endWrite(); }
-        }
-
-        private <T> Iterator<T> trackedIterator(Iterator<T> iterator) {
-            return new Iterator<>() {
-                @Override public boolean hasNext() { return iterator.hasNext(); }
-                @Override public T next() { return iterator.next(); }
-                @Override public void remove() {
-                    beginWrite();
-                    try { iterator.remove(); }
-                    finally { endWrite(); }
-                }
-            };
+            if (!isEmpty()) backing.clear();
         }
 
         @Override
         public Collection<Effect> values() {
-            Collection<Effect> view = this.valuesView;
-            if (view != null) return view;
-            return this.valuesView = new AbstractCollection<>() {
+            Collection<Effect> v = valuesView;
+            if (v != null) return v;
+            return valuesView = new AbstractCollection<>() {
                 @Override public int size() { return TrackedEffectMap.this.size(); }
                 @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
                 @Override public boolean contains(Object v) { return !isEmpty() && backing.containsValue(v); }
                 @Override public void clear() { TrackedEffectMap.this.clear(); }
                 @Override public Iterator<Effect> iterator() {
-                    return isEmpty() ? Collections.emptyIterator() : trackedIterator(backing.values().iterator());
+                    return isEmpty() ? Collections.emptyIterator() : backing.values().iterator();
                 }
             };
         }
 
         @Override
         public Set<Integer> keySet() {
-            Set<Integer> view = this.keySetView;
-            if (view != null) return view;
-            return this.keySetView = new AbstractSet<>() {
+            Set<Integer> k = keySetView;
+            if (k != null) return k;
+            return keySetView = new AbstractSet<>() {
                 @Override public int size() { return TrackedEffectMap.this.size(); }
                 @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
                 @Override public boolean contains(Object k) { return TrackedEffectMap.this.containsKey(k); }
                 @Override public boolean remove(Object k) { return TrackedEffectMap.this.remove(k) != null; }
                 @Override public void clear() { TrackedEffectMap.this.clear(); }
                 @Override public Iterator<Integer> iterator() {
-                    return isEmpty() ? Collections.emptyIterator() : trackedIterator(backing.keySet().iterator());
+                    return isEmpty() ? Collections.emptyIterator() : backing.keySet().iterator();
                 }
             };
         }
 
         @Override
         public Set<Entry<Integer, Effect>> entrySet() {
-            Set<Entry<Integer, Effect>> view = this.entrySetView;
-            if (view != null) return view;
-            return this.entrySetView = new AbstractSet<>() {
+            Set<Entry<Integer, Effect>> es = entrySetView;
+            if (es != null) return es;
+            return entrySetView = new AbstractSet<>() {
                 @Override public int size() { return TrackedEffectMap.this.size(); }
                 @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
                 @Override public boolean contains(Object o) { return !isEmpty() && backing.entrySet().contains(o); }
@@ -639,25 +590,7 @@ public abstract class Entity extends Location implements Metadatable {
                 }
                 @Override public void clear() { TrackedEffectMap.this.clear(); }
                 @Override public Iterator<Entry<Integer, Effect>> iterator() {
-                    if (isEmpty()) return Collections.emptyIterator();
-                    Iterator<Entry<Integer, Effect>> it = trackedIterator(backing.entrySet().iterator());
-                    return new Iterator<>() {
-                        @Override public boolean hasNext() { return it.hasNext(); }
-                        @Override public void remove() { it.remove(); }
-                        @Override public Entry<Integer, Effect> next() {
-                            Entry<Integer, Effect> e = it.next();
-                            return new SimpleEntry<>(e) {
-                                @Override public Effect setValue(Effect value) {
-                                    beginWrite();
-                                    try {
-                                        Effect prev = e.setValue(value);
-                                        super.setValue(value);
-                                        return prev;
-                                    } finally { endWrite(); }
-                                }
-                            };
-                        }
-                    };
+                    return isEmpty() ? Collections.emptyIterator() : backing.entrySet().iterator();
                 }
             };
         }
