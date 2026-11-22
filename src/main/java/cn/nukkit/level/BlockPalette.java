@@ -5,8 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.*;
 import cn.nukkit.utils.Hash;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -20,7 +19,10 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
@@ -44,6 +46,18 @@ public class BlockPalette {
     private volatile boolean locked;
     private volatile long networkVersion;
     private volatile boolean networkMappingReady;
+    /**
+     * 旧版方块 ID → 调色板原始 state NBT（name/version/states），仅结构导出需要，首次使用时构建。
+     * <p>
+     * Legacy block id to raw palette state NBT (name/version/states); built on first use, only structure export needs it.
+     */
+    private volatile Map<Integer, CompoundTag> legacyStateTags;
+    /**
+     * 方块名 → 调色板状态条目，供跨版本状态回退使用，首次需要时构建。
+     * <p>
+     * Block name to palette state entries, built on first use for cross-version state fallback.
+     */
+    private volatile Map<String, List<Map.Entry<Integer, CompoundTag>>> stateTagsByName;
 
     @Deprecated
     public BlockPalette(int protocol) {
@@ -347,6 +361,124 @@ public class BlockPalette {
 
     public int getLegacyFullId(CompoundTag blockState) {
         return stateHashToLegacy.get(Hash.hashBlock(blockState));
+    }
+
+    /**
+     * 先按状态哈希精确匹配；新版本改过属性集时退回同名方块中状态最接近的一档。
+     * <p>
+     * Exact state-hash lookup first; when a newer/older version changed the state set,
+     * fall back to the closest state of the same block name (vanilla-like upgrade).
+     */
+    public int getLegacyFullIdWithFallback(CompoundTag blockState) {
+        int direct = this.getLegacyFullId(blockState);
+        if (direct >= 0) {
+            return direct;
+        }
+        String name = blockState.getString("name");
+        if (name.isEmpty()) {
+            return -1;
+        }
+        List<Map.Entry<Integer, CompoundTag>> candidates = this.statesByName().get(name);
+        if (candidates == null) {
+            return -1;
+        }
+        CompoundTag wanted = blockState.getCompound("states");
+        int best = -1;
+        int bestScore = -1;
+        for (Map.Entry<Integer, CompoundTag> candidate : candidates) {
+            int score = matchingStates(candidate.getValue().getCompound("states"), wanted);
+            if (score > bestScore) {
+                bestScore = score;
+                best = candidate.getKey();
+            }
+        }
+        return best;
+    }
+
+    private static int matchingStates(CompoundTag candidate, CompoundTag wanted) {
+        int score = 0;
+        for (Map.Entry<String, Tag> entry : candidate.getTags().entrySet()) {
+            Tag wantedValue = wanted.get(entry.getKey());
+            if (wantedValue != null && sameStateValue(entry.getValue(), wantedValue)) {
+                score++;
+            }
+        }
+        return score;
+    }
+
+    private static boolean sameStateValue(Tag first, Tag second) {
+        if (first instanceof NumberTag<?> a && second instanceof NumberTag<?> b) {
+            return a.getData().longValue() == b.getData().longValue();
+        }
+        if (first instanceof StringTag a && second instanceof StringTag b) {
+            return a.data.equals(b.data);
+        }
+        return false;
+    }
+
+    private Map<String, List<Map.Entry<Integer, CompoundTag>>> statesByName() {
+        Map<String, List<Map.Entry<Integer, CompoundTag>>> index = this.stateTagsByName;
+        if (index == null) {
+            synchronized (this) {
+                index = this.stateTagsByName;
+                if (index == null) {
+                    index = new HashMap<>();
+                    for (Map.Entry<Integer, CompoundTag> entry : this.legacyStateTags().entrySet()) {
+                        String name = entry.getValue().getString("name");
+                        index.computeIfAbsent(name, key -> new ArrayList<>()).add(entry);
+                    }
+                    this.stateTagsByName = index;
+                }
+            }
+        }
+        return index;
+    }
+
+    /**
+     * 取方块状态对应的调色板原始 NBT（含 name/version/states），结构导出用。
+     * <p>
+     * Returns the raw palette state NBT for a block (name/version/states); used by structure export.
+     * Falls back to {@code null} when the protocol palette has no such state.
+     */
+    public CompoundTag getBlockStateTag(int legacyFullId) {
+        return this.legacyStateTags().get(legacyFullId);
+    }
+
+    private Map<Integer, CompoundTag> legacyStateTags() {
+        Map<Integer, CompoundTag> tags = this.legacyStateTags;
+        if (tags == null) {
+            synchronized (this) {
+                tags = this.legacyStateTags;
+                if (tags == null) {
+                    tags = this.loadLegacyStateTags();
+                    this.legacyStateTags = tags;
+                }
+            }
+        }
+        return tags;
+    }
+
+    private Map<Integer, CompoundTag> loadLegacyStateTags() {
+        Map<Integer, CompoundTag> tags = new HashMap<>();
+        // 同一 legacy id 既有 canonical 又有 overload 条目时，canonical 优先
+        // When a legacy id has both canonical and overload entries, keep the canonical one.
+        Map<Integer, Boolean> canonical = new HashMap<>();
+        for (CompoundTag state : paletteFor(this.protocol).getAll()) {
+            int legacyId = state.getInt("id") << Block.DATA_BITS | state.getShort("data");
+            boolean overload = state.getBoolean("stateOverload");
+            Boolean existingCanonical = canonical.get(legacyId);
+            if (existingCanonical != null && (existingCanonical || overload)) {
+                continue;
+            }
+            CompoundTag copy = state.copy()
+                    .remove("id")
+                    .remove("data")
+                    .remove("runtimeId")
+                    .remove("stateOverload");
+            tags.put(legacyId, copy);
+            canonical.put(legacyId, !overload);
+        }
+        return tags;
     }
 
     /**

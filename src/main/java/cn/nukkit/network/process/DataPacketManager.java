@@ -273,7 +273,9 @@ public final class DataPacketManager {
                 SetPlayerGameTypeProcessor.INSTANCE,
                 SubChunkRequestProcessor.INSTANCE,
                 TextProcessor.INSTANCE,
-                CommandBlockUpdateProcessor.INSTANCE
+                CommandBlockUpdateProcessor.INSTANCE,
+                StructureBlockUpdateProcessor.INSTANCE,
+                StructureTemplateDataRequestProcessor.INSTANCE
         );
 
         registerProcessor(

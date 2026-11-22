@@ -40,6 +40,7 @@ public enum InventoryType {
     CARTOGRAPHY(2, "Cartography Table", 30),
     HORSE(17, "Horse", 12), //1 SADDLE, 1 ARMOR, up to 15 CHEST
     CRAFTER(9, "Crafter", 36),
+    STRUCTURE_BLOCK(0, "Structure Block", 14),
     COMMAND_BLOCK(0, "Command Block", 16);
 
     private final int size;
