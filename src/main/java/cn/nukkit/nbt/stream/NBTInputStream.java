@@ -248,6 +248,36 @@ public class NBTInputStream implements DataInput, AutoCloseable {
         return ints;
     }
 
+    /**
+     * 读取 {@code length} 个 long；定宽编码复用 {@link #readByteArray(int)}，分配量受实际到达
+     * 字节约束，网络 VarLong 编码逐元素解码到可增长缓冲区，与 {@link #readIntArray(int)} 一致。
+     * Reads {@code length} longs; fixed-width payloads reuse {@link #readByteArray(int)} so the
+     * allocation stays bounded by arriving bytes, while network VarLongs grow a buffer
+     * element by element, same as {@link #readIntArray(int)}.
+     */
+    public long[] readLongArray(int length) throws IOException {
+        if (length < 0) {
+            throw new IOException("Negative NBT array length: " + length);
+        }
+        if (this.network) {
+            long[] longs = new long[this.readSafely ? Math.min(length, SAFE_INITIAL_BYTES / Long.BYTES) : length];
+            for (int i = 0; i < length; i++) {
+                if (i == longs.length) {
+                    longs = Arrays.copyOf(longs, (int) Math.min(length, (long) i << 1));
+                }
+                longs[i] = VarInt.readVarLong(this.stream);
+            }
+            return longs;
+        }
+        if (length > Integer.MAX_VALUE / Long.BYTES) {
+            throw new IOException("NBT long array length out of range: " + length);
+        }
+        byte[] payload = this.readByteArray(length * Long.BYTES);
+        long[] longs = new long[length];
+        ByteBuffer.wrap(payload).order(this.endianness).asLongBuffer().get(longs);
+        return longs;
+    }
+
     public Object readTag() throws IOException {
         return this.readTag(16);
     }
@@ -322,6 +352,9 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                 case Tag.TAG_Int_Array:
                     arraySize = this.readInt();
                     return new IntArrayTag("", this.readIntArray(arraySize));
+                case Tag.TAG_Long_Array:
+                    arraySize = this.readInt();
+                    return new LongArrayTag("", this.readLongArray(arraySize));
                 default:
                     throw new IllegalArgumentException("Unknown type " + type);
             }
