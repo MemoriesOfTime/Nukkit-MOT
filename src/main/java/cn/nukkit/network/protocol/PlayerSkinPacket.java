@@ -49,6 +49,22 @@ public class PlayerSkinPacket extends DataPacket {
     @Override
     public void encode() {
         reset();
+        if (skin != null) {
+            long estimated = 32L + estimatedStringBytes(newSkinName) + estimatedStringBytes(oldSkinName);
+            if (protocol < 388) {
+                byte[] skinBytes = skin.getSkinData() != null ? skin.getSkinData().data : null;
+                byte[] capeBytes = skin.getCapeData() != null ? skin.getCapeData().data : null;
+                estimated += 72L
+                        + (skinBytes != null ? skinBytes.length : 0)
+                        + (capeBytes != null ? capeBytes.length : 0)
+                        + estimatedStringBytes(skin.getGeometryData());
+            } else {
+                estimated += estimatedSkinSize(this.gameVersion, skin);
+            }
+            if (estimated > 0 && estimated <= Integer.MAX_VALUE - 64L) {
+                reserve((int) estimated);
+            }
+        }
         putUUID(uuid);
         if (protocol < 388) {
             putString(skin.isLegacySlim ? "geometry.humanoid.customSlim" : "geometry.humanoid.custom");
