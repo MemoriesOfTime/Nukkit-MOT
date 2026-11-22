@@ -69,10 +69,8 @@ public class PlayerAuthInputPacket extends DataPacket {
     private InventoryTransactionPacket itemUseTransaction;
     private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
-    /** All decoded actions in wire order; the legacy map can retain only the last of each type. */
-    private final List<PlayerBlockActionData> decodedBlockActions = new ArrayList<>();
     @Getter(lombok.AccessLevel.NONE)
-    private final Map<PlayerActionType, PlayerBlockActionData> decodedBlockActionSnapshot = new EnumMap<>(PlayerActionType.class);
+    private final DecodedBlockActions decodedBlockActions = new DecodedBlockActions();
     /**
      * @since v748
      */
@@ -120,7 +118,6 @@ public class PlayerAuthInputPacket extends DataPacket {
     public void decode() {
         this.blockActionData.clear();
         this.decodedBlockActions.clear();
-        this.decodedBlockActionSnapshot.clear();
         this.pitch = this.getLFloat();
         this.yaw = this.getLFloat();
         this.position = this.getVector3f();
@@ -297,10 +294,7 @@ public class PlayerAuthInputPacket extends DataPacket {
                 }
             }
         }
-        // Packet listeners may mutate the legacy map, its actions or their coordinates.
-        // Preserve those filters instead of replaying an unfiltered decoded sequence.
-        this.blockActionData.forEach((type, action) ->
-                this.decodedBlockActionSnapshot.put(type, copyBlockAction(action)));
+        this.decodedBlockActions.capture(this.blockActionData);
     }
 
     /**
@@ -310,12 +304,7 @@ public class PlayerAuthInputPacket extends DataPacket {
      * to filter or replace actions.
      */
     public List<PlayerBlockActionData> getDecodedBlockActions() {
-        if (this.decodedBlockActions.isEmpty()) {
-            return List.of();
-        }
-        return this.blockActionData.equals(this.decodedBlockActionSnapshot)
-                ? this.decodedBlockActions.stream().map(PlayerAuthInputPacket::copyBlockAction).toList()
-                : List.of();
+        return this.decodedBlockActions.replay(this.blockActionData);
     }
 
     private static PlayerBlockActionData copyBlockAction(PlayerBlockActionData action) {
@@ -332,8 +321,43 @@ public class PlayerAuthInputPacket extends DataPacket {
     /** Replacing the legacy map explicitly also replaces the decoded action sequence. */
     public void setBlockActionData(Map<PlayerActionType, PlayerBlockActionData> actions) {
         this.decodedBlockActions.clear();
-        this.decodedBlockActionSnapshot.clear();
         this.blockActionData = actions;
+    }
+
+    /** The replay sequence and its comparison snapshot stay together across shallow packet clones. */
+    @ToString
+    private static final class DecodedBlockActions {
+        private List<PlayerBlockActionData> actions;
+        private Map<PlayerActionType, PlayerBlockActionData> snapshot;
+
+        void clear() {
+            if (this.actions != null) {
+                this.actions.clear();
+                this.snapshot.clear();
+            }
+        }
+
+        void add(PlayerBlockActionData action) {
+            if (this.actions == null) {
+                this.actions = new ArrayList<>();
+                this.snapshot = new EnumMap<>(PlayerActionType.class);
+            }
+            this.actions.add(action);
+        }
+
+        void capture(Map<PlayerActionType, PlayerBlockActionData> legacyActions) {
+            // Packet listeners can mutate the map, its actions or their coordinates.
+            if (this.actions != null && !this.actions.isEmpty()) {
+                legacyActions.forEach((type, action) -> this.snapshot.put(type, copyBlockAction(action)));
+            }
+        }
+
+        List<PlayerBlockActionData> replay(Map<PlayerActionType, PlayerBlockActionData> legacyActions) {
+            if (this.actions == null || this.actions.isEmpty() || !legacyActions.equals(this.snapshot)) {
+                return List.of();
+            }
+            return this.actions.stream().map(PlayerAuthInputPacket::copyBlockAction).toList();
+        }
     }
 
     private InventoryTransactionPacket readItemUseTransaction() {
