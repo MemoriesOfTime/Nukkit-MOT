@@ -826,6 +826,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         }
     }
 
+    /** Returns a read-only iterator for native entity maps, or null for alternate maps. */
+    public static Iterator<Entity> nativeEntityScanIterator(Map<Long, Entity> entities) {
+        return entities instanceof PickupEntityIndex index ? index.readOnlyNativeIterator() : null;
+    }
+
     private PickupEntityIndex entityIndex() {
         PickupEntityIndex index = this.pickupEntityIndex;
         if (index != null && index.backing() == this.entities) return index;

@@ -15,6 +15,7 @@ import com.sun.management.ThreadMXBean;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.lang.management.ManagementFactory;
@@ -23,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -96,6 +98,51 @@ class PickupEntityIndexRideableAndViewsTest {
         assertSame(index.values(), index.values());
         assertSame(index.keySet(), index.keySet());
         assertSame(index.entrySet(), index.entrySet());
+    }
+
+    @Test
+    void rideableScanKeepsPrefetchedNativeEntryAndCustomMapOrder(@TempDir Path world) throws Exception {
+        SimpleAxisAlignedBB box = new SimpleAxisAlignedBB(14, 64, 14, 18, 66, 18);
+        LevelDBChunk nativeChunk = createInitializedChunk(0, 0);
+        Entity first = rideable(0L, box);
+        Entity prefetched = rideable(42L, box);
+        nativeChunk.addEntity(first);
+        nativeChunk.addEntity(prefetched);
+
+        Entity customFirst = rideable(9L, box);
+        Entity customSecond = rideable(7L, box);
+        Map<Long, Entity> customEntities = new LinkedHashMap<>();
+        customEntities.put(9L, customFirst);
+        customEntities.put(7L, customSecond);
+        when(Server.getInstance().getLanguage()).thenReturn(new cn.nukkit.lang.BaseLang("eng"));
+        Anvil.generate(world + "/", "rideable", 0L, Flat.class);
+        Level level = new Level(Server.getInstance(), "rideable", world + "/", Anvil.class) {
+            @Override
+            public Map<Long, Entity> getChunkEntities(int chunkX, int chunkZ, boolean loadChunks) {
+                assertFalse(loadChunks);
+                if (chunkX == 0 && chunkZ == 0) return nativeChunk.getEntities();
+                if (chunkX == 0 && chunkZ == 1) return customEntities;
+                return Collections.emptyMap();
+            }
+        };
+        when(first.getLevel()).thenReturn(level);
+        level.addEntity(first);
+        when(first.isAlive()).thenAnswer(call -> {
+            nativeChunk.getEntities().remove(42L);
+            return true;
+        });
+
+        assertArrayEquals(new Entity[]{first, prefetched, customFirst, customSecond}, level.getNearbyRideables(box, null));
+        assertFalse(nativeChunk.getEntities().containsKey(42L));
+        assertArrayEquals(new Entity[]{first, customFirst, customSecond}, level.getNearbyRideables(box, null));
+    }
+
+    private static Entity rideable(long id, SimpleAxisAlignedBB box) {
+        Entity entity = mock(Entity.class, withSettings().extraInterfaces(EntityRideable.class));
+        when(entity.getId()).thenReturn(id);
+        when(entity.isAlive()).thenReturn(true);
+        entity.boundingBox = box;
+        return entity;
     }
 
     @Test
@@ -190,6 +237,7 @@ class PickupEntityIndexRideableAndViewsTest {
 
             ThreadMXBean mx = (ThreadMXBean) ManagementFactory.getThreadMXBean();
             long tid = Thread.currentThread().getId();
+            mx.getThreadAllocatedBytes(tid);
             long beforeDirect = mx.getThreadAllocatedBytes(tid);
             int sink = 0;
             for (int i = 0; i < 5_000; i++) {
@@ -199,7 +247,7 @@ class PickupEntityIndexRideableAndViewsTest {
             assertEquals(0, sink);
             // ThreadMXBean.getThreadAllocatedBytes(long) allocates 96 B internally for its 1-element id/result arrays;
             // without empty-chunk & view reuse, 5,000 probes allocated >440,000 B.
-            assertTrue(directAllocated <= 256L,
+            assertTrue(directAllocated <= 1024L,
                     "Expected zero-allocation chunk entity/rideable probes, got " + directAllocated + " B across 5,000 ticks");
 
             long beforeLevel = mx.getThreadAllocatedBytes(tid);

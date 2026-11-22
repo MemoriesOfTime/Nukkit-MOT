@@ -3737,7 +3737,10 @@ public class Level implements ChunkManager, Metadatable {
                 if (chunkEntities instanceof EntityPresenceIndex indexed && !indexed.hasRideableEntities()) {
                     continue;
                 }
-                for (Entity ent : chunkEntities.values()) {
+                Iterator<Entity> entities = BaseFullChunk.nativeEntityScanIterator(chunkEntities);
+                if (entities == null) entities = chunkEntities.values().iterator();
+                while (entities.hasNext()) {
+                    Entity ent = entities.next();
                     if (ent != entity && ent instanceof EntityRideable && !ent.closed && ent.isAlive()
                             && ent.boundingBox.intersectsWith(bb)) {
                         if (count == result.length) {

@@ -1134,6 +1134,18 @@ public class Long2ObjectNonBlockingMap<TypeV>
         }
     }
 
+    /** Traverses a weakly consistent value snapshot without permitting iterator removal. */
+    public Iterator<TypeV> readOnlyValueIterator() {
+        return new ReadOnlySnapshotV();
+    }
+
+    private final class ReadOnlySnapshotV extends SnapshotV {
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
     // The main class for iterating over the NBHM.  It "snapshots" a clean
     // view of the K/V array.
     private class SnapshotV implements Iterator<TypeV>, Enumeration<TypeV> {

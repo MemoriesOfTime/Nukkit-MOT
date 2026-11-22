@@ -72,6 +72,11 @@ final class PickupEntityIndex extends AbstractMap<Long, Entity> implements Concu
         }
     }
 
+    Iterator<Entity> readOnlyNativeIterator() {
+        if (backing.getClass() != Long2ObjectNonBlockingMap.class) return null;
+        return hasAnyEntities() ? backing.readOnlyValueIterator() : Collections.emptyIterator();
+    }
+
     private boolean hasKind(int mask) {
         long stamp = revision.get();
         if (writers.get() != 0) return true;
