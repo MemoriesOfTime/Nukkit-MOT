@@ -26,6 +26,10 @@ import org.junit.jupiter.api.Test;
 import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -97,6 +101,39 @@ class EntityLivingEyeAndEffectsFastPathTest {
             acc += e.getId();
         }
         return acc;
+    }
+
+    @Test
+    void completedEffectMutationsAreVisibleDuringConcurrentEmptyChecks() throws Exception {
+        Map<Integer, Effect> effects = new Fixture().actor.getEffects();
+        Effect speed = Effect.getEffect(Effect.SPEED);
+        var stop = new AtomicBoolean();
+        var started = new CountDownLatch(1);
+        var reader = new FutureTask<>(() -> {
+            started.countDown();
+            while (!stop.get()) {
+                effects.isEmpty();
+            }
+            return null;
+        });
+        new Thread(reader, "effect-empty-reader").start();
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            for (int i = 0; i < 20_000; i++) {
+                effects.put(Effect.SPEED, speed);
+                assertFalse(effects.isEmpty(), "Completed insertion must invalidate an empty result");
+                Map.Entry<Integer, Effect> entry = effects.entrySet().iterator().next();
+                effects.clear();
+                assertTrue(effects.isEmpty(), "Completed clear must invalidate a populated result");
+                entry.setValue(speed);
+                assertFalse(effects.isEmpty(), "An entry can reinsert its mapping after a clear");
+                effects.remove(Effect.SPEED);
+                assertTrue(effects.isEmpty(), "Completed removal must invalidate a populated result");
+            }
+        } finally {
+            stop.set(true);
+            reader.get(5, TimeUnit.SECONDS);
+        }
     }
 
     @Test
