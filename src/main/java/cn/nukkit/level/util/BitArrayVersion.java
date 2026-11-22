@@ -21,12 +21,20 @@ public enum BitArrayVersion {
     final byte entriesPerWord;
     final int maxEntryValue;
     final BitArrayVersion next;
+    final long wordIndexMultiplier;
 
     BitArrayVersion(int bits, int entriesPerWord, BitArrayVersion next) {
         this.bits = (byte) bits;
         this.entriesPerWord = (byte) entriesPerWord;
         this.maxEntryValue = (1 << this.bits) - 1;
         this.next = next;
+        this.wordIndexMultiplier = entriesPerWord == 0 ? 0 : ((1L << 34) + entriesPerWord - 1) / entriesPerWord;
+    }
+
+    /** Exact for every nonnegative int, including palettes larger than a chunk section. */
+    int getWordIndex(int index) {
+        // 34 fractional bits give an exact quotient for every supported entriesPerWord.
+        return (int) (((long) index * this.wordIndexMultiplier) >>> 34);
     }
 
     public static BitArrayVersion get(int version, boolean read) {
