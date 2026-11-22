@@ -34,6 +34,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
+import cn.nukkit.level.format.EntityPresenceIndex;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.Anvil;
@@ -412,10 +413,18 @@ public class Level implements ChunkManager, Metadatable {
             .expireAfterWrite(1, TimeUnit.SECONDS)
             .build();
 
-    private final Cache<Long, Entity[]> nearbyEntitiesCache = Caffeine.newBuilder()
+    private final Cache<Long, Object> nearbyEntitiesCache = Caffeine.newBuilder()
             .maximumSize(4096)
             .expireAfterWrite(700, TimeUnit.MILLISECONDS)
             .build();
+
+    public record NearbyPlayerTargets(List<Player> players) {
+        private static final NearbyPlayerTargets EMPTY = new NearbyPlayerTargets(List.of());
+
+        public NearbyPlayerTargets {
+            players = List.copyOf(players);
+        }
+    }
 
     /** Live EntityRideable count in this level; lets the per-tick rideable proximity probe skip entirely when zero. */
     private final AtomicInteger rideableEntityCount = new AtomicInteger();
@@ -3689,14 +3698,62 @@ public class Level implements ChunkManager, Metadatable {
                 return new Entity[]{};
             }
             long chunkHash = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
-            Entity[] cached = this.nearbyEntitiesCache.getIfPresent(entity.getId());
-            if (entityNearbyCacheDirty.getIfPresent(chunkHash) != null || cached == null) {
-                cached = this.getNearbyEntities(bb, entity, loadChunks);
-                this.nearbyEntitiesCache.put(entity.getId(), cached);
-                entityNearbyCacheDirty.invalidate(chunkHash);
+            Object cached = this.nearbyEntitiesCache.getIfPresent(entity.getId());
+            if (entityNearbyCacheDirty.getIfPresent(chunkHash) == null && cached instanceof Entity[] entities) {
+                return entities;
             }
-            return cached;
+            // Entering breeding (or another full query) needs non-player candidates.
+            Entity[] entities = this.getNearbyEntities(bb, entity, loadChunks);
+            this.nearbyEntitiesCache.put(entity.getId(), entities);
+            entityNearbyCacheDirty.invalidate(chunkHash);
+            return entities;
         }
+    }
+
+    /**
+     * Cached candidates for native walking animals with a player-only target predicate.
+     * Uses resident entities in legacy traversal order. A null result requests the full query.
+     */
+    public NearbyPlayerTargets getNearbyPlayerTargets(AxisAlignedBB bb, Entity entity) {
+        if (entity.getLevel() != this) return NearbyPlayerTargets.EMPTY;
+        Long id = entity.getId();
+        Object cached = this.nearbyEntitiesCache.getIfPresent(id);
+        // Keep using the full entry if a breeding or extension query populated it.
+        if (cached instanceof Entity[]) return null;
+        Long chunkHash = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
+        if (entityNearbyCacheDirty.getIfPresent(chunkHash) == null && cached instanceof NearbyPlayerTargets players) {
+            return players;
+        }
+
+        int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
+        int maxX = NukkitMath.floorDouble((bb.getMaxX() + 2) * 0.0625);
+        int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
+        int maxZ = NukkitMath.floorDouble((bb.getMaxZ() + 2) * 0.0625);
+        ArrayList<Player> found = null;
+        for (int x = minX; x <= maxX; ++x) {
+            for (int z = minZ; z <= maxZ; ++z) {
+                Map<Long, Entity> chunkEntities = this.getChunkEntities(x, z, false);
+                if (!(chunkEntities instanceof EntityPresenceIndex indexed)) {
+                    if (chunkEntities.isEmpty()) continue;
+                    return null;
+                }
+                List<Player> players = indexed.playersInIterationOrder();
+                if (players == null) return null;
+                for (int i = 0; i < players.size(); i++) {
+                    Player player = players.get(i);
+                    if (player.boundingBox.intersectsWith(bb)) {
+                        // A custom player's callbacks can change the animal's targeting mode.
+                        if (player.getClass() != Player.class) return null;
+                        if (found == null) found = new ArrayList<>();
+                        found.add(player);
+                    }
+                }
+            }
+        }
+        NearbyPlayerTargets players = found == null ? NearbyPlayerTargets.EMPTY : new NearbyPlayerTargets(found);
+        this.nearbyEntitiesCache.put(id, players);
+        entityNearbyCacheDirty.invalidate(chunkHash);
+        return players;
     }
 
     public void setDirtyNearby(Entity entity) {

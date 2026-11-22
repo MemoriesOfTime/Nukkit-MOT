@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.Player;
 import cn.nukkit.block.*;
 import cn.nukkit.entity.mob.EntityDrowned;
 import cn.nukkit.entity.passive.EntityIronGolem;
@@ -12,6 +13,8 @@ import cn.nukkit.entity.route.RouteFinderThreadPool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
+import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
@@ -22,8 +25,11 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.List;
+
 public abstract class EntityWalking extends BaseEntity {
     private static final double FLOW_MULTIPLIER = 0.1;
+    private SimpleAxisAlignedBB targetSearchBox;
 
     @Getter
     @Setter
@@ -50,27 +56,7 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         if (searchForTarget) {
-            for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
-                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
-                    continue;
-                }
-
-                if (creature instanceof BaseEntity baseEntity && baseEntity.isFriendly() == this.isFriendly() && !this.isInLove()) {
-                    continue;
-                }
-
-                double distance = this.distanceSquared(creature);
-                if (!this.targetOption(creature, distance)) {
-                    continue;
-                }
-
-                this.stayTime = 0;
-                this.moveTime = 0;
-                this.followTarget = creature;
-                if (this.route == null && this.passengers.isEmpty()) {
-                    this.target = creature;
-                }
-            }
+            this.acquireTarget();
         }
 
         if (!this.canSetTemporalTarget()) {
@@ -117,6 +103,54 @@ public abstract class EntityWalking extends BaseEntity {
                 return;
             }
             this.target = new Vector3(tx, this.y + Utils.rand(-20.0, 20.0) / 10, tz);
+        }
+    }
+
+    private void acquireTarget() {
+        Level level = this.getLevel();
+        // Preserve clone/grow overrides and boxes retained by custom queries.
+        if (this.boundingBox.getClass() != SimpleAxisAlignedBB.class || !EntityRanges.hasNativeNearbyQuery(level)) {
+            this.acquireFromEntities(level, EntityRanges.createTargetSearchBox(this));
+            return;
+        }
+        if (this.targetSearchBox == null) {
+            this.targetSearchBox = new SimpleAxisAlignedBB(0, 0, 0, 0, 0, 0);
+        }
+        AxisAlignedBB searchBox = EntityRanges.updateTargetSearchBox(this, this.targetSearchBox);
+        Level.NearbyPlayerTargets nearby = EntityRanges.targetsOnlyPlayersWhenNotInLove(this)
+                ? level.getNearbyPlayerTargets(searchBox, this) : null;
+        if (nearby != null) {
+            List<Player> players = nearby.players();
+            for (int i = 0; i < players.size(); i++) {
+                this.considerTarget(players.get(i));
+            }
+        } else {
+            this.acquireFromEntities(level, searchBox);
+        }
+    }
+
+    private void acquireFromEntities(Level level, AxisAlignedBB box) {
+        for (Entity entity : level.getNearbyEntities(box, this, false, true)) {
+            this.considerTarget(entity);
+        }
+    }
+
+    private void considerTarget(Entity entity) {
+        if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+            return;
+        }
+        if (creature instanceof BaseEntity baseEntity && baseEntity.isFriendly() == this.isFriendly() && !this.isInLove()) {
+            return;
+        }
+        double distance = this.distanceSquared(creature);
+        if (!this.targetOption(creature, distance)) {
+            return;
+        }
+        this.stayTime = 0;
+        this.moveTime = 0;
+        this.followTarget = creature;
+        if (this.route == null && this.passengers.isEmpty()) {
+            this.target = creature;
         }
     }
 
