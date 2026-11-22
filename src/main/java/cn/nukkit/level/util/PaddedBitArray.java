@@ -21,11 +21,13 @@ public class PaddedBitArray implements BitArray {
      * Number of entries in this palette (<b>not</b> the length of the words array that internally backs this palette)
      */
     private final int size;
+    private final long wordIndexMultiplier;
 
     PaddedBitArray(BitArrayVersion version, int size, int[] words) {
         this.size = size;
         this.version = version;
         this.words = words;
+        this.wordIndexMultiplier = version.wordIndexMultiplier;
         int expectedWordsLength = MathHelper.ceil((float) size / version.entriesPerWord);
         if (words.length != expectedWordsLength) {
             throw new IllegalArgumentException("Invalid length given for storage, got: " + words.length +
@@ -38,8 +40,8 @@ public class PaddedBitArray implements BitArray {
         Preconditions.checkElementIndex(index, this.size);
         Preconditions.checkArgument(value >= 0 && value <= this.version.maxEntryValue,
                 "Max value: %s. Received value", this.version.maxEntryValue, value);
-        int arrayIndex = index / this.version.entriesPerWord;
-        int offset = (index % this.version.entriesPerWord) * this.version.bits;
+        int arrayIndex = (int) (((long) index * this.wordIndexMultiplier) >>> 34);
+        int offset = (index - arrayIndex * this.version.entriesPerWord) * this.version.bits;
 
         this.words[arrayIndex] = this.words[arrayIndex] & ~(this.version.maxEntryValue << offset) | (value & this.version.maxEntryValue) << offset;
     }
@@ -47,8 +49,8 @@ public class PaddedBitArray implements BitArray {
     @Override
     public int get(int index) {
         Preconditions.checkElementIndex(index, this.size);
-        int arrayIndex = index / this.version.entriesPerWord;
-        int offset = (index % this.version.entriesPerWord) * this.version.bits;
+        int arrayIndex = (int) (((long) index * this.wordIndexMultiplier) >>> 34);
+        int offset = (index - arrayIndex * this.version.entriesPerWord) * this.version.bits;
 
         return (this.words[arrayIndex] >>> offset) & this.version.maxEntryValue;
     }

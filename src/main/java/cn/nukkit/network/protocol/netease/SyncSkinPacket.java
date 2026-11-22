@@ -119,6 +119,10 @@ public class SyncSkinPacket extends DataPacket {
             this.putString(entry.string3 != null ? entry.string3 : "");
         }
         // 尾部 SerializedSkin
+        int skinReserve = estimatedSkinSize(this.gameVersion, this.skin);
+        if (skinReserve > 0) {
+            this.reserve(skinReserve);
+        }
         this.putSkin(this.gameVersion, this.skin);
     }
 

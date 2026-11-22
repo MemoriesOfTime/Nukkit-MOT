@@ -170,6 +170,24 @@ public class NBTOutputStream implements DataOutput, AutoCloseable {
         this.stream.write(buffer.array());
     }
 
+    /**
+     * 写入带长度前缀的 long 数组；定宽编码一次批量写出，网络 VarLong 无固定宽度仍逐元素写。
+     * Writes a length-prefixed long array; fixed-width payloads go out in one bulk write while
+     * network VarLongs stay element-wise because they have no fixed width.
+     */
+    public void writeLongArray(long[] data) throws IOException {
+        this.writeInt(data.length);
+        if (network) {
+            for (long value : data) {
+                VarInt.writeVarLong(this.stream, value);
+            }
+            return;
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(data.length * Long.BYTES).order(this.endianness);
+        buffer.asLongBuffer().put(data);
+        this.stream.write(buffer.array());
+    }
+
     public void writeTag(Tag tag) throws IOException {
         this.writeTag(tag, 16);
     }
@@ -220,6 +238,8 @@ public class NBTOutputStream implements DataOutput, AutoCloseable {
                     this.writeInt(byteArray.length);
                     this.write(byteArray);
                 }
+                case Tag.TAG_Int_Array -> this.writeIntArray((int[]) tag.parseValue());
+                case Tag.TAG_Long_Array -> this.writeLongArray((long[]) tag.parseValue());
                 case Tag.TAG_String -> {
                     String string = (String) tag.parseValue();
                     this.writeUTF(string);
