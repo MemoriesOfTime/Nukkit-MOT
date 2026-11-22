@@ -1474,7 +1474,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             return null;
         }
 
-        for (CompoundTag entry : this.getNamedTag().getList("ench", CompoundTag.class).getAll()) {
+        ListTag<CompoundTag> enchantments = this.getNamedTag().getList("ench", CompoundTag.class);
+        CompoundTag singleEntry = singleEnchantmentEntry(enchantments);
+        if (singleEntry != null) {
+            return findEnchantment(singleEntry, id);
+        }
+
+        for (CompoundTag entry : enchantments.getAll()) {
             if (entry.getShort("id") == id) {
                 Enchantment e = Enchantment.getEnchantment(entry.getShort("id"));
                 if (e != null) {
@@ -1485,6 +1491,32 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         return null;
+    }
+
+    private static CompoundTag singleEnchantmentEntry(ListTag<CompoundTag> enchantments) {
+        if (enchantments.getClass() == ListTag.class) {
+            List<CompoundTag> entries = enchantments.getAllUnsafe();
+            if (entries.getClass() == ArrayList.class && entries.size() == 1) {
+                // The sole reference is the whole snapshot, even if a custom tag mutates the list during lookup.
+                try {
+                    return entries.get(0);
+                } catch (IndexOutOfBoundsException ignored) {
+                    // A retained list may have been cleared. Re-read through the normal snapshot path.
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Enchantment findEnchantment(CompoundTag entry, short id) {
+        if (entry.getShort("id") != id) {
+            return null;
+        }
+        Enchantment enchantment = Enchantment.getEnchantment(entry.getShort("id"));
+        if (enchantment != null) {
+            enchantment.setLevel(entry.getShort("lvl"), Server.getInstance().forcedSafetyEnchant);
+        }
+        return enchantment;
     }
 
     public void addEnchantment(Enchantment... enchantments) {
