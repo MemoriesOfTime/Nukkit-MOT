@@ -47,6 +47,11 @@ public class LevelChunkPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
+        long estimated = (this.data != null ? (long) this.data.length : 0L)
+                + (this.blobIds != null ? (long) this.blobIds.length * Long.BYTES : 0L) + 32L;
+        if (estimated <= Integer.MAX_VALUE - this.getCount()) {
+            this.reserve((int) estimated);
+        }
         this.putVarInt(this.chunkX);
         this.putVarInt(this.chunkZ);
         if (protocol >= ProtocolInfo.v1_20_60) {

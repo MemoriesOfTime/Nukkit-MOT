@@ -126,6 +126,7 @@ public class BinaryStream {
     public void setBuffer(byte[] buffer) {
         this.buffer = buffer;
         this.count = buffer == null ? -1 : buffer.length;
+        this.onBufferChanged();
     }
 
     public void setBuffer(byte[] buffer, int offset) {
@@ -206,6 +207,23 @@ public class BinaryStream {
 
         System.arraycopy(bytes, 0, this.buffer, this.count, bytes.length);
         this.count += bytes.length;
+    }
+
+    public void put(byte[] bytes, int offset, int length) {
+        if (bytes == null) {
+            return;
+        }
+        Objects.checkFromIndexSize(offset, length, bytes.length);
+        if (!directByteWrite) {
+            this.put(Arrays.copyOfRange(bytes, offset, offset + length));
+            return;
+        }
+        if (length == 0) {
+            return;
+        }
+        this.ensureCapacity(Math.addExact(this.count, length));
+        System.arraycopy(bytes, offset, this.buffer, this.count, length);
+        this.count += length;
     }
 
     public long getLong() {
@@ -2638,6 +2656,10 @@ public class BinaryStream {
             newCapacity = hugeCapacity(minCapacity);
         }
         this.buffer = Arrays.copyOf(buffer, newCapacity);
+        this.onBufferChanged();
+    }
+
+    void onBufferChanged() {
     }
 
     private static int hugeCapacity(int minCapacity) {
