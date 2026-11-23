@@ -56,6 +56,8 @@ public class RuntimeItemMapping {
     private final ArrayList<String> customItems = new ArrayList<>();
 
     private byte[] itemPalette;
+    // Guarded by this, together with palette mutations and publication.
+    private boolean itemPaletteDirty;
 
     private static final ByteOrder[] BLOCK_STATE_BYTE_ORDERS = {
             ByteOrder.LITTLE_ENDIAN,
@@ -194,7 +196,7 @@ public class RuntimeItemMapping {
         this.registerItem(identifier, runtimeId, legacyId, damage, false);
     }
 
-    public void registerItem(String identifier, int runtimeId, int legacyId, int damage, boolean hasDamage) {
+    public synchronized void registerItem(String identifier, int runtimeId, int legacyId, int damage, boolean hasDamage) {
         int fullId = this.getFullId(legacyId, damage);
         LegacyEntry legacyEntry = new LegacyEntry(legacyId, hasDamage, damage);
 
@@ -215,10 +217,11 @@ public class RuntimeItemMapping {
             RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage);
             this.legacy2Runtime.put(fullId, runtimeEntry);
             this.itemPaletteEntries.add(runtimeEntry);
+            this.itemPaletteDirty = true;
         }
     }
 
-    public void registerCustomBlockItem(String identifier, int legacyId, int damage) {
+    public synchronized void registerCustomBlockItem(String identifier, int legacyId, int damage) {
         int fullId = this.getFullId(legacyId, damage);
         LegacyEntry legacyEntry = new LegacyEntry(legacyId, false, damage);
 
@@ -241,6 +244,7 @@ public class RuntimeItemMapping {
             RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, legacyId, false, true);
             this.legacy2Runtime.put(fullId, runtimeEntry);
             this.itemPaletteEntries.add(runtimeEntry);
+            this.itemPaletteDirty = true;
         }
     }
 
@@ -260,7 +264,7 @@ public class RuntimeItemMapping {
             this.runtimeId2Name.put(runtimeId, namespaceId);
             this.name2RuntimeId.put(namespaceId, runtimeId);
 
-            this.generatePalette();
+            this.itemPaletteDirty = true;
         }
         return true;
     }
@@ -281,7 +285,7 @@ public class RuntimeItemMapping {
         this.name2RuntimeId.removeInt(customItem.getNamespaceId());
         this.itemPaletteEntries.removeIf(next -> next.getIdentifier().equals(customItem.getNamespaceId()));
 
-        this.generatePalette();
+        this.itemPaletteDirty = true;
     }
 
     public ArrayList<String> getCustomItems() {
@@ -297,7 +301,7 @@ public class RuntimeItemMapping {
         this.legacy2Runtime.put(fullId, new RuntimeEntry(identifier, legacyId, false));
     }
 
-    public void generatePalette() {
+    public synchronized void generatePalette() {
         BinaryStream paletteBuffer = new BinaryStream();
         int size = 0;
         for (RuntimeEntry entry : this.itemPaletteEntries) {
@@ -324,6 +328,7 @@ public class RuntimeItemMapping {
             }
         }
         this.itemPalette = paletteBuffer.getBuffer();
+        this.itemPaletteDirty = false;
     }
 
     public LegacyEntry fromRuntime(int runtimeId) {
@@ -612,7 +617,10 @@ public class RuntimeItemMapping {
         return runtimeEntry.runtimeId;
     }
 
-    public byte[] getItemPalette() {
+    public synchronized byte[] getItemPalette() {
+        if (this.itemPaletteDirty) {
+            this.generatePalette();
+        }
         return this.itemPalette;
     }
 
