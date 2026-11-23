@@ -52,6 +52,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private static final ThreadLocal<byte[]> CHECKSUM_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
     // Separate from the received trailer: verification still needs CHECKSUM_LOCAL after hashing.
     private static final ThreadLocal<byte[]> CHECKSUM_COUNTER_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
+    private static final ThreadLocal<byte[]> COMPRESSION_PREFIX_LOCAL = ThreadLocal.withInitial(() -> new byte[1]);
     /** Maximum packet work one player may force onto one server tick. The tail stays queued. */
     static final int MAX_INBOUND_PACKETS_PER_SERVER_TICK = 120;
     /** Maximum decoded payload work one player may force onto one server tick. */
@@ -104,6 +105,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private boolean prefixUnavailableClosed;
 
     private SecretKey encryptionKey;
+    private byte[] encryptionKeyBytes;
     private Cipher encryptionCipher;
     private Cipher decryptionCipher;
     private final AtomicLong encryptCounter = new AtomicLong();
@@ -504,18 +506,23 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
         if (this.encryptionCipher != null) {
             try {
-                byte[] fullPayload = ci ? new byte[compressedPayload.length + 1] : compressedPayload;
+                ByteBuf compressed = Unpooled.wrappedBuffer(compressedPayload);
+                byte[] prefix = null;
                 if (ci) {
-                    fullPayload[0] = this.compressionOut.getPrefix();
-                    System.arraycopy(compressedPayload, 0, fullPayload, 1, compressedPayload.length);
+                    prefix = COMPRESSION_PREFIX_LOCAL.get();
+                    prefix[0] = this.compressionOut.getPrefix();
                 }
-                ByteBuf compressed = Unpooled.wrappedBuffer(fullPayload);
-                ByteBuffer trailer = ByteBuffer.wrap(this.calculateChecksum(this.encryptCounter.getAndIncrement(), compressed));
-                ByteBuffer outBuffer = finalPayload.internalNioBuffer(1, compressed.readableBytes() + 8);
+                ByteBuffer trailer = ByteBuffer.wrap(this.calculateChecksum(
+                        this.encryptCounter.getAndIncrement(), compressed, prefix));
+                ByteBuffer outBuffer = finalPayload.internalNioBuffer(
+                        1, compressed.readableBytes() + (ci ? 1 : 0) + 8);
+                if (ci) {
+                    this.encryptionCipher.update(ByteBuffer.wrap(prefix), outBuffer);
+                }
                 ByteBuffer inBuffer = compressed.internalNioBuffer(compressed.readerIndex(), compressed.readableBytes());
                 this.encryptionCipher.update(inBuffer, outBuffer);
                 this.encryptionCipher.update(trailer, outBuffer);
-                finalPayload.writerIndex(finalPayload.writerIndex() + compressed.readableBytes() + 8);
+                finalPayload.writerIndex(finalPayload.writerIndex() + compressed.readableBytes() + (ci ? 1 : 0) + 8);
             } catch (Exception e) {
                 log.error("Packet encryption failed for {}", player.getName(), e);
             }
@@ -660,6 +667,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     @Override
     public void setEncryption(SecretKey encryptionKey, Cipher encryptionCipher, Cipher decryptionCipher) {
         this.encryptionKey = encryptionKey;
+        byte[] encodedKey = encryptionKey == null ? null : encryptionKey.getEncoded();
+        this.encryptionKeyBytes = encodedKey == null ? null : encodedKey.clone();
         this.encryptionCipher = encryptionCipher;
         this.decryptionCipher = decryptionCipher;
         this.state.getSecurity().setEncryptionEnabled(encryptionKey != null && encryptionCipher != null && decryptionCipher != null);
@@ -675,6 +684,10 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private byte[] calculateChecksum(long count, ByteBuf payload) {
+        return this.calculateChecksum(count, payload, null);
+    }
+
+    private byte[] calculateChecksum(long count, ByteBuf payload, byte[] prefix) {
         Sha256 hash = HASH_LOCAL.get();
         byte[] counter = CHECKSUM_COUNTER_LOCAL.get();
         try {
@@ -682,10 +695,12 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             for (int i = 0; i < Long.BYTES; i++) {
                 counter[i] = (byte) (count >>> (i * Byte.SIZE));
             }
-            ByteBuffer keyBuffer = ByteBuffer.wrap(this.encryptionKey.getEncoded());
             hash.update(counter);
+            if (prefix != null) {
+                hash.update(prefix);
+            }
             hash.update(payload.internalNioBuffer(payload.readerIndex(), payload.readableBytes()));
-            hash.update(keyBuffer);
+            hash.update(this.encryptionKeyBytes);
             byte[] digested = hash.digest();
             return Arrays.copyOf(digested, 8);
         } finally {
