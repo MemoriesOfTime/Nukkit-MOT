@@ -139,10 +139,12 @@ public class Level implements ChunkManager, Metadatable {
     public static final int MAX_BLOCK_CACHE = 1024;
 
     // The blocks that can randomly tick
-    private static final boolean[] randomTickBlocks = new boolean[Block.MAX_BLOCK_ID];
+    private static volatile RandomTickPolicy randomTickPolicy =
+            new RandomTickPolicy(new boolean[Block.MAX_BLOCK_ID], 0);
     public static final boolean[] xrayableBlocks = new boolean[Block.MAX_BLOCK_ID];
 
     static {
+        boolean[] randomTickBlocks = randomTickPolicy.blocks;
         randomTickBlocks[Block.GRASS] = true;
         randomTickBlocks[Block.FARMLAND] = true;
         randomTickBlocks[Block.MYCELIUM] = true;
@@ -1855,8 +1857,26 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public static boolean isRandomTickBlock(int blockId) {
+        boolean[] randomTickBlocks = randomTickPolicy.blocks;
         return blockId >= 0 && blockId < randomTickBlocks.length && randomTickBlocks[blockId];
     }
+
+    public static long getRandomTickPaletteEpoch() {
+        return randomTickPolicy.epoch;
+    }
+
+    public static synchronized void setCanRandomTick(int blockId, boolean enabled) {
+        RandomTickPolicy current = randomTickPolicy;
+        Objects.checkIndex(blockId, current.blocks.length);
+        boolean[] blocks = current.blocks;
+        if (blocks[blockId] != enabled) {
+            blocks = blocks.clone();
+            blocks[blockId] = enabled;
+        }
+        randomTickPolicy = new RandomTickPolicy(blocks, current.epoch + 1);
+    }
+
+    private record RandomTickPolicy(boolean[] blocks, long epoch) {}
 
     private void tickChunks() {
         if (this.chunksPerTicks <= 0 || this.loaders.isEmpty()) {
@@ -1968,7 +1988,7 @@ public class Level implements ChunkManager, Metadatable {
                                 int[] state = chunk.getBlockState(x, y + (Y << 4), z);
                                 int blockId = state[0];
                                 blockTest |= blockId != 0 && state[1] != 0;
-                                if (blockId <= Block.MAX_BLOCK_ID && Level.randomTickBlocks[blockId]) {
+                                if (isRandomTickBlock(blockId)) {
                                     Block block = Block.get(blockId, state[1], this, x, y + (Y << 4), z);
                                     block.onUpdate(BLOCK_UPDATE_RANDOM);
                                 }

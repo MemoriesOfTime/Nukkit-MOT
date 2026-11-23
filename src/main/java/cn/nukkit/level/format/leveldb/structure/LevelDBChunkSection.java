@@ -44,9 +44,10 @@ public class LevelDBChunkSection implements ChunkSection {
     // Lock-free reads: the array is replaced as a whole and published by one volatile store (see createLayerUnsafe).
     protected volatile StateBlockStorage[] storages;
 
-    // Positive-only memo. Storage replacement or mutation must recheck the palette.
-    private volatile StateBlockStorage randomTickStorage;
-    private volatile int randomTickStorageVersion;
+    // Positive-only memo. The storage owns any negative, including its write-lock validation.
+    private volatile RandomTickMemo randomTickMemo;
+
+    private record RandomTickMemo(StateBlockStorage storage, int version, long epoch) {}
 
 
     protected byte[] blockLight;
@@ -830,8 +831,10 @@ public class LevelDBChunkSection implements ChunkSection {
         }
         StateBlockStorage[] current = this.storages;
         StateBlockStorage storage = current.length == 0 ? null : current[0];
-        if (storage != null && storage == this.randomTickStorage
-                && storage.getVersion() == this.randomTickStorageVersion) {
+        long epoch = Level.getRandomTickPaletteEpoch();
+        RandomTickMemo memo = this.randomTickMemo;
+        if (memo != null && storage == memo.storage && epoch == memo.epoch
+                && storage.getVersion() == memo.version) {
             return true;
         }
         // A busy writer is not evidence of an empty section. Fall back to the usual samples.
@@ -840,14 +843,20 @@ public class LevelDBChunkSection implements ChunkSection {
         }
         try {
             storage = this.hasLayerUnsafe(0) ? this.storages[0] : null;
-            if (storage != null && storage.mayHaveRandomTickBlocks()) {
-                this.randomTickStorageVersion = storage.getVersion();
-                this.randomTickStorage = storage;
-                return true;
+            if (storage != null) {
+                if (storage.getClass() != StateBlockStorage.class) {
+                    return true;
+                }
+                int version = storage.getVersion();
+                switch (storage.randomTickPaletteStatus()) {
+                    case RETRY -> { return true; }
+                    case ACTIVE -> {
+                        this.randomTickMemo = new RandomTickMemo(storage, version, epoch);
+                        return true;
+                    }
+                }
             }
-            // Never memoize a negative: borrowed data and dynamic mappings can change
-            // without the storage mutation counter.
-            this.randomTickStorage = null;
+            this.randomTickMemo = null;
             return false;
         } finally {
             this.readLock.unlock();

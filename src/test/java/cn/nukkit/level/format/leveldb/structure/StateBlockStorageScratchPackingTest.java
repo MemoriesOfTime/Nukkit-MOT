@@ -142,7 +142,9 @@ class StateBlockStorageScratchPackingTest {
 
     private static void runCleanChildProbe() throws Exception {
         String javaBin = java.nio.file.Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        Process proc = new ProcessBuilder(javaBin, "-cp", System.getProperty("java.class.path"),
+        Process proc = new ProcessBuilder(javaBin,
+                "-javaagent:" + java.nio.file.Path.of(org.mockito.Mockito.class.getProtectionDomain().getCodeSource().getLocation().toURI()),
+                "-cp", System.getProperty("java.class.path"),
                 StateBlockStorageScratchPackingTest.class.getName())
                 .redirectErrorStream(true)
                 .start();

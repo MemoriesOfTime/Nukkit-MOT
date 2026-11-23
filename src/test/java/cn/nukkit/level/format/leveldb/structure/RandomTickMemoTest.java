@@ -49,10 +49,10 @@ class RandomTickMemoTest {
     }
 
     @Test
-    void largeInertPaletteFallsBackThenCompactionRestoresSkippingAndInsertionRestoresTicks() {
-        StateBlockStorage data = largeStorage(false);
+    void largeInertPaletteSkipsBeforeAndAfterCompactionAndInsertionRestoresTicks() {
+        StateBlockStorage data = largeStorage(false).copy();
         LevelDBChunkSection section = section(data);
-        assertTrue(section.mayHaveRandomTickBlocks(), "seventeen entries retain bounded-probe fallback");
+        assertFalse(section.mayHaveRandomTickBlocks(), "seventeen inert entries no longer require random samples");
         assertTrue(data.compress());
         assertFalse(section.mayHaveRandomTickBlocks(), "collapsed inert palette must no longer stay active forever");
         data.set(123, state(BlockID.GRASS));
