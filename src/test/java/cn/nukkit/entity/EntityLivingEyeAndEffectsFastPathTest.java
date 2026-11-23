@@ -137,6 +137,40 @@ class EntityLivingEyeAndEffectsFastPathTest {
     }
 
     @Test
+    void tickKeepsCapturedEffectsWhenCallbackMutatesTrackedMap() {
+        for (int count : new int[]{2, 17}) {
+            PlainLiving actor = new Fixture().actor;
+            actor.noClip = true;
+            actor.setAirTicks(300);
+            Map<Integer, Effect> activeEffects = actor.getEffects();
+            Effect removed = new Effect(Effect.SPEED, "removed", 0, 0, 0).setDuration(100);
+            Effect replacement = new Effect(Effect.SPEED, "replacement", 0, 0, 0).setDuration(100);
+            Effect mutator = new Effect(Effect.SPEED, "mutator", 0, 0, 0) {
+                @Override
+                public boolean canTick() {
+                    return true;
+                }
+
+                @Override
+                public void applyEffect(Entity entity) {
+                    assertSame(removed, activeEffects.put(count - 1, replacement));
+                }
+            }.setDuration(100);
+            activeEffects.put(0, mutator);
+            for (int key = 1; key < count - 1; key++) {
+                activeEffects.put(key, new Effect(Effect.SPEED, "witness", 0, 0, 0).setDuration(100));
+            }
+            activeEffects.put(count - 1, removed);
+
+            actor.entityBaseTick(1);
+
+            assertEquals(99, removed.getDuration());
+            assertEquals(100, replacement.getDuration());
+            assertSame(replacement, activeEffects.get(count - 1));
+        }
+    }
+
+    @Test
     void dryLivingEntitySkipsBubbleColumnAndNonDamagingFloorBlockMaterialization() {
         Fixture fixture = new Fixture();
         PlainLiving dry = spy(fixture.actor);

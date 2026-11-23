@@ -546,6 +546,41 @@ public abstract class Entity extends Location implements Metadatable {
             if (!isEmpty()) backing.clear();
         }
 
+        private Effect[] copyTickSnapshot(Effect[] buffer) {
+            Iterator<?> iterator = backing.values().iterator();
+            // Preserve the typed array store check even for a value inserted through a raw view.
+            Object[] values = buffer;
+            int size = 0;
+            while (iterator.hasNext()) {
+                if (size == buffer.length) {
+                    return copyOverflowSnapshot(buffer, iterator);
+                }
+                values[size++] = iterator.next();
+            }
+            if (size < buffer.length) {
+                buffer[size] = null;
+            }
+            return buffer;
+        }
+
+        private Effect[] copyOverflowSnapshot(Effect[] buffer, Iterator<?> iterator) {
+            int size = buffer.length;
+            // Read a size hint only after the bounded tick buffer is full.
+            Effect[] snapshot = Arrays.copyOf(buffer, Math.max(size + 1, backing.size()));
+            Object[] values = snapshot;
+            do {
+                if (size == snapshot.length) {
+                    if (size == Integer.MAX_VALUE) {
+                        throw new OutOfMemoryError("Required array size too large");
+                    }
+                    int capacity = (int) Math.min(Integer.MAX_VALUE, (long) size + (size >> 1) + 1);
+                    values = snapshot = Arrays.copyOf(snapshot, capacity);
+                }
+                values[size++] = iterator.next();
+            } while (iterator.hasNext());
+            return size == snapshot.length ? snapshot : Arrays.copyOf(snapshot, size);
+        }
+
         @Override
         public Collection<Effect> values() {
             Collection<Effect> v = valuesView;
@@ -2339,7 +2374,10 @@ public abstract class Entity extends Location implements Metadatable {
             }
             Effect[] snapshot = null;
             try {
-                snapshot = this.effects.values().toArray(ownsBuffer ? lease.effects : new Effect[0]);
+                Effect[] buffer = ownsBuffer ? lease.effects : new Effect[0];
+                snapshot = ownsBuffer && this.effects instanceof TrackedEffectMap tracked
+                        ? tracked.copyTickSnapshot(buffer)
+                        : this.effects.values().toArray(buffer);
                 for (Effect effect : snapshot) {
                     if (snapshot == lease.effects && effect == null) {
                         break;
