@@ -7,13 +7,22 @@ import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.mob.EntityMob;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ShortTag;
 import cn.nukkit.utils.Utils;
 
+import java.util.Map;
+
 public class BlockEntitySpawner extends BlockEntitySpawnable {
+
+    /**
+     * Chunk rectangles up to this size are probed coordinate by coordinate. Larger custom ranges
+     * compare against the loaded chunk set and filter it instead, so empty coordinates are skipped.
+     */
+    private static final int MAX_PROBED_CHUNKS = 64;
 
     private int entityId;
     private int spawnRange;
@@ -109,14 +118,36 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
 
             int nearbyEntities = 0;
             boolean playerInRange = false;
-            for (Entity entity : this.level.getEntities()) {
-                if (!playerInRange && entity instanceof Player && !((Player) entity).isSpectator()) {
-                    if (entity.distanceSquared(this) <= this.requiredPlayerRange2) {
-                        playerInRange = true;
+            for (Player player : this.level.getPlayers().values()) {
+                if (!player.isSpectator() && player.distanceSquared(this) <= this.requiredPlayerRange2) {
+                    playerInRange = true;
+                    break;
+                }
+            }
+            if (playerInRange) {
+                // Keep the original squared radius, including negative/custom range settings.
+                double radius = Math.sqrt(this.requiredPlayerRange2);
+                int minChunkX = (int) Math.floor(this.x - radius) >> 4;
+                int minChunkZ = (int) Math.floor(this.z - radius) >> 4;
+                // checkChunks() truncates negative fractions; creation can use floor instead.
+                int maxChunkX = (int) (this.x + radius) >> 4;
+                int maxChunkZ = (int) (this.z + radius) >> 4;
+                long chunkCount = (long) (maxChunkX - minChunkX + 1) * (maxChunkZ - minChunkZ + 1);
+                Map<Long, ? extends FullChunk> loaded = chunkCount > MAX_PROBED_CHUNKS ? this.level.getChunks() : null;
+                if (loaded != null && chunkCount > loaded.size()) {
+                    // Large custom ranges must not probe millions of empty chunk coordinates.
+                    for (long hash : loaded.keySet()) {
+                        int chunkX = Level.getHashX(hash);
+                        int chunkZ = Level.getHashZ(hash);
+                        if (chunkX >= minChunkX && chunkX <= maxChunkX && chunkZ >= minChunkZ && chunkZ <= maxChunkZ) {
+                            nearbyEntities += this.countNearbyEntitiesInChunk(chunkX, chunkZ);
+                        }
                     }
-                } else if (entity instanceof BaseEntity) {
-                    if (entity.distanceSquared(this) <= this.requiredPlayerRange2) {
-                        nearbyEntities++;
+                } else {
+                    for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                        for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                            nearbyEntities += this.countNearbyEntitiesInChunk(chunkX, chunkZ);
+                        }
                     }
                 }
             }
@@ -162,6 +193,16 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
         }
 
         return true;
+    }
+
+    private int countNearbyEntitiesInChunk(int chunkX, int chunkZ) {
+        int count = 0;
+        for (Entity entity : this.level.getChunkEntities(chunkX, chunkZ, false).values()) {
+            if (entity instanceof BaseEntity && entity.distanceSquared(this) <= this.requiredPlayerRange2) {
+                count++;
+            }
+        }
+        return count;
     }
 
     @Override
