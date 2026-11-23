@@ -4,6 +4,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.network.process.processor.common.RequestChunkRadiusProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.NetworkChunkPublisherUpdatePacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RequestChunkRadiusPacket;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
@@ -19,6 +20,22 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class PlayerRadiusLifecycleTest {
+    @Test
+    void unchangedEmptyViewMeetsChunkOrderSkipConditions() {
+        Level level = mock(Level.class);
+        Player.ChunkOrderState state = new Player.ChunkOrderState(level, 3, 1, 2, 12, 12, true);
+
+        assertTrue(Player.shouldSkipChunkOrdering(true, false, true, true, false, state, state));
+        assertFalse(Player.shouldSkipChunkOrdering(false, false, true, true, false, state, state));
+        assertFalse(Player.shouldSkipChunkOrdering(true, true, true, true, false, state, state));
+        assertFalse(Player.shouldSkipChunkOrdering(true, false, false, true, false, state, state));
+        assertFalse(Player.shouldSkipChunkOrdering(true, false, true, false, false, state, state));
+        assertFalse(Player.shouldSkipChunkOrdering(true, false, true, true, true, state, state));
+
+        Player.ChunkOrderState moved = new Player.ChunkOrderState(level, 3, 2, 2, 12, 12, true);
+        assertFalse(Player.shouldSkipChunkOrdering(true, false, true, true, false, moved, state));
+    }
+
     @Test
     void clientCanGrowAgainAfterShrinkingWithinConfiguredLimit() throws Exception {
         Fixture f = new Fixture();
@@ -58,6 +75,83 @@ class PlayerRadiusLifecycleTest {
     }
 
     @Test
+    void unchangedEmptyViewSkipsQueueRebuildForSupportedProtocols() throws Exception {
+        List<Integer> protocols = ProtocolInfo.SUPPORTED_PROTOCOLS.stream()
+                .filter(protocol -> protocol >= ProtocolInfo.v1_20_0_23
+                        && protocol <= ProtocolInfo.v1_26_60)
+                .toList();
+        assertFalse(protocols.isEmpty());
+
+        for (int protocol : protocols) {
+            Fixture f = new Fixture();
+            f.player.protocol = protocol;
+            TrackingLoadQueue loadQueue = new TrackingLoadQueue();
+            field(f.player, "loadQueue", loadQueue);
+            f.player.orderChunks();
+            for (long index : loadQueue) f.player.usedChunks.put(index, Boolean.TRUE);
+            loadQueue.clear();
+            loadQueue.clearCalls = 0;
+
+            f.player.orderChunks();
+
+            assertEquals(0, loadQueue.clearCalls,
+                    "unchanged idle ordering must leave the queue intact for protocol " + protocol);
+        }
+    }
+
+    @Test
+    void changedPendingTrackedChunkInvalidatesIdleOrderingShortcut() throws Exception {
+        Fixture f = new Fixture();
+        long changedIndex = Level.chunkHash(0, 0);
+        f.player.orderChunks();
+        for (long index : f.player.loadQueue) {
+            f.player.usedChunks.put(index, index == changedIndex ? Boolean.FALSE : Boolean.TRUE);
+        }
+        f.player.loadQueue.clear();
+
+        cn.nukkit.level.format.FullChunk changedChunk = mock(cn.nukkit.level.format.FullChunk.class);
+        when(changedChunk.getX()).thenReturn(0);
+        when(changedChunk.getZ()).thenReturn(0);
+        f.player.onChunkChanged(changedChunk);
+        f.player.orderChunks();
+
+        assertTrue(f.player.loadQueue.contains(changedIndex), "invalidated chunk must be requested again");
+    }
+
+    @Test
+    void unloadingTrackedChunkInvalidatesIdleOrderingShortcut() throws Exception {
+        Fixture f = new Fixture();
+        long unloadedIndex = Level.chunkHash(0, 0);
+        f.player.orderChunks();
+        for (long index : f.player.loadQueue) f.player.usedChunks.put(index, Boolean.TRUE);
+        f.player.loadQueue.clear();
+        f.player.orderChunks();
+
+        f.player.unloadChunk(0, 0);
+        f.player.orderChunks();
+
+        assertTrue(f.player.loadQueue.contains(unloadedIndex), "unloaded chunk must be requested again");
+    }
+
+    @Test
+    void removingQueuedChunkInvalidatesIdleOrderingShortcut() throws Exception {
+        Fixture f = new Fixture();
+        long queuedIndex = Level.chunkHash(0, 0);
+        f.player.orderChunks();
+        for (long index : f.player.loadQueue) {
+            if (index != queuedIndex) f.player.usedChunks.put(index, Boolean.TRUE);
+        }
+        f.player.loadQueue.clear();
+        f.player.orderChunks();
+
+        f.player.loadQueue.add(queuedIndex);
+        f.player.unloadChunk(0, 0);
+        f.player.orderChunks();
+
+        assertTrue(f.player.loadQueue.contains(queuedIndex), "removed chunk must be queued again");
+    }
+
+    @Test
     void maximumRemainsHostControlledAfterClientShrink() throws Exception {
         Fixture f = new Fixture();
         f.player.setViewDistance(6);
@@ -75,6 +169,7 @@ class PlayerRadiusLifecycleTest {
         Fixture() throws Exception {
             field(player, "usedChunks", new Long2ObjectOpenHashMap<Boolean>());
             field(player, "loadQueue", new LongLinkedOpenHashSet());
+            field(player, "pendingChunkRetries", Player.newPendingRetryQueue());
             field(player, "server", server);
             player.level = level;
             player.connected = true;
@@ -98,6 +193,16 @@ class PlayerRadiusLifecycleTest {
             RequestChunkRadiusPacket packet = new RequestChunkRadiusPacket();
             packet.radius = radius;
             RequestChunkRadiusProcessor.INSTANCE.handle(new PlayerHandle(player), packet);
+        }
+    }
+
+    private static final class TrackingLoadQueue extends LongLinkedOpenHashSet {
+        int clearCalls;
+
+        @Override
+        public void clear() {
+            clearCalls++;
+            super.clear();
         }
     }
 

@@ -364,6 +364,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int lastOrderChunkX = Integer.MIN_VALUE;
     private int lastOrderChunkZ = Integer.MIN_VALUE;
     private double lastOrderYaw = Double.NaN;
+    private ChunkOrderState lastChunkOrderState;
+    private boolean chunkOrderDirty = true;
+
+    record ChunkOrderState(Level level, long deliveryEpoch, int centerX, int centerZ,
+                           int chunkRadius, int orderRadius, boolean spawned) { }
+
+    static boolean shouldSkipChunkOrdering(boolean queueEmpty, boolean orderDirty, boolean retriesEmpty,
+                                           boolean noPendingChunkSends, boolean publisherUpdatePending,
+                                           ChunkOrderState current, ChunkOrderState previous) {
+        return queueEmpty && !orderDirty && retriesEmpty && noPendingChunkSends && !publisherUpdatePending
+                && current.equals(previous);
+    }
+
     // 借鉴 PNX,默认 100° / Adapted from PNX, default 100°
     private static final double FOV_DEGREES = 100.0;
 
@@ -1327,11 +1340,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            this.usedChunks.remove(index);
+            if (this.usedChunks.remove(index) != null) {
+                this.chunkOrderDirty = true;
+            }
             this.forgetColumnData(index);
         }
         level.unregisterChunkLoader(this, x, z);
-        this.loadQueue.remove(index);
+        if (this.loadQueue.remove(index)) {
+            this.chunkOrderDirty = true;
+        }
     }
 
     private void unloadChunks(boolean online) {
@@ -1840,26 +1857,37 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
-        long sourceOrderEpoch = ++this.chunkOrderEpoch;
         Level sourceLevel = this.level;
         long sourceEpoch = this.chunkDeliveryEpoch;
+        int centerX = (int) this.x >> 4;
+        int centerZ = (int) this.z >> 4;
+        int radius = spawned ? this.chunkRadius : Math.max(this.chunkRadius, server.c_s_spawnThreshold);
+        ChunkOrderState orderState = new ChunkOrderState(sourceLevel, sourceEpoch, centerX, centerZ,
+                this.chunkRadius, radius, this.spawned);
+        if (shouldSkipChunkOrdering(this.loadQueue.isEmpty(), this.chunkOrderDirty,
+                this.pendingChunkRetries.isEmpty(), !this.usedChunks.containsValue(Boolean.FALSE),
+                this.chunkPublisherUpdatePending,
+                orderState, this.lastChunkOrderState)) {
+            this.nextChunkOrderRun = 20;
+            return true;
+        }
+
+        this.chunkOrderDirty = false;
+        this.lastChunkOrderState = orderState;
+        long sourceOrderEpoch = ++this.chunkOrderEpoch;
         this.nextChunkOrderRun = 20;
-        this.lastOrderChunkX = (int) this.x >> 4;
-        this.lastOrderChunkZ = (int) this.z >> 4;
+        this.lastOrderChunkX = centerX;
+        this.lastOrderChunkZ = centerZ;
         this.lastOrderYaw = this.yaw;
 
         loadQueue.clear();
         Long2ObjectOpenHashMap<Boolean> lastChunk = new Long2ObjectOpenHashMap<>(this.usedChunks);
-
-        int centerX = (int) this.x >> 4;
-        int centerZ = (int) this.z >> 4;
 
         // Before the first spawn the client already waits for every chunk inside the publisher
         // radius (chunkRadius, never below 3). Capping the pre-spawn radius to sqrt(spawn-threshold)
         // left the outer ring unsent, so the client hung in the air until its own timeout and only
         // then sent SetLocalPlayerAsInitialized. PocketMine-MP and PowerNukkitX send the full view
         // distance before spawn and use the threshold only to decide when PLAYER_SPAWN goes out.
-        int radius = spawned ? this.chunkRadius : Math.max(this.chunkRadius, server.c_s_spawnThreshold);
         int radiusSqr = radius * radius;
 
         // FOV 朝向优先(借鉴 PNX):视野内先入队,组内近→远;LongLinkedOpenHashSet 保插入序
@@ -9231,7 +9259,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     @Override
     public void onChunkChanged(FullChunk chunk) {
         long index = Level.chunkHash(chunk.getX(), chunk.getZ());
-        this.usedChunks.remove(index);
+        if (this.usedChunks.remove(index) != null) {
+            this.chunkOrderDirty = true;
+        }
         this.forgetColumnData(index);
     }
 
