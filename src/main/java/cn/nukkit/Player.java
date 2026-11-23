@@ -1345,7 +1345,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int chunkZ = Level.getHashZ(index);
             this.level.unregisterChunkLoader(this, chunkX, chunkZ);
 
-            for (Entity entity : level.getChunkEntities(chunkX, chunkZ, false).values()) {
+            Map<Long, Entity> chunkEntities = level.getChunkEntities(chunkX, chunkZ, false);
+            Iterator<Entity> entities = BaseFullChunk.nativeEntityScanIterator(chunkEntities);
+            if (entities == null) entities = chunkEntities.values().iterator();
+            while (entities.hasNext()) {
+                Entity entity = entities.next();
                 if (entity != this) {
                     if (online) {
                         entity.despawnFrom(this);

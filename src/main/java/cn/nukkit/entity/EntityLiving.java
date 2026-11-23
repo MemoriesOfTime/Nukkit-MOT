@@ -18,10 +18,12 @@ import cn.nukkit.item.ItemTurtleShell;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.GameRule;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
@@ -37,6 +39,8 @@ import java.util.*;
  * Nukkit Project
  */
 public abstract class EntityLiving extends Entity implements EntityDamageable {
+
+    private SimpleAxisAlignedBB rideableScanBox;
 
     public EntityLiving(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -537,8 +541,21 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 this.knockBackTime -= tickDiff;
             }
 
-            if (this.riding == null && this.age % 2 == 1 && !this.closed && this.isAlive()) {
-                for (Entity entity : level.getNearbyRideables(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this)) {
+            if (this.riding == null && this.age % 2 == 1 && !this.closed && this.isAlive()
+                    && (level.getClass() != Level.class || level.hasRideableEntities())) {
+                SimpleAxisAlignedBB queryBox = this.rideableScanBox;
+                if (queryBox == null) {
+                    this.rideableScanBox = queryBox = new SimpleAxisAlignedBB(0, 0, 0, 0, 0, 0);
+                }
+                queryBox.setBounds(
+                        this.boundingBox.getMinX() - 0.20000000298023224,
+                        this.boundingBox.getMinY(),
+                        this.boundingBox.getMinZ() - 0.20000000298023224,
+                        this.boundingBox.getMaxX() + 0.20000000298023224,
+                        this.boundingBox.getMaxY(),
+                        this.boundingBox.getMaxZ()
+                );
+                for (Entity entity : level.getNearbyRideables(queryBox, this)) {
                     this.collidingWith(entity);
                 }
             }

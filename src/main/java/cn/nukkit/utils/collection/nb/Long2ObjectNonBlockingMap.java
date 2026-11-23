@@ -166,6 +166,10 @@ public class Long2ObjectNonBlockingMap<TypeV>
 
     // Count of reprobes
     private transient ConcurrentAutoLongTable _reprobes = new ConcurrentAutoLongTable();
+    private transient Collection<TypeV> _values;
+    private transient LongSet _keySet;
+    private transient Set<Entry<Long, TypeV>> _entrySet;
+    private transient Set<LongObjectEntry<TypeV>> _fastEntrySet;
 
     /**
      * Get and clear the current count of reprobes.  Reprobes happen on key
@@ -1130,6 +1134,18 @@ public class Long2ObjectNonBlockingMap<TypeV>
         }
     }
 
+    /** Traverses a weakly consistent value snapshot without permitting iterator removal. */
+    public Iterator<TypeV> readOnlyValueIterator() {
+        return new ReadOnlySnapshotV();
+    }
+
+    private final class ReadOnlySnapshotV extends SnapshotV {
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
     // The main class for iterating over the NBHM.  It "snapshots" a clean
     // view of the K/V array.
     private class SnapshotV implements Iterator<TypeV>, Enumeration<TypeV> {
@@ -1245,7 +1261,9 @@ public class Long2ObjectNonBlockingMap<TypeV>
      */
     @Override
     public @NonNull Collection<TypeV> values() {
-        return new AbstractCollection<>() {
+        Collection<TypeV> view = _values;
+        if (view != null) return view;
+        return _values = new AbstractCollection<>() {
             @Override
             public void clear() {
                 Long2ObjectNonBlockingMap.this.clear();
@@ -1396,7 +1414,9 @@ public class Long2ObjectNonBlockingMap<TypeV>
      */
     @Override
     public @NonNull LongSet keySet() {
-        return new AbstractLongSet() {
+        LongSet view = _keySet;
+        if (view != null) return view;
+        return _keySet = new AbstractLongSet() {
             @Override
             public @NonNull LongIterator iterator() {
                 return new IteratorLong();
@@ -1545,7 +1565,9 @@ public class Long2ObjectNonBlockingMap<TypeV>
      */
     @Override
     public @NonNull Set<Entry<Long, TypeV>> entrySet() {
-        return new AbstractSet<>() {
+        Set<Entry<Long, TypeV>> view = _entrySet;
+        if (view != null) return view;
+        return _entrySet = new AbstractSet<>() {
             @Override
             public void clear() {
                 Long2ObjectNonBlockingMap.this.clear();
@@ -1577,7 +1599,9 @@ public class Long2ObjectNonBlockingMap<TypeV>
     }
 
     public Set<LongObjectEntry<TypeV>> fastEntrySet() {
-        return new AbstractSet<>() {
+        Set<LongObjectEntry<TypeV>> view = _fastEntrySet;
+        if (view != null) return view;
+        return _fastEntrySet = new AbstractSet<>() {
             @Override
             public void clear() {
                 Long2ObjectNonBlockingMap.this.clear();
@@ -1656,6 +1680,10 @@ public class Long2ObjectNonBlockingMap<TypeV>
             // field, the CHM in _kvs[0] won't be in sync.
             //
             // Wipe out the cloned array (it was shallow anyways).
+            t._values = null;
+            t._keySet = null;
+            t._entrySet = null;
+            t._fastEntrySet = null;
             t.clear();
             // Now copy sanely
             for (long K : keySetLong())

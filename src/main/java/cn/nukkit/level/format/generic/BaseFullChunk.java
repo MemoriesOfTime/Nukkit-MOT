@@ -11,6 +11,7 @@ import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.EntityPresenceIndex;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.leveldb.serializer.EntityNbtAdapter;
@@ -813,6 +814,23 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return entities == null ? Collections.emptyMap() : entityIndex();
     }
 
+    /** Schedules resident entities in the chunk map's existing iteration order. */
+    public static void scheduleEntityUpdates(FullChunk chunk) {
+        Map<Long, Entity> entities = chunk.getEntities();
+        if (entities instanceof PickupEntityIndex indexed) {
+            indexed.scheduleUpdates();
+        } else if (!(entities instanceof EntityPresenceIndex indexed) || indexed.hasAnyEntities()) {
+            for (Entity entity : entities.values()) {
+                entity.scheduleUpdate();
+            }
+        }
+    }
+
+    /** Returns a read-only iterator for native entity maps, or null for alternate maps. */
+    public static Iterator<Entity> nativeEntityScanIterator(Map<Long, Entity> entities) {
+        return entities instanceof PickupEntityIndex index ? index.readOnlyNativeIterator() : null;
+    }
+
     private PickupEntityIndex entityIndex() {
         PickupEntityIndex index = this.pickupEntityIndex;
         if (index != null && index.backing() == this.entities) return index;
@@ -826,8 +844,18 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
+    public boolean hasEntities() {
+        return this.entities != null && this.entityIndex().hasAnyEntities();
+    }
+
+    @Override
     public boolean hasPickupEntities(boolean itemsOnly) {
         return this.entities != null && this.entityIndex().hasPickupEntities(itemsOnly);
+    }
+
+    @Override
+    public boolean hasRideableEntities() {
+        return this.entities != null && this.entityIndex().hasRideableEntities();
     }
 
     @Override

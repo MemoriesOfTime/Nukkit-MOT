@@ -207,10 +207,30 @@ public interface FullChunk extends Cloneable {
 
     Map<Long, Entity> getEntities();
 
+    default boolean hasEntities() {
+        Map<Long, Entity> map = getEntities();
+        return map instanceof EntityPresenceIndex indexed ? indexed.hasAnyEntities() : !map.isEmpty();
+    }
+
     /** Conservative fallback for chunk implementations without a pickup-presence index. */
     default boolean hasPickupEntities(boolean itemsOnly) {
-        for (Entity entity : getEntities().values()) {
+        Map<Long, Entity> map = getEntities();
+        if (map instanceof EntityPresenceIndex indexed) {
+            return indexed.hasPickupEntities(itemsOnly);
+        }
+        for (Entity entity : map.values()) {
             if (isPickupEntity(entity, itemsOnly)) return true;
+        }
+        return false;
+    }
+
+    default boolean hasRideableEntities() {
+        Map<Long, Entity> map = getEntities();
+        if (map instanceof EntityPresenceIndex indexed) {
+            return indexed.hasRideableEntities();
+        }
+        for (Entity entity : map.values()) {
+            if (entity instanceof cn.nukkit.entity.EntityRideable) return true;
         }
         return false;
     }

@@ -3,6 +3,7 @@ package cn.nukkit;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.generic.BaseFullChunk;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.network.process.processor.common.RequestChunkRadiusProcessor;
 import cn.nukkit.network.protocol.*;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -364,6 +365,31 @@ class PlayerChunkSendTest {
             verify(player, never()).dataPacket(any());
             verify(entity, never()).despawnFrom(any());
             verify(level, never()).getChunk(anyInt(), anyInt());
+        }
+
+        @Test
+        void bulkWorldSwitchRetainsPrefetchedNativeEntityWhenDespawnRemovesIt() throws Exception {
+            LevelDBChunk chunk = new LevelDBChunk(null, 3, 5);
+            when(level.getChunkIfLoaded(3, 5)).thenReturn(chunk);
+            Entity first = mock(Entity.class);
+            Entity prefetched = mock(Entity.class);
+            when(first.getId()).thenReturn(0L);
+            when(prefetched.getId()).thenReturn(42L);
+            chunk.addEntity(prefetched);
+            chunk.addEntity(first);
+            doAnswer(invocation -> {
+                chunk.removeEntity(prefetched);
+                return null;
+            }).when(first).despawnFrom(player);
+
+            unloadAll(true);
+
+            var order = inOrder(level, first, prefetched);
+            order.verify(level).unregisterChunkLoader(player, 3, 5);
+            order.verify(level).getChunkIfLoaded(3, 5);
+            order.verify(first).despawnFrom(player);
+            order.verify(prefetched).despawnFrom(player);
+            assertFalse(chunk.getEntities().containsKey(42L));
         }
 
         private void unloadAll(boolean online) throws Exception {
