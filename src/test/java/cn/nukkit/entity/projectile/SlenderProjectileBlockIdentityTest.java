@@ -78,6 +78,7 @@ class SlenderProjectileBlockIdentityTest {
                 (int) i.getArgument(0) == 0 && (int) i.getArgument(1) == 0 ? chunk : null);
         when(level.getChunkEntities(anyInt(), anyInt(), eq(false))).thenAnswer(i ->
                 (int) i.getArgument(0) == 0 && (int) i.getArgument(1) == 0 ? entities : Map.of());
+        when(level.getChunkEntitySnapshot(anyInt(), anyInt(), eq(false))).thenCallRealMethod();
         when(chunk.getBlockId(anyInt(), anyInt(), anyInt(), eq(0))).thenAnswer(i ->
                 cells.getOrDefault(new Cell(i.getArgument(0), i.getArgument(1), i.getArgument(2)), BlockID.AIR));
         when(level.getBlock(anyInt(), anyInt(), anyInt())).thenAnswer(i ->
