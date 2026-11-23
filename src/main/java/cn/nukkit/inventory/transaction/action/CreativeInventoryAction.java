@@ -20,6 +20,7 @@ public class CreativeInventoryAction extends InventoryAction {
 
     public CreativeInventoryAction(Item source, Item target, int action) {
         super(source, target);
+        this.actionType = action;
     }
 
     /**
