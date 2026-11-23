@@ -317,7 +317,15 @@ public class StateBlockStorage {
         long stamp = this.cellsLock.tryOptimisticRead();
         try {
             List<BlockStateSnapshot> palette = this.palette;
-            int paletteIndex = this.bitArray.get(index);
+            BitArray cells = this.bitArray;
+            int paletteIndex;
+            if (cells instanceof Pow2BitArray pow2) {
+                paletteIndex = pow2.get(index);
+            } else if (cells instanceof PaddedBitArray padded) {
+                paletteIndex = padded.get(index);
+            } else {
+                paletteIndex = cells.get(index);
+            }
             if (paletteIndex >= 0 && paletteIndex < palette.size()) {
                 BlockStateSnapshot snapshot = palette.get(paletteIndex);
                 if (snapshot != null && this.cellsLock.validate(stamp)) {
@@ -347,7 +355,15 @@ public class StateBlockStorage {
         long stamp = this.cellsLock.tryOptimisticRead();
         try {
             List<BlockStateSnapshot> palette = this.palette;
-            int paletteIndex = this.bitArray.get(index);
+            BitArray cells = this.bitArray;
+            int paletteIndex;
+            if (cells instanceof Pow2BitArray pow2) {
+                paletteIndex = pow2.get(index);
+            } else if (cells instanceof PaddedBitArray padded) {
+                paletteIndex = padded.get(index);
+            } else {
+                paletteIndex = cells.get(index);
+            }
             if (paletteIndex >= 0 && paletteIndex < palette.size()) {
                 BlockStateSnapshot snapshot = palette.get(paletteIndex);
                 if (snapshot != null) {
