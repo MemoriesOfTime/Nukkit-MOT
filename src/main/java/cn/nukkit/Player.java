@@ -102,6 +102,7 @@ import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 import cn.nukkit.scoreboard.scorer.PlayerScorer;
 import cn.nukkit.utils.*;
+import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -320,7 +321,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private final int loaderId;
 
-    public final Map<Long, Boolean> usedChunks = new ConcurrentHashMap<>();
+    // Keys are Level.chunkHash values. Long.hashCode folds them to x ^ z, so a view square
+    // filled a few dozen ConcurrentHashMap bins and every bin became a tree. The lock-free
+    // long map hashes all 64 bits and keeps the same off-thread write safety (ec6a5e297).
+    public final Map<Long, Boolean> usedChunks = new Long2ObjectNonBlockingMap<>();
 
     private int chunksSent = 0;
     // 异步回调会读取这两代次，写入方恒为主线程 / async callbacks read both epochs; the main thread is the only writer
