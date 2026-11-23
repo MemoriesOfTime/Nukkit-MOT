@@ -9,9 +9,12 @@ import cn.nukkit.network.protocol.NetworkChunkPublisherUpdatePacket;
 import cn.nukkit.network.protocol.RemoveEntityPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.plugin.PluginManager;
+import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -118,6 +121,37 @@ class PlayerChunkPublisherAdmissionTest {
                 "old-world unload continuation must not remove newly ordered destination center");
         assertEquals(nestedSize.get(), f.player.loadQueue.size(),
                 "old order must preserve destination load queue after nested switch/reorder");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 20, 21, 22, 188, 189, 190, 765, 766, 767})
+    void nativeChunkSnapshotKeepsLegacyUnloadOrderAndPendingMembership(int farChunks) throws Exception {
+        Fixture f = new Fixture();
+        var usedChunks = new Long2ObjectNonBlockingMap<Boolean>();
+        field(f.player, "usedChunks", usedChunks);
+        f.player.x = 10 * 16;
+        long delivered = Level.chunkHash(10, 0);
+        long pending = Level.chunkHash(11, 0);
+        usedChunks.put(delivered, Boolean.TRUE);
+        usedChunks.put(pending, Boolean.FALSE);
+        usedChunks.put(Level.chunkHash(0, 0), Boolean.TRUE);
+        for (int x = 30; x < 30 + farChunks; x++) {
+            usedChunks.put(Level.chunkHash(x, -x), Boolean.valueOf((x & 1) == 0));
+        }
+        var legacySnapshot = new Long2ObjectOpenHashMap<Boolean>((Map<Long, Boolean>) usedChunks);
+        legacySnapshot.remove(delivered);
+        legacySnapshot.remove(pending);
+        List<Long> unloaded = new ArrayList<>();
+        doAnswer(call -> {
+            unloaded.add(Level.chunkHash(call.getArgument(0), call.getArgument(1)));
+            return null;
+        }).when(f.player).unloadChunk(anyInt(), anyInt());
+
+        assertTrue(f.player.orderChunks());
+
+        assertEquals(new ArrayList<>(legacySnapshot.keySet()), unloaded);
+        assertFalse(f.player.loadQueue.contains(delivered));
+        assertTrue(f.player.loadQueue.contains(pending));
     }
 
     private static final class Fixture {
