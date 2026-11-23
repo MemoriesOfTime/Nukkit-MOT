@@ -32,6 +32,7 @@ import cn.nukkit.level.*;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import cn.nukkit.level.vibration.VibrationEvent;
@@ -3783,7 +3784,36 @@ public abstract class Entity extends Location implements Metadatable {
         int px = this.getFloorX();
         int py = this.getFloorY();
         int pz = this.getFloorZ();
-        for (int i = this.level.getMaxBlockY(); i >= py; i--) {
+        int top = this.level.getMaxBlockY();
+        // Skip only leading immutable native air sections; do not trust a stale heightmap.
+        // Custom bounds/offset getters and sections retain every original scalar callback.
+        if (top >= py && (top & 15) == 15 && this.level.getClass() == Level.class
+                && this.chunk != null && this.chunk.getClass() == LevelDBChunk.class
+                && this.chunk.getX() == px >> 4 && this.chunk.getZ() == pz >> 4) {
+            var provider = this.level.getProvider();
+            if (provider != null && provider.getClass() == LevelDBProvider.class
+                    && provider.getLevel() == this.level) {
+                DimensionData dimension = this.level.getDimensionData();
+                LevelDBChunk nativeChunk = (LevelDBChunk) this.chunk;
+                if (dimension != null && (dimension.getClass() == DimensionData.class
+                        || dimension == DimensionData.LEGACY_DIMENSION)
+                        && top >= dimension.getMinHeight() && nativeChunk.hasStableSectionOffset()) {
+                    int min = dimension.getMinHeight();
+                    int offset = nativeChunk.getSectionOffset();
+                    ChunkSection[] sections = nativeChunk.getSections();
+                    while (top >= py && top >= min && top >= Integer.MIN_VALUE + 16) {
+                        // Match getSection(float); invalid indices must keep its diagnostic path.
+                        int index = (int) (offset + (float) (top >> 4));
+                        if (sections == null || index < 0 || index >= sections.length
+                                || sections[index] == null || sections[index].getClass() != EmptyChunkSection.class) {
+                            break;
+                        }
+                        top -= 16;
+                    }
+                }
+            }
+        }
+        for (int i = top; i >= py; i--) {
             if (level.getBlockIdAt(chunk, px, i, pz) != 0) {
                 return false;
             }
