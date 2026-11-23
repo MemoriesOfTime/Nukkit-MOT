@@ -1,14 +1,18 @@
 package cn.nukkit.level.format.generic;
 
+import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.level.format.EntityPresenceIndex;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
@@ -18,15 +22,18 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Typed presence cache over a chunk's existing entity map. Membership mutations invalidate the
  * cache, including the public Map API and mutable views. Iteration remains the backing map's
- * weakly consistent order; neither a second entity map nor a reordered typed snapshot is kept.
+ * weakly consistent order. The player target snapshot retains that exact backing-map order
+ * and is invalidated even by non-player writes that can rehash the backing map.
  */
-final class PickupEntityIndex extends AbstractMap<Long, Entity> implements ConcurrentMap<Long, Entity> {
+final class PickupEntityIndex extends AbstractMap<Long, Entity> implements ConcurrentMap<Long, Entity>, EntityPresenceIndex {
     private final Long2ObjectNonBlockingMap<Entity> backing;
     private final AtomicLong revision = new AtomicLong();
     private final AtomicInteger writers = new AtomicInteger();
     private record Presence(long revision, int kinds) { }
 
     private volatile Presence cached = new Presence(-1, 0);
+    private record Players(long revision, List<Player> values) { }
+    private volatile Players cachedPlayers;
 
     PickupEntityIndex(Long2ObjectNonBlockingMap<Entity> backing) {
         this.backing = backing;
@@ -34,6 +41,29 @@ final class PickupEntityIndex extends AbstractMap<Long, Entity> implements Concu
 
     Long2ObjectNonBlockingMap<Entity> backing() {
         return backing;
+    }
+
+    @Override
+    public List<Player> playersInIterationOrder() {
+        long stamp = revision.get();
+        if (writers.get() != 0) return null;
+        Players players = cachedPlayers;
+        if (players != null && players.revision == stamp) return players.values;
+        ArrayList<Player> found = null;
+        for (Entity entity : backing.values()) {
+            if (entity instanceof Player player) {
+                if (found == null) found = new ArrayList<>();
+                found.add(player);
+            }
+        }
+        List<Player> values = found == null ? List.of() : List.copyOf(found);
+        Players snapshot = new Players(stamp, values);
+        cachedPlayers = snapshot;
+        if (writers.get() != 0 || revision.get() != stamp) {
+            if (cachedPlayers == snapshot) cachedPlayers = null;
+            return null;
+        }
+        return values;
     }
 
     boolean hasPickupEntities(boolean itemsOnly) {
@@ -60,6 +90,9 @@ final class PickupEntityIndex extends AbstractMap<Long, Entity> implements Concu
 
     private void endWrite() {
         revision.incrementAndGet();
+        // Release snapshots holding departing players even if nobody searches this chunk again.
+        Players players = cachedPlayers;
+        if (players != null && !players.values.isEmpty()) cachedPlayers = null;
         writers.decrementAndGet();
     }
 

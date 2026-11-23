@@ -204,7 +204,7 @@ public class Anvil2LevelDBConverter {
             newChunk.unknownTiles.putAll(oldChunk.unknownTiles);
         }
         newChunk.entities = new Long2ObjectNonBlockingMap<>();
-        newChunk.entities.putAll(oldChunk.getEntities());
+        newChunk.getEntities().putAll(oldChunk.getEntities());
         newChunk.tileList = oldChunk.tileList;
 
         for (int blockX = 0; blockX < 16; blockX++) {

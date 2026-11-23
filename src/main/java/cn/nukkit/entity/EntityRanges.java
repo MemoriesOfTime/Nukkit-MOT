@@ -3,9 +3,12 @@ package cn.nukkit.entity;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
 import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.level.Level;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class EntityRanges {
     private static final Map<Class<?>, Integer> FOLLOW_RANGES = new HashMap<>();
@@ -64,6 +67,44 @@ public class EntityRanges {
     };
 
 
+    // Exact built-in classes only. Unknown subclasses may override target predicates,
+    // friendliness or feeding behavior and must retain the complete entity query.
+    private static final Set<Class<?>> PLAYER_ONLY_TARGET_TYPES = Set.of(
+            EntityArmadillo.class, EntityCamel.class, EntityCat.class, EntityChicken.class,
+            EntityCopperGolem.class, EntityCow.class, EntityDonkey.class, EntityFox.class,
+            EntityGoat.class, EntityHorse.class, EntityHorseBase.class, EntityLlama.class,
+            EntityMooshroom.class, EntityMule.class, EntityOcelot.class, EntityPanda.class,
+            EntityPig.class, EntitySheep.class, EntitySkeletonHorse.class, EntitySniffer.class,
+            EntityStrider.class, EntityVillager.class, EntityVillagerV2.class,
+            EntityWanderingTrader.class, EntityZombieHorse.class);
+
+    private static final ClassValue<Boolean> PLAYER_ONLY_TARGETS = new ClassValue<>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            return PLAYER_ONLY_TARGET_TYPES.contains(type);
+        }
+    };
+
+    private static final ClassValue<Boolean> NATIVE_NEARBY_QUERY = new ClassValue<>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("getNearbyEntities", AxisAlignedBB.class, Entity.class,
+                        boolean.class, boolean.class).getDeclaringClass() == Level.class
+                        && type.getMethod("getNearbyEntities", AxisAlignedBB.class, Entity.class,
+                        boolean.class).getDeclaringClass() == Level.class;
+            } catch (NoSuchMethodException impossible) {
+                throw new IllegalStateException("Level lacks nearby entity query", impossible);
+            }
+        }
+    };
+
+    static boolean targetsOnlyPlayersWhenNotInLove(EntityWalking entity) {
+        return PLAYER_ONLY_TARGETS.get(entity.getClass()) && !entity.isInLove();
+    }
+
+    static boolean hasNativeNearbyQuery(Level level) {
+        return NATIVE_NEARBY_QUERY.get(level.getClass());
+    }
+
     /*
       follow_range from bedrock-samples
       [https://github.com/Mojang/bedrock-samples/tree/preview/behavior_pack/entities]
@@ -117,6 +158,15 @@ public class EntityRanges {
     public static AxisAlignedBB createTargetSearchBox(Entity entity) {
         int radius = getTargetSearchRange(entity);
         return entity.boundingBox.clone().grow(radius, radius, radius);
+    }
+
+    /** Updates an entity-owned search box without retaining or mutating its collision box. */
+    static AxisAlignedBB updateTargetSearchBox(Entity entity, SimpleAxisAlignedBB box) {
+        int radius = getTargetSearchRange(entity);
+        AxisAlignedBB bounds = entity.boundingBox;
+        return box.setBounds(bounds.getMinX() - radius, bounds.getMinY() - radius,
+                bounds.getMinZ() - radius, bounds.getMaxX() + radius,
+                bounds.getMaxY() + radius, bounds.getMaxZ() + radius);
     }
 
     /**
