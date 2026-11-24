@@ -37,6 +37,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     protected boolean exploded;
     protected boolean wasExplosion;
     protected int invul;
+    private boolean spawnExplosionPending;
 
     private HashMap<UUID, DummyBossBar> dummyBossBars;
 
@@ -75,6 +76,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         } else {
             this.invul = 200;
         }
+
+        this.spawnExplosionPending = this.invul > 0;
 
         this.dummyBossBars = new HashMap<>();
 
@@ -185,7 +188,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
             return true;
         }
 
-        if (!this.closed && this.age == 200) {
+        if (!this.closed && this.spawnExplosionPending && this.invul <= 0) {
+            this.spawnExplosionPending = false;
             this.explode();
             this.setDataProperty(new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, 0));
         }
