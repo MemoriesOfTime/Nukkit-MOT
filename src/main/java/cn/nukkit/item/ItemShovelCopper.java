@@ -34,6 +34,6 @@ public class ItemShovelCopper extends StringItemToolBase {
 
     @Override
     public int getAttackDamage() {
-        return 4;
+        return 3;
     }
 }
