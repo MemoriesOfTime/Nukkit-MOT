@@ -7,6 +7,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
@@ -27,7 +28,7 @@ public class MinecartDispenseBehavior extends DefaultDispenseBehavior {
             }
 
             Entity minecart = Entity.createEntity(getMinecartId(item),
-                    block.level.getChunk(target.getChunkX(), target.getChunkZ()), new CompoundTag("")
+                    block.level.getChunk(target.getChunkX(), target.getChunkZ()), withTntItemSnapshot(new CompoundTag("")
                             .putList(new ListTag<>("Pos")
                                     .add(new DoubleTag("", target.getX() + 0.5))
                                     .add(new DoubleTag("", target.getY() + 0.0625D + adjacent))
@@ -38,7 +39,7 @@ public class MinecartDispenseBehavior extends DefaultDispenseBehavior {
                                     .add(new DoubleTag("", 0)))
                             .putList(new ListTag<>("Rotation")
                                     .add(new FloatTag("", 0))
-                                    .add(new FloatTag("", 0)))
+                                    .add(new FloatTag("", 0))), item)
             );
 
             minecart.spawnToAll();
@@ -46,6 +47,15 @@ public class MinecartDispenseBehavior extends DefaultDispenseBehavior {
         }
 
         return super.dispense(block, face, item);
+    }
+
+    private static CompoundTag withTntItemSnapshot(CompoundTag nbt, Item item) {
+        if (item.getId() == ItemID.MINECART_WITH_TNT) {
+            Item sourceItem = item.clone();
+            sourceItem.setCount(1);
+            nbt.putCompound("MinecartItem", NBTIO.putItemHelper(sourceItem));
+        }
+        return nbt;
     }
 
     private String getMinecartId(Item item) {

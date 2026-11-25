@@ -2,6 +2,7 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.MockServer;
+import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntityHopper;
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -457,6 +459,68 @@ public class EntityMinecartTest {
             assertFalse(minecart.exploded,
                     "Cancelled flaming-projectile damage should not detonate the TNT minecart");
         }
+        @Test
+        void acceptedFlamingArrowRecordsActualShooterInsteadOfPreviousIgniter() {
+            Level level = newMockLevel(GameRules.getDefault());
+            FullChunk chunk = newMockChunk(level);
+            TestableTNTMinecart minecart = new TestableTNTMinecart(chunk, baseNbt());
+            minecart.namedTag.putString("TntIgniter", UUID.randomUUID().toString());
+            Player shooter = mock(Player.class);
+            UUID shooterId = UUID.randomUUID();
+            when(shooter.getUniqueId()).thenReturn(shooterId);
+            EntityArrow arrow = newArrow(chunk, true);
+            arrow.shootingEntity = shooter;
+
+            assertTrue(minecart.attack(new EntityDamageByChildEntityEvent(shooter, arrow, minecart,
+                    EntityDamageEvent.DamageCause.PROJECTILE, 5)));
+
+            assertTrue(minecart.exploded);
+            assertEquals(shooterId.toString(), minecart.namedTag.getString("TntIgniter"));
+        }
+
+        @Test
+        void acceptedFlamingArrowWithoutShooterClearsPreviousIgniter() {
+            Level level = newMockLevel(GameRules.getDefault());
+            FullChunk chunk = newMockChunk(level);
+            TestableTNTMinecart minecart = new TestableTNTMinecart(chunk, baseNbt());
+            minecart.namedTag.putString("TntIgniter", UUID.randomUUID().toString());
+            EntityArrow arrow = newArrow(chunk, true);
+
+            assertTrue(minecart.attack(new EntityDamageByChildEntityEvent(mock(Entity.class), arrow, minecart,
+                    EntityDamageEvent.DamageCause.PROJECTILE, 5)));
+
+            assertTrue(minecart.exploded);
+            assertFalse(minecart.namedTag.contains("TntIgniter"));
+        }
+
+        @Test
+        void cancelledFlamingArrowPreservesPreviousIgniter() {
+            PluginManager pluginManager = mock(PluginManager.class);
+            doAnswer(invocation -> {
+                Event event = invocation.getArgument(0);
+                if (event instanceof EntityDamageEvent damageEvent) {
+                    damageEvent.setCancelled();
+                }
+                return null;
+            }).when(pluginManager).callEvent(any(Event.class));
+            when(serverMock.getPluginManager()).thenReturn(pluginManager);
+            Level level = newMockLevel(GameRules.getDefault());
+            FullChunk chunk = newMockChunk(level);
+            TestableTNTMinecart minecart = new TestableTNTMinecart(chunk, baseNbt());
+            String previousIgniter = UUID.randomUUID().toString();
+            minecart.namedTag.putString("TntIgniter", previousIgniter);
+            Player shooter = mock(Player.class);
+            when(shooter.getUniqueId()).thenReturn(UUID.randomUUID());
+            EntityArrow arrow = newArrow(chunk, true);
+            arrow.shootingEntity = shooter;
+
+            assertFalse(minecart.attack(new EntityDamageByChildEntityEvent(shooter, arrow, minecart,
+                    EntityDamageEvent.DamageCause.PROJECTILE, 5)));
+
+            assertFalse(minecart.exploded);
+            assertEquals(previousIgniter, minecart.namedTag.getString("TntIgniter"));
+        }
+
 
         @Test
         void flamingProjectileKeepsOriginalDamageVisibleToDamageEvent() {
