@@ -1824,6 +1824,11 @@ public abstract class Entity extends Location implements Metadatable {
         return item != null && item.getId() == Item.TOTEM && item.getCount() > 0;
     }
 
+    /** Called after damage listeners and before the event can change health. */
+    protected boolean canTakeDamage(EntityDamageEvent source) {
+        return true;
+    }
+
     public boolean attack(EntityDamageEvent source) {
         if (hasEffect(Effect.FIRE_RESISTANCE)
                 && (source.getCause() == DamageCause.FIRE
@@ -1838,7 +1843,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         server.getPluginManager().callEvent(source);
-        if (source.isCancelled()) {
+        if (source.isCancelled() || !this.canTakeDamage(source)) {
             return false;
         }
 
