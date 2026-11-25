@@ -100,10 +100,24 @@ public class BlockDoublePlant extends BlockFlowable {
         if ((this.getDamage() & TOP_HALF_BITMASK) == TOP_HALF_BITMASK) { // Top half
             Block down = down();
             if (down instanceof BlockDoublePlant) {
+                // 内层破坏已同步移除两格；此处再清空会吞掉插件在内层事件期间放入的新方块
+                // The nested break already removed both halves; clearing here again would
+                // wipe a block plugins placed during the inner event
                 this.getLevel().useBreakOn(down);
+            } else {
+                this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
             }
         } else {
+            // 先清自身，再核对上半格原状态，避免误删同步回调放入的新方块。
+            // Clear self first, then verify the original top state to preserve synchronous callback replacements.
+            int originalTopFullId = this.up().getFullId();
             this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
+            Block up = this.up();
+            if (up instanceof BlockDoublePlant
+                    && (up.getDamage() & TOP_HALF_BITMASK) == TOP_HALF_BITMASK
+                    && up.getFullId() == originalTopFullId) {
+                this.getLevel().setBlock(up, Block.get(BlockID.AIR), true, true);
+            }
         }
 
         return true;
