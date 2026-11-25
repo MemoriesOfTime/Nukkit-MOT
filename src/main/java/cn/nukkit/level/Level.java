@@ -3182,6 +3182,7 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
                 if (!canBreak) {
+                    BlockRefusalDiagnostics.refused(this, player, target, BlockRefusalDiagnostics.Reason.ADVENTURE_CAN_DESTROY);
                     return null;
                 }
             }
@@ -3440,6 +3441,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (player != null) {
+            boolean adventureDenied = false;
             BlockPlaceEvent event = new BlockPlaceEvent(player, hand, block, target, item);
             if (player.getGamemode() == Player.ADVENTURE) {
                 Tag tag = item.getNamedTagEntry("CanPlaceOn");
@@ -3457,6 +3459,7 @@ public class Level implements ChunkManager, Metadatable {
                 }
                 if (!canPlace) {
                     event.setCancelled();
+                    adventureDenied = true;
                 }
             }
 
@@ -3466,6 +3469,9 @@ public class Level implements ChunkManager, Metadatable {
 
             this.server.getPluginManager().callEvent(event);
             if (event.isCancelled()) {
+                if (adventureDenied) {
+                    BlockRefusalDiagnostics.refused(this, player, hand, BlockRefusalDiagnostics.Reason.ADVENTURE_CAN_PLACE_ON);
+                }
                 return null;
             }
 
@@ -3532,6 +3538,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (hand.getWaterloggingType() == Block.WaterloggingType.NO_WATERLOGGING && hand.canBeFlowedInto() && (block instanceof BlockLiquid || block.getLevelBlockAtLayer(1) instanceof BlockLiquid)) {
+            BlockRefusalDiagnostics.refused(this, player, hand, BlockRefusalDiagnostics.Reason.FLOWABLE_LIQUID);
             return null;
         }
 

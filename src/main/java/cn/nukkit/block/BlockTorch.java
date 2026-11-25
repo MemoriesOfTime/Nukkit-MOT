@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -74,6 +75,7 @@ public class BlockTorch extends BlockFlowable implements Faceable {
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (block instanceof BlockWater || block.level.isBlockWaterloggedAt(block.getChunk(), (int) block.x, (int) block.y, (int) block.z)) {
+            BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.TORCH_LIQUID);
             return false;
         }
 
@@ -83,6 +85,7 @@ public class BlockTorch extends BlockFlowable implements Faceable {
                 this.setDamage(side);
                 return this.getLevel().setBlock(this, this, true, true);
             }
+            BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.TORCH_SUPPORT);
             return false;
         }
 
@@ -90,6 +93,7 @@ public class BlockTorch extends BlockFlowable implements Faceable {
             this.setDamage(0);
             return this.getLevel().setBlock(this, this, true, true);
         }
+        BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.TORCH_SUPPORT);
         return false;
     }
 

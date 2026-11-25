@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockRefusalDiagnostics;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -94,6 +95,7 @@ public class BlockRail extends BlockFlowable implements Faceable {
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         if (!canStayOnFullSolid(this.down())) {
+            BlockRefusalDiagnostics.refused(player, this, BlockRefusalDiagnostics.Reason.RAIL_SUPPORT);
             return false;
         }
         Map<BlockRail, BlockFace> railsAround = this.checkRailsAroundAffected();
