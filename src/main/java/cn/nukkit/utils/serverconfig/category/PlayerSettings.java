@@ -16,6 +16,10 @@ public class PlayerSettings extends OkaeriConfig {
     @CustomKey("movement-collision-check")
     private boolean movementCollisionCheck = true;
 
+    @Comment("Fire cancellable XP pickup before consuming the orb or Mending; false restores legacy pickup")
+    @CustomKey("experience-pickup-event")
+    private boolean experiencePickupEvent = true;
+
     @Comment("Save player data to disk")
     @CustomKey("save-player-data")
     private boolean savePlayerData = true;
