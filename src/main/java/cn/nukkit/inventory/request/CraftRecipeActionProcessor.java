@@ -99,7 +99,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             if (recipe instanceof UserDataShapelessRecipe) {
                 applyInputNbt(recipeResult, collectCraftingInputList(player));
             }
-            recipeResult = fireCraftItemEvent(player, recipe, recipeResult);
+            recipeResult = fireCraftItemEvent(
+                    player, recipe, recipeResult, action.getNumberOfRequestedCrafts());
             if (recipeResult == null) {
                 return context.error();
             }
@@ -130,7 +131,8 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
             if (!validateMultiRecipeConsumePlan(player, multiRecipe, output, context)) {
                 return context.error();
             }
-            Item authoritativeOutput = fireCraftItemEvent(player, recipe, output);
+            Item authoritativeOutput = fireCraftItemEvent(
+                    player, recipe, output, action.getNumberOfRequestedCrafts());
             if (authoritativeOutput == null) {
                 return context.error();
             }
@@ -294,14 +296,15 @@ public class CraftRecipeActionProcessor implements ItemStackRequestActionProcess
         return input.getId() == Item.BOOK || enchantment.canEnchant(input);
     }
 
-    private static Item fireCraftItemEvent(Player player, Recipe recipe, Item output) {
+    private static Item fireCraftItemEvent(
+            Player player, Recipe recipe, Item output, int repetitions) {
         if (output == null || output.isNull()) {
             return null;
         }
         List<Item> originalInputs = collectCraftingInputList(player);
         CraftingTransaction snapshot = new ItemStackRequestCraftingTransaction(
                 player, originalInputs, output, recipe);
-        CraftItemEvent craftEvent = new CraftItemEvent(snapshot);
+        CraftItemEvent craftEvent = new CraftItemEvent(snapshot, repetitions);
         Server.getInstance().getPluginManager().callEvent(craftEvent);
         if (craftEvent.isCancelled()) {
             return null;
