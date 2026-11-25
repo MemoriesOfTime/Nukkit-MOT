@@ -93,7 +93,7 @@ public class EntityDonkey extends EntityHorseBase {
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (!this.isBaby() && !this.isChested() && item.getId() == Item.CHEST) {
+        if (item.getId() == Item.CHEST && this.isItemHandledByHorse(item)) {
             if (!player.isCreative()) {
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             }
@@ -102,6 +102,12 @@ public class EntityDonkey extends EntityHorseBase {
         }
 
         return super.onInteract(player, item, clickedPos);
+    }
+
+    @Override
+    protected boolean isItemHandledByHorse(Item item) {
+        return (!this.isBaby() && !this.isChested() && item.getId() == Item.CHEST)
+                || super.isItemHandledByHorse(item);
     }
 
     @Override

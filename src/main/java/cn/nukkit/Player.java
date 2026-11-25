@@ -18,6 +18,7 @@ import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityHappyGhast;
+import cn.nukkit.entity.passive.EntityHorseBase;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
@@ -5607,6 +5608,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 if (this.protocol >= ProtocolInfo.v1_19_0) {
                                     this.addWindow(((InventoryHolder) targetEntity).getInventory());
                                 }
+                            } else if (this.riding instanceof EntityHorseBase horseRide
+                                    && (targetEntity == null || targetEntity == horseRide)
+                                    && !horseRide.isClosed() && horseRide.getInventory() != null) {
+                                this.addWindow(horseRide.getInventory());
                             } else if (this.protocol >= 407) {
                                 if (this.inventory.open(this)) {
                                     this.inventoryOpen = true;
