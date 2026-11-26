@@ -77,6 +77,18 @@ public class BinaryStream {
         }
     };
 
+    private static final ClassValue<Boolean> DIRECT_STRING_WRITE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getMethod("putString", String.class).getDeclaringClass() == BinaryStream.class
+                        && type.getMethod("putByteArray", byte[].class).getDeclaringClass() == BinaryStream.class;
+            } catch (ReflectiveOperationException | SecurityException | LinkageError failure) {
+                return false;
+            }
+        }
+    };
+
     private static final ClassValue<Boolean> DIRECT_BYTE_READ = new ClassValue<>() {
         @Override
         protected Boolean computeValue(Class<?> type) {
@@ -531,7 +543,9 @@ public class BinaryStream {
             if (protocol >= ProtocolInfo.v1_16_210 && protocol < ProtocolInfo.v1_26_60) {
                 this.putString(skin.getPlayFabId());
             }
-            this.putString(skin.getSkinResourcePatch());
+            boolean directText = directByteWrite && DIRECT_STRING_WRITE.get(getClass());
+            if (directText) putEncodedSkinText(skin.encodedSkinResourcePatch());
+            else this.putString(skin.getSkinResourcePatch());
             this.putImage(skin.getSkinData());
 
             List<SkinAnimation> animations = skin.getAnimations();
@@ -556,7 +570,8 @@ public class BinaryStream {
             }
 
             this.putImage(skin.getCapeData());
-            this.putString(skin.getGeometryData());
+            if (directText) putEncodedSkinText(skin.encodedGeometryData());
+            else this.putString(skin.getGeometryData());
             if (protocol >= ProtocolInfo.v1_17_30) {
                 this.putString(skin.getGeometryDataEngineVersion());
             }
@@ -635,6 +650,14 @@ public class BinaryStream {
         }
     }
 
+    private void putEncodedSkinText(Skin.EncodedText text) {
+        int length = text.byteLength();
+        putUnsignedVarInt(length);
+        ensureCapacity(count + length);
+        text.copyTo(buffer, count);
+        count += length;
+    }
+
     public void putImage(SerializedImage image) {
         this.putLInt(image.width);
         this.putLInt(image.height);
@@ -672,7 +695,7 @@ public class BinaryStream {
         if (protocol >= ProtocolInfo.v1_16_210 && protocol < ProtocolInfo.v1_26_60) {
             size += estimatedStringBytes(skin.getPlayFabId());
         }
-        size += estimatedStringBytes(skin.getSkinResourcePatch());
+        size += skin.encodedSkinResourcePatch().byteLength() + 5L;
         size += estimatedImageBytes(skin.getSkinData());
 
         List<SkinAnimation> animations = skin.getAnimations();
@@ -685,7 +708,7 @@ public class BinaryStream {
         }
 
         size += estimatedImageBytes(skin.getCapeData());
-        size += estimatedStringBytes(skin.getGeometryData());
+        size += skin.encodedGeometryData().byteLength() + 5L;
         if (protocol >= ProtocolInfo.v1_17_30) {
             size += estimatedStringBytes(skin.getGeometryDataEngineVersion());
         }
