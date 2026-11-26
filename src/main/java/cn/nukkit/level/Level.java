@@ -10,6 +10,7 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityRideable;
+import cn.nukkit.entity.EntityViewerMap;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.item.EntityItem;
@@ -6108,39 +6109,57 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void addEntityMovement(Entity entity, double x, double y, double z, double yaw, double pitch, double headYaw) {
+        long eid = entity.getId();
+        // An overridden getViewers() may move the entity. Capture the delta before calling it.
+        boolean movedX = entity.lastX != x;
+        boolean movedY = entity.lastY != entity.y;
+        boolean movedZ = entity.lastZ != z;
+        boolean changedPitch = entity.lastPitch != pitch;
+        boolean changedYaw = entity.lastYaw != yaw;
+        boolean changedHeadYaw = entity.lastHeadYaw != headYaw;
+        boolean onGround = entity.onGround;
+        Map<Integer, Player> viewerMap = entity.getViewers();
+        if (EntityViewerMap.isKnownEmpty(viewerMap)) return;
+        Iterator<Player> viewers = viewerMap.values().iterator();
+        if (!viewers.hasNext()) {
+            EntityViewerMap.noteEmptyIteration(viewerMap);
+            return;
+        }
+
         MoveEntityDeltaPacket pk2 = new MoveEntityDeltaPacket();
-        pk2.eid = entity.getId();
-        if (entity.lastX != x) {
+        pk2.eid = eid;
+        if (movedX) {
             pk2.x = (float) x;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_X;
         }
         // lastY is the raw position, while y may include the entity's base offset
-        if (entity.lastY != entity.y) {
+        if (movedY) {
             pk2.y = (float) y;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_Y;
         }
-        if (entity.lastZ != z) {
+        if (movedZ) {
             pk2.z = (float) z;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_Z;
         }
-        if (entity.lastPitch != pitch) {
+        if (changedPitch) {
             pk2.pitchDelta = (float) pitch;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_PITCH;
         }
-        if (entity.lastYaw != yaw) {
+        if (changedYaw) {
             pk2.yawDelta = (float) yaw;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_YAW;
         }
-        if (entity.lastHeadYaw != headYaw) {
+        if (changedHeadYaw) {
             pk2.headYawDelta = (float) headYaw;
             pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_HEAD_YAW;
         }
-        if (entity.onGround) {
+        if (onGround) {
             pk2.flags |= MoveEntityDeltaPacket.FLAG_ON_GROUND;
         }
 
         MoveEntityAbsolutePacket pk = null; // Lazily created for legacy clients only
-        for (Player p : entity.getViewers().values()) {
+        do {
+            Player p = viewers.next();
             if (p.protocol < ProtocolInfo.v1_16_100) {
                 if (pk == null) {
                     pk = new MoveEntityAbsolutePacket();
@@ -6157,7 +6176,7 @@ public class Level implements ChunkManager, Metadatable {
             } else {
                 p.dataPacket(pk2);
             }
-        }
+        } while (viewers.hasNext());
     }
 
     public boolean isRaining() {
