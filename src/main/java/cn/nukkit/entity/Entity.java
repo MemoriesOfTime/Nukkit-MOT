@@ -466,17 +466,43 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected final Map<Integer, Effect> effects = new TrackedEffectMap();
 
-    private static final class TrackedEffectMap extends AbstractMap<Integer, Effect> implements ConcurrentMap<Integer, Effect> {
-        private final ConcurrentHashMap<Integer, Effect> backing = new ConcurrentHashMap<>();
-        // Only a pristine map can prove emptiness without consulting the concurrent backing map.
-        private volatile boolean mayHaveEntries;
+    static final class TrackedEffectMap extends AbstractMap<Integer, Effect> implements ConcurrentMap<Integer, Effect> {
+        private final ConcurrentHashMap<Integer, Effect> backing;
+        // Zero proves emptiness, -1 means occupied, positive values count in-flight insertions.
+        // Only publish stable occupancy when no insertion can race the backing count.
+        private static final int OCCUPIED = -1;
+        private volatile int occupancy;
         private Collection<Effect> valuesView;
         private Set<Integer> keySetView;
         private Set<Entry<Integer, Effect>> entrySetView;
 
+        TrackedEffectMap() {
+            backing = new ConcurrentHashMap<>();
+        }
+
+        /** Takes exclusive ownership of the supplied storage. */
+        TrackedEffectMap(ConcurrentHashMap<Integer, Effect> backing) {
+            this.backing = backing;
+            occupancy = backing.isEmpty() ? 0 : OCCUPIED;
+        }
+
         @Override
         public boolean isEmpty() {
-            return !mayHaveEntries || backing.isEmpty();
+            int state = occupancy;
+            return state == 0 || (state > 0 && backing.isEmpty() && confirmEmpty());
+        }
+
+        private boolean confirmEmpty() {
+            synchronized (backing) {
+                if (occupancy <= 0) return occupancy == 0;
+                // No new inserts can start here. Each admitted put can publish at most one key.
+                // If traversal misses a continuously occupied map, a key must have been inserted
+                // during that traversal. One more empty traversal than pending puts proves emptiness.
+                for (int remaining = occupancy; remaining >= 0; remaining--) {
+                    if (backing.keys().hasMoreElements()) return false;
+                }
+                return true;
+            }
         }
 
         @Override
@@ -499,36 +525,85 @@ public abstract class Entity extends Location implements Metadatable {
             return !isEmpty() && backing.containsKey(key);
         }
 
-        private void beforeInsert() {
-            if (!mayHaveEntries) mayHaveEntries = true;
+        private void beginInsert() {
+            synchronized (backing) {
+                occupancy = occupancy > 0 ? occupancy + 1 : 1;
+            }
+        }
+
+        private void finishInsert() {
+            synchronized (backing) {
+                int remaining = occupancy - 1;
+                if (remaining == 0 && !backing.isEmpty()) remaining = OCCUPIED;
+                occupancy = remaining;
+            }
+        }
+
+        private void afterRemoval() {
+            synchronized (backing) {
+                if (occupancy <= 0) occupancy = backing.isEmpty() ? 0 : OCCUPIED;
+            }
         }
 
         @Override
         public Effect put(Integer key, Effect value) {
-            beforeInsert();
-            return backing.put(key, value);
+            beginInsert();
+            try {
+                return backing.put(key, value);
+            } finally {
+                finishInsert();
+            }
         }
 
         @Override
         public Effect putIfAbsent(Integer key, Effect value) {
-            beforeInsert();
-            return backing.putIfAbsent(key, value);
+            beginInsert();
+            try {
+                return backing.putIfAbsent(key, value);
+            } finally {
+                finishInsert();
+            }
         }
 
         @Override
         public void putAll(Map<? extends Integer, ? extends Effect> map) {
-            beforeInsert();
-            backing.putAll(map);
+            // Keep the backing map's native pre-sizing policy and source.size() callback order.
+            // Admit actual insertions separately so bounded verification also covers bulk writes.
+            backing.putAll(new AbstractMap<Integer, Effect>() {
+                @Override public int size() { return map.size(); }
+                @Override public Set<Entry<Integer, Effect>> entrySet() { return Collections.emptySet(); }
+            });
+            putEntries(backing, map);
+        }
+
+        private <K, V> void putEntries(Map<K, V> target, Map<? extends K, ? extends V> source) {
+            for (Entry<? extends K, ? extends V> entry : source.entrySet()) {
+                K key = entry.getKey();
+                V value = entry.getValue();
+                beginInsert();
+                try {
+                    target.put(key, value);
+                } finally {
+                    finishInsert();
+                }
+            }
         }
 
         @Override
         public Effect remove(Object key) {
-            return isEmpty() ? null : backing.remove(key);
+            if (isEmpty()) return null;
+            try {
+                return backing.remove(key);
+            } finally {
+                afterRemoval();
+            }
         }
 
         @Override
         public boolean remove(Object key, Object value) {
-            return !isEmpty() && backing.remove(key, value);
+            if (isEmpty() || !backing.remove(key, value)) return false;
+            afterRemoval();
+            return true;
         }
 
         @Override
@@ -543,7 +618,51 @@ public abstract class Entity extends Location implements Metadatable {
 
         @Override
         public void clear() {
-            if (!isEmpty()) backing.clear();
+            if (!isEmpty()) {
+                try {
+                    backing.clear();
+                } finally {
+                    afterRemoval();
+                }
+            }
+        }
+
+        private class RemovalTrackingIterator<T> implements Iterator<T> {
+            private final Iterator<T> iterator;
+
+            RemovalTrackingIterator(Iterator<T> iterator) {
+                this.iterator = iterator;
+            }
+
+            @Override public boolean hasNext() { return iterator.hasNext(); }
+            @Override public T next() { return iterator.next(); }
+
+            @Override
+            public void remove() {
+                iterator.remove();
+                afterRemoval();
+            }
+        }
+
+        private <K, V> Entry<K, V> trackedEntry(Entry<K, V> entry) {
+            return new Entry<>() {
+                @Override public K getKey() { return entry.getKey(); }
+                @Override public V getValue() { return entry.getValue(); }
+                @Override public int hashCode() { return entry.hashCode(); }
+                @Override public boolean equals(Object other) { return entry.equals(other); }
+                @Override public String toString() { return entry.toString(); }
+
+                @Override
+                public V setValue(V value) {
+                    // A retained entry can reinsert its key after the mapping was removed.
+                    beginInsert();
+                    try {
+                        return entry.setValue(value);
+                    } finally {
+                        finishInsert();
+                    }
+                }
+            };
         }
 
         private Effect[] copyTickSnapshot(Effect[] buffer) {
@@ -591,7 +710,7 @@ public abstract class Entity extends Location implements Metadatable {
                 @Override public boolean contains(Object v) { return !isEmpty() && backing.containsValue(v); }
                 @Override public void clear() { TrackedEffectMap.this.clear(); }
                 @Override public Iterator<Effect> iterator() {
-                    return isEmpty() ? Collections.emptyIterator() : backing.values().iterator();
+                    return isEmpty() ? Collections.emptyIterator() : new RemovalTrackingIterator<>(backing.values().iterator());
                 }
             };
         }
@@ -607,7 +726,7 @@ public abstract class Entity extends Location implements Metadatable {
                 @Override public boolean remove(Object k) { return TrackedEffectMap.this.remove(k) != null; }
                 @Override public void clear() { TrackedEffectMap.this.clear(); }
                 @Override public Iterator<Integer> iterator() {
-                    return isEmpty() ? Collections.emptyIterator() : backing.keySet().iterator();
+                    return isEmpty() ? Collections.emptyIterator() : new RemovalTrackingIterator<>(backing.keySet().iterator());
                 }
             };
         }
@@ -625,7 +744,10 @@ public abstract class Entity extends Location implements Metadatable {
                 }
                 @Override public void clear() { TrackedEffectMap.this.clear(); }
                 @Override public Iterator<Entry<Integer, Effect>> iterator() {
-                    return isEmpty() ? Collections.emptyIterator() : backing.entrySet().iterator();
+                    if (isEmpty()) return Collections.emptyIterator();
+                    return new RemovalTrackingIterator<>(backing.entrySet().iterator()) {
+                        @Override public Entry<Integer, Effect> next() { return trackedEntry(super.next()); }
+                    };
                 }
             };
         }
