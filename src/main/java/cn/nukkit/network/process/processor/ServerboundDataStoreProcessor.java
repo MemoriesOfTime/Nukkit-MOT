@@ -38,6 +38,8 @@ public class ServerboundDataStoreProcessor extends DataPacketProcessor<Serverbou
             if (property == null) return;
             if (!property.isClientWritable()) return;
 
+            player.recordClientInput();
+
             Object data = update.getData();
             if (property instanceof LongProperty) {
                 if (data instanceof Number) {

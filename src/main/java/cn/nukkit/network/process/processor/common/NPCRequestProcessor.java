@@ -25,8 +25,12 @@ public class NPCRequestProcessor extends DataPacketProcessor<NPCRequestPacket> {
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull NPCRequestPacket pk) {
         Player player = playerHandle.player;
+        if (!player.spawned || !player.isAlive()) {
+            return;
+        }
         //若sceneName字段为空，则为玩家在编辑NPC，我们并不需要记录对话框，直接通过entityRuntimeId获取实体即可
         if (pk.sceneName.isEmpty() && player.level.getEntity(pk.entityRuntimeId) instanceof EntityNPCEntity npcEntity) {
+            player.recordClientInput();
             FormWindowDialog dialog = npcEntity.getDialog();
 
             FormResponseDialog response = new FormResponseDialog(pk, dialog);
@@ -39,6 +43,7 @@ public class NPCRequestProcessor extends DataPacketProcessor<NPCRequestPacket> {
             return;
         }
         if (playerHandle.getDialogWindows().getIfPresent(pk.sceneName) != null) {
+            player.recordClientInput();
             //remove the window from the map only if the requestType is EXECUTE_CLOSING_COMMANDS
             FormWindowDialog dialog;
             if (pk.requestType == NPCRequestPacket.RequestType.EXECUTE_CLOSING_COMMANDS) {

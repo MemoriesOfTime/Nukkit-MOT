@@ -54,11 +54,15 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
         if (inv instanceof PlayerInventory) {
             PlayerInventory playerInventory = (PlayerInventory) inv;
             int previousHeldIndex = playerInventory.getHeldItemIndex();
+            if (previousHeldIndex != pk.hotbarSlot) {
+                player.recordClientInput();
+            }
             playerInventory.equipItem(pk.hotbarSlot);
             if (UsingItemReceive.shouldClearUsingOnMobEquipment(player.isJavaClient(), player.isUsingItem(), previousHeldIndex, pk.hotbarSlot)) {
                 player.setUsingItem(false);
             }
         } else {
+            player.recordClientInput();
             player.setUsingItem(false);
         }
     }

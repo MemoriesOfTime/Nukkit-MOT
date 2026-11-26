@@ -18,12 +18,66 @@ public class PlayerAuthInputPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.PLAYER_AUTH_INPUT_PACKET;
 
+    private static final float INPUT_AXIS_EPSILON = 1.0e-4f;
+    private static final long HUMAN_INPUT_BITS_0;
+    private static final long HUMAN_INPUT_BITS_1;
+
+    static {
+        long bits0 = 0L;
+        long bits1 = 0L;
+        for (int ordinal = 0; ordinal < AuthInputAction.size(); ordinal++) {
+            AuthInputAction action = AuthInputAction.from(ordinal);
+            if (isHumanAuthInputAction(action)) {
+                if (ordinal < Long.SIZE) {
+                    bits0 |= (1L << ordinal);
+                } else if (ordinal < Long.SIZE * 2) {
+                    bits1 |= (1L << (ordinal - Long.SIZE));
+                }
+            }
+        }
+        HUMAN_INPUT_BITS_0 = bits0;
+        HUMAN_INPUT_BITS_1 = bits1;
+    }
+
+    private static boolean isHumanAuthInputAction(AuthInputAction action) {
+        return switch (action) {
+            case SPRINT_DOWN,
+                 AUTO_JUMPING_IN_WATER,
+                 SNEAKING,
+                 SNEAK_DOWN,
+                 SPRINTING,
+                 PERSIST_SNEAK,
+                 HANDLE_TELEPORT,
+                 EMOTING,
+                 RECEIVED_SERVER_DATA,
+                 IN_CLIENT_PREDICTED_IN_VEHICLE,
+                 BLOCK_BREAKING_DELAY_ENABLED,
+                 HORIZONTAL_COLLISION,
+                 VERTICAL_COLLISION,
+                 CAMERA_RELATIVE_MOVEMENT_ENABLED,
+                 ROT_CONTROLLED_BY_MOVE_DIRECTION,
+                 HOTBAR_ONLY_TOUCH,
+                 SNEAK_CURRENT_RAW,
+                 INTERNAL_UPDATE -> false;
+            default -> true;
+        };
+    }
+
     private float yaw;
     private float pitch;
     private float headYaw;
     private Vector3f position;
     private Vector2 motion;
     private Set<AuthInputAction> inputData = EnumSet.noneOf(AuthInputAction.class);
+    @Getter(lombok.AccessLevel.NONE)
+    @Setter(lombok.AccessLevel.NONE)
+    private long decodedInputBits0;
+    @Getter(lombok.AccessLevel.NONE)
+    @Setter(lombok.AccessLevel.NONE)
+    private long decodedInputBits1;
+    @Getter(lombok.AccessLevel.NONE)
+    @Setter(lombok.AccessLevel.NONE)
+    private boolean inputBitsDecoded;
     private InputMode inputMode;
     private ClientPlayMode playMode;
     private AuthInteractionModel interactionModel;
@@ -118,6 +172,10 @@ public class PlayerAuthInputPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.inputData.clear();
+        this.decodedInputBits0 = 0L;
+        this.decodedInputBits1 = 0L;
+        this.inputBitsDecoded = true;
         this.blockActionData.clear();
         this.decodedBlockActions.clear();
         this.decodedBlockActionSnapshot.clear();
@@ -137,7 +195,7 @@ public class PlayerAuthInputPacket extends DataPacket {
             for (int i = 0; i < Math.min(count, 256); i++) {
                 int ordinal = this.getVarInt();
                 if (ordinal >= 0 && ordinal < AuthInputAction.size()) {
-                    this.inputData.add(AuthInputAction.from(ordinal));
+                    this.recordDecodedInputOrdinal(ordinal);
                 }
             }
         } else {
@@ -154,7 +212,7 @@ public class PlayerAuthInputPacket extends DataPacket {
                     offset = -netEaseExtraInputFlags;
                 }
                 if ((inputData & (1L << i)) != 0) {
-                    this.inputData.add(AuthInputAction.from(i + offset));
+                    this.recordDecodedInputOrdinal(i + offset);
                 }
             }
         }
@@ -334,6 +392,53 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.decodedBlockActions.clear();
         this.decodedBlockActionSnapshot.clear();
         this.blockActionData = actions;
+    }
+
+    public void setInputData(Set<AuthInputAction> inputData) {
+        this.inputBitsDecoded = false;
+        this.inputData = inputData;
+    }
+
+    private void recordDecodedInputOrdinal(int ordinal) {
+        this.inputData.add(AuthInputAction.from(ordinal));
+        if (ordinal < Long.SIZE) {
+            this.decodedInputBits0 |= (1L << ordinal);
+        } else if (ordinal < Long.SIZE * 2) {
+            this.decodedInputBits1 |= (1L << (ordinal - Long.SIZE));
+        }
+    }
+
+    public boolean hasHumanInputAction() {
+        if (this.inputBitsDecoded) {
+            return ((this.decodedInputBits0 & HUMAN_INPUT_BITS_0) | (this.decodedInputBits1 & HUMAN_INPUT_BITS_1)) != 0L;
+        }
+        if (this.inputData == null || this.inputData.isEmpty()) {
+            return false;
+        }
+        for (AuthInputAction action : this.inputData) {
+            if (action != null && isHumanAuthInputAction(action)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean hasControlInput() {
+        if (this.hasHumanInputAction()) {
+            return true;
+        }
+        if (this.motion != null && (Math.abs(this.motion.x) > INPUT_AXIS_EPSILON || Math.abs(this.motion.y) > INPUT_AXIS_EPSILON)) {
+            return true;
+        }
+        if (this.analogMoveVector != null && (Math.abs(this.analogMoveVector.x) > INPUT_AXIS_EPSILON || Math.abs(this.analogMoveVector.y) > INPUT_AXIS_EPSILON)) {
+            return true;
+        }
+        if (this.rawMoveVector != null && (Math.abs(this.rawMoveVector.x) > INPUT_AXIS_EPSILON || Math.abs(this.rawMoveVector.y) > INPUT_AXIS_EPSILON)) {
+            return true;
+        }
+        return this.itemUseTransaction != null
+                || this.itemStackRequest != null
+                || (this.blockActionData != null && !this.blockActionData.isEmpty());
     }
 
     private InventoryTransactionPacket readItemUseTransaction() {

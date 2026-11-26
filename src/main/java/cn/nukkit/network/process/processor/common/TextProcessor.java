@@ -27,6 +27,7 @@ public class TextProcessor extends DataPacketProcessor<TextPacket> {
         }
 
         if (pk.type == TextPacket.TYPE_CHAT) {
+            player.resetLastActionTime();
             String chatMessage = pk.message;
             int breakLine = chatMessage.indexOf('\n');
             // Chat messages shouldn't contain break lines so ignore text afterwards

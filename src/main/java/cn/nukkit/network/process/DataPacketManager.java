@@ -327,7 +327,13 @@ public final class DataPacketManager {
 
         registerProcessor(
                 ProtocolInfo.v1_20_50,
-                ToggleCrafterSlotRequestProcessor.INSTANCE
+                ToggleCrafterSlotRequestProcessor.INSTANCE,
+                SetPlayerInventoryOptionsProcessor.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_21_40,
+                SettingsCommandProcessor.INSTANCE
         );
 
         registerProcessor(
@@ -338,6 +344,17 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_26_10,
                 ServerboundDataDrivenScreenClosedProcessor.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_26_50_27,
+                SetPlayerFurnaceOptionsProcessor.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_26_60,
+                ServerboundStonecutterSetRecipeProcessor.INSTANCE,
+                ServerboundCursorItemDragProcessor.INSTANCE
         );
     }
 }

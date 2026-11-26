@@ -30,6 +30,7 @@ public class EmotePacketProcessor extends DataPacketProcessor<EmotePacket> {
             player.getServer().getLogger().warning(player.getUsername() + " tried to send EmotePacket with invalid entity id: " + pk.runtimeId + "!=" + player.getId());
             return;
         }
+        player.recordClientInput();
         player.emote(pk);
     }
 

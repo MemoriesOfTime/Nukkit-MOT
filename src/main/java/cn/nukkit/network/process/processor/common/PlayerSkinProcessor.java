@@ -48,6 +48,9 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
         }
         player.getServer().getPluginManager().callEvent(playerChangeSkinEvent);
         if (!playerChangeSkinEvent.isCancelled()) {
+            if (player.spawned) {
+                player.recordClientInput();
+            }
             player.lastSkinChange = System.currentTimeMillis();
             player.setSkin(skin.isPersona() && !player.getServer().personaSkins ? skin.getDefaultSkin() : skin);
         }

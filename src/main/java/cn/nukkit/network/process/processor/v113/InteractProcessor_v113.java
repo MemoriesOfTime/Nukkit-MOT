@@ -72,13 +72,20 @@ public class InteractProcessor_v113 extends DataPacketProcessor<InteractPacket> 
                 handleMouseOver(player, targetEntity);
                 break;
             case InteractPacket.ACTION_VEHICLE_EXIT:
+                player.recordClientInput();
                 handleVehicleExit(player, targetEntity);
                 break;
             case InteractPacket.ACTION_LEFT_CLICK:
+                player.recordClientInput();
                 handleAttack(player, targetEntity);
                 break;
             case InteractPacket.ACTION_RIGHT_CLICK:
+                player.recordClientInput();
                 handleInteract(player, targetEntity);
+                break;
+            case InteractPacket.ACTION_OPEN_INVENTORY:
+            case InteractPacket.ACTION_OPEN_NPC:
+                player.recordClientInput();
                 break;
         }
     }

@@ -24,10 +24,13 @@ public class PlayerHotbarProcessor extends DataPacketProcessor<PlayerHotbarPacke
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull PlayerHotbarPacket pk) {
         Player player = playerHandle.player;
-        if (pk.windowId != ContainerIds.INVENTORY) {
+        if (!player.spawned || !player.isAlive() || pk.windowId != ContainerIds.INVENTORY) {
             return;
         }
 
+        if (player.getInventory().getHeldItemIndex() != pk.selectedHotbarSlot) {
+            player.recordClientInput();
+        }
         player.getInventory().equipItem(pk.selectedHotbarSlot);
     }
 

@@ -36,6 +36,7 @@ public class SetPlayerGameTypeProcessor extends DataPacketProcessor<SetPlayerGam
                 this.adventureSettings.update();*/
                 return;
             }
+            player.recordClientInput();
             player.setGamemode(pk.gamemode, true);
             Command.broadcastCommandMessage(player, new TranslationContainer("commands.gamemode.success.self", Server.getGamemodeString(player.gamemode)));
         }

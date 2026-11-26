@@ -20,6 +20,7 @@ public class PlayerKickEvent extends PlayerEvent implements Cancellable {
         SERVER_FULL,
         FLYING_DISABLED,
         INVALID_PACKET,
+        IDLE_TIMEOUT,
         UNKNOWN;
 
         @Override

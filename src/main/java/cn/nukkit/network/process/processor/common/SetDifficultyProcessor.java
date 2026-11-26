@@ -29,6 +29,7 @@ public class SetDifficultyProcessor extends DataPacketProcessor<SetDifficultyPac
         if (!player.spawned || !player.hasPermission("nukkit.command.difficulty")) {
             return;
         }
+        player.recordClientInput();
         player.getServer().setDifficulty(pk.difficulty);
         SetDifficultyPacket difficultyPacket = new SetDifficultyPacket();
         difficultyPacket.difficulty = player.getServer().getDifficulty();

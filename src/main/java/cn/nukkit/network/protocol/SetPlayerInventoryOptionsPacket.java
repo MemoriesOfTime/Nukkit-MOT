@@ -36,11 +36,19 @@ public class SetPlayerInventoryOptionsPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.leftTab = InventoryTabLeft.VALUES[this.getVarInt()];
-        this.rightTab = InventoryTabRight.VALUES[this.getVarInt()];
+        int leftOrdinal = this.getVarInt();
+        this.leftTab = leftOrdinal >= 0 && leftOrdinal < InventoryTabLeft.VALUES.length
+                ? InventoryTabLeft.VALUES[leftOrdinal] : InventoryTabLeft.NONE;
+        int rightOrdinal = this.getVarInt();
+        this.rightTab = rightOrdinal >= 0 && rightOrdinal < InventoryTabRight.VALUES.length
+                ? InventoryTabRight.VALUES[rightOrdinal] : InventoryTabRight.NONE;
         this.filtering = this.getBoolean();
-        this.layout = InventoryLayout.VALUES[this.getVarInt()];
-        this.craftingLayout = InventoryLayout.VALUES[this.getVarInt()];
+        int layoutOrdinal = this.getVarInt();
+        this.layout = layoutOrdinal >= 0 && layoutOrdinal < InventoryLayout.VALUES.length
+                ? InventoryLayout.VALUES[layoutOrdinal] : InventoryLayout.NONE;
+        int craftingLayoutOrdinal = this.getVarInt();
+        this.craftingLayout = craftingLayoutOrdinal >= 0 && craftingLayoutOrdinal < InventoryLayout.VALUES.length
+                ? InventoryLayout.VALUES[craftingLayoutOrdinal] : InventoryLayout.NONE;
         if (this.gameVersion.isNetEase() && !this.feof()) {
             try {
                 this.trailingVarint = (int) this.getUnsignedVarInt();

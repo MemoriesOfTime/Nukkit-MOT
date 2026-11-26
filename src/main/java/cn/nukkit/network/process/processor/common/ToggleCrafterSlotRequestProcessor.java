@@ -44,6 +44,7 @@ public class ToggleCrafterSlotRequestProcessor extends DataPacketProcessor<Toggl
         if (player.getWindowId(inventory) == -1 || !inventory.getViewers().contains(player)) {
             return;
         }
+        player.recordClientInput();
         if (!inventory.setSlotDisabled(slot, pk.disabled)) {
             inventory.sendContents(player);
         }

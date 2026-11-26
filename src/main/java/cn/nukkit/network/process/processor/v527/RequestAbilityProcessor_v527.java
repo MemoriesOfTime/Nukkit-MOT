@@ -44,6 +44,7 @@ public class RequestAbilityProcessor_v527 extends DataPacketProcessor<RequestAbi
         if (player.isSpectator()) {
             playerToggleFlightEvent.setCancelled();
         }
+        player.recordClientInput();
         player.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
         if (playerToggleFlightEvent.isCancelled()) {
             player.getAdventureSettings().update();

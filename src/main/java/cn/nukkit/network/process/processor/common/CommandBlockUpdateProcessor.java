@@ -31,6 +31,7 @@ public class CommandBlockUpdateProcessor extends DataPacketProcessor<CommandBloc
         if (!player.isOp() || !player.isCreative()) {
             return;
         }
+        player.recordClientInput();
         if (!pk.isBlock) {
             // Command block minecart: only command/name/track-output apply (no mode/conditional/redstone).
             Entity entity = player.getLevel().getEntity(pk.minecartEid);

@@ -32,10 +32,15 @@ public class SetPlayerFurnaceOptionsPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.type = FurnaceType.values()[this.getByte() & 0xff];
-        this.leftTabIndex = FurnaceLeftTabIndex.values()[this.getVarInt()];
+        int typeOrdinal = this.getByte() & 0xff;
+        this.type = typeOrdinal < FurnaceType.VALUES.length ? FurnaceType.VALUES[typeOrdinal] : FurnaceType.NONE;
+        int tabOrdinal = this.getVarInt();
+        this.leftTabIndex = tabOrdinal >= 0 && tabOrdinal < FurnaceLeftTabIndex.VALUES.length
+                ? FurnaceLeftTabIndex.VALUES[tabOrdinal] : FurnaceLeftTabIndex.NONE;
         this.filtering = this.getBoolean();
-        this.layout = FurnaceLayout.values()[this.getVarInt()];
+        int layoutOrdinal = this.getVarInt();
+        this.layout = layoutOrdinal >= 0 && layoutOrdinal < FurnaceLayout.VALUES.length
+                ? FurnaceLayout.VALUES[layoutOrdinal] : FurnaceLayout.NONE;
     }
 
     @Override
@@ -47,7 +52,9 @@ public class SetPlayerFurnaceOptionsPacket extends DataPacket {
         NONE,
         FURNACE,
         BLAST_FURNACE,
-        SMOKER
+        SMOKER;
+
+        public static final FurnaceType[] VALUES = values();
     }
 
     public enum FurnaceLeftTabIndex {
@@ -56,12 +63,16 @@ public class SetPlayerFurnaceOptionsPacket extends DataPacket {
         RECIPE_ITEMS,
         RECIPE_BLOCKS,
         RECIPE_SEARCH,
-        INVENTORY
+        INVENTORY;
+
+        public static final FurnaceLeftTabIndex[] VALUES = values();
     }
 
     public enum FurnaceLayout {
         NONE,
         INVENTORY_ONLY,
-        DEFAULT
+        DEFAULT;
+
+        public static final FurnaceLayout[] VALUES = values();
     }
 }
