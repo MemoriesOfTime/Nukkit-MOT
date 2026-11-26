@@ -58,6 +58,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
@@ -463,7 +464,294 @@ public abstract class Entity extends Location implements Metadatable {
 
     public final Map<Integer, Player> hasSpawned = new ConcurrentHashMap<>();
 
-    protected final Map<Integer, Effect> effects = new ConcurrentHashMap<>();
+    protected final Map<Integer, Effect> effects = new TrackedEffectMap();
+
+    static final class TrackedEffectMap extends AbstractMap<Integer, Effect> implements ConcurrentMap<Integer, Effect> {
+        private final ConcurrentHashMap<Integer, Effect> backing;
+        // Zero proves emptiness, -1 means occupied, positive values count in-flight insertions.
+        // Only publish stable occupancy when no insertion can race the backing count.
+        private static final int OCCUPIED = -1;
+        private volatile int occupancy;
+        private Collection<Effect> valuesView;
+        private Set<Integer> keySetView;
+        private Set<Entry<Integer, Effect>> entrySetView;
+
+        TrackedEffectMap() {
+            backing = new ConcurrentHashMap<>();
+        }
+
+        /** Takes exclusive ownership of the supplied storage. */
+        TrackedEffectMap(ConcurrentHashMap<Integer, Effect> backing) {
+            this.backing = backing;
+            occupancy = backing.isEmpty() ? 0 : OCCUPIED;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            int state = occupancy;
+            return state == 0 || (state > 0 && backing.isEmpty() && confirmEmpty());
+        }
+
+        private boolean confirmEmpty() {
+            synchronized (backing) {
+                if (occupancy <= 0) return occupancy == 0;
+                // No new inserts can start here. Each admitted put can publish at most one key.
+                // If traversal misses a continuously occupied map, a key must have been inserted
+                // during that traversal. One more empty traversal than pending puts proves emptiness.
+                for (int remaining = occupancy; remaining >= 0; remaining--) {
+                    if (backing.keys().hasMoreElements()) return false;
+                }
+                return true;
+            }
+        }
+
+        @Override
+        public int size() {
+            return isEmpty() ? 0 : backing.size();
+        }
+
+        @Override
+        public Effect get(Object key) {
+            return isEmpty() ? null : backing.get(key);
+        }
+
+        @Override
+        public Effect getOrDefault(Object key, Effect defaultValue) {
+            return isEmpty() ? defaultValue : backing.getOrDefault(key, defaultValue);
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return !isEmpty() && backing.containsKey(key);
+        }
+
+        private void beginInsert() {
+            synchronized (backing) {
+                occupancy = occupancy > 0 ? occupancy + 1 : 1;
+            }
+        }
+
+        private void finishInsert() {
+            synchronized (backing) {
+                int remaining = occupancy - 1;
+                if (remaining == 0 && !backing.isEmpty()) remaining = OCCUPIED;
+                occupancy = remaining;
+            }
+        }
+
+        private void afterRemoval() {
+            synchronized (backing) {
+                if (occupancy <= 0) occupancy = backing.isEmpty() ? 0 : OCCUPIED;
+            }
+        }
+
+        @Override
+        public Effect put(Integer key, Effect value) {
+            beginInsert();
+            try {
+                return backing.put(key, value);
+            } finally {
+                finishInsert();
+            }
+        }
+
+        @Override
+        public Effect putIfAbsent(Integer key, Effect value) {
+            beginInsert();
+            try {
+                return backing.putIfAbsent(key, value);
+            } finally {
+                finishInsert();
+            }
+        }
+
+        @Override
+        public void putAll(Map<? extends Integer, ? extends Effect> map) {
+            // Keep the backing map's native pre-sizing policy and source.size() callback order.
+            // Admit actual insertions separately so bounded verification also covers bulk writes.
+            backing.putAll(new AbstractMap<Integer, Effect>() {
+                @Override public int size() { return map.size(); }
+                @Override public Set<Entry<Integer, Effect>> entrySet() { return Collections.emptySet(); }
+            });
+            putEntries(backing, map);
+        }
+
+        private <K, V> void putEntries(Map<K, V> target, Map<? extends K, ? extends V> source) {
+            for (Entry<? extends K, ? extends V> entry : source.entrySet()) {
+                K key = entry.getKey();
+                V value = entry.getValue();
+                beginInsert();
+                try {
+                    target.put(key, value);
+                } finally {
+                    finishInsert();
+                }
+            }
+        }
+
+        @Override
+        public Effect remove(Object key) {
+            if (isEmpty()) return null;
+            try {
+                return backing.remove(key);
+            } finally {
+                afterRemoval();
+            }
+        }
+
+        @Override
+        public boolean remove(Object key, Object value) {
+            if (isEmpty() || !backing.remove(key, value)) return false;
+            afterRemoval();
+            return true;
+        }
+
+        @Override
+        public Effect replace(Integer key, Effect value) {
+            return isEmpty() ? null : backing.replace(key, value);
+        }
+
+        @Override
+        public boolean replace(Integer key, Effect oldValue, Effect newValue) {
+            return !isEmpty() && backing.replace(key, oldValue, newValue);
+        }
+
+        @Override
+        public void clear() {
+            if (!isEmpty()) {
+                try {
+                    backing.clear();
+                } finally {
+                    afterRemoval();
+                }
+            }
+        }
+
+        private class RemovalTrackingIterator<T> implements Iterator<T> {
+            private final Iterator<T> iterator;
+
+            RemovalTrackingIterator(Iterator<T> iterator) {
+                this.iterator = iterator;
+            }
+
+            @Override public boolean hasNext() { return iterator.hasNext(); }
+            @Override public T next() { return iterator.next(); }
+
+            @Override
+            public void remove() {
+                iterator.remove();
+                afterRemoval();
+            }
+        }
+
+        private <K, V> Entry<K, V> trackedEntry(Entry<K, V> entry) {
+            return new Entry<>() {
+                @Override public K getKey() { return entry.getKey(); }
+                @Override public V getValue() { return entry.getValue(); }
+                @Override public int hashCode() { return entry.hashCode(); }
+                @Override public boolean equals(Object other) { return entry.equals(other); }
+                @Override public String toString() { return entry.toString(); }
+
+                @Override
+                public V setValue(V value) {
+                    // A retained entry can reinsert its key after the mapping was removed.
+                    beginInsert();
+                    try {
+                        return entry.setValue(value);
+                    } finally {
+                        finishInsert();
+                    }
+                }
+            };
+        }
+
+        private Effect[] copyTickSnapshot(Effect[] buffer) {
+            Iterator<?> iterator = backing.values().iterator();
+            // Preserve the typed array store check even for a value inserted through a raw view.
+            Object[] values = buffer;
+            int size = 0;
+            while (iterator.hasNext()) {
+                if (size == buffer.length) {
+                    return copyOverflowSnapshot(buffer, iterator);
+                }
+                values[size++] = iterator.next();
+            }
+            if (size < buffer.length) {
+                buffer[size] = null;
+            }
+            return buffer;
+        }
+
+        private Effect[] copyOverflowSnapshot(Effect[] buffer, Iterator<?> iterator) {
+            int size = buffer.length;
+            // Read a size hint only after the bounded tick buffer is full.
+            Effect[] snapshot = Arrays.copyOf(buffer, Math.max(size + 1, backing.size()));
+            Object[] values = snapshot;
+            do {
+                if (size == snapshot.length) {
+                    if (size == Integer.MAX_VALUE) {
+                        throw new OutOfMemoryError("Required array size too large");
+                    }
+                    int capacity = (int) Math.min(Integer.MAX_VALUE, (long) size + (size >> 1) + 1);
+                    values = snapshot = Arrays.copyOf(snapshot, capacity);
+                }
+                values[size++] = iterator.next();
+            } while (iterator.hasNext());
+            return size == snapshot.length ? snapshot : Arrays.copyOf(snapshot, size);
+        }
+
+        @Override
+        public Collection<Effect> values() {
+            Collection<Effect> v = valuesView;
+            if (v != null) return v;
+            return valuesView = new AbstractCollection<>() {
+                @Override public int size() { return TrackedEffectMap.this.size(); }
+                @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
+                @Override public boolean contains(Object v) { return !isEmpty() && backing.containsValue(v); }
+                @Override public void clear() { TrackedEffectMap.this.clear(); }
+                @Override public Iterator<Effect> iterator() {
+                    return isEmpty() ? Collections.emptyIterator() : new RemovalTrackingIterator<>(backing.values().iterator());
+                }
+            };
+        }
+
+        @Override
+        public Set<Integer> keySet() {
+            Set<Integer> k = keySetView;
+            if (k != null) return k;
+            return keySetView = new AbstractSet<>() {
+                @Override public int size() { return TrackedEffectMap.this.size(); }
+                @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
+                @Override public boolean contains(Object k) { return TrackedEffectMap.this.containsKey(k); }
+                @Override public boolean remove(Object k) { return TrackedEffectMap.this.remove(k) != null; }
+                @Override public void clear() { TrackedEffectMap.this.clear(); }
+                @Override public Iterator<Integer> iterator() {
+                    return isEmpty() ? Collections.emptyIterator() : new RemovalTrackingIterator<>(backing.keySet().iterator());
+                }
+            };
+        }
+
+        @Override
+        public Set<Entry<Integer, Effect>> entrySet() {
+            Set<Entry<Integer, Effect>> es = entrySetView;
+            if (es != null) return es;
+            return entrySetView = new AbstractSet<>() {
+                @Override public int size() { return TrackedEffectMap.this.size(); }
+                @Override public boolean isEmpty() { return TrackedEffectMap.this.isEmpty(); }
+                @Override public boolean contains(Object o) { return !isEmpty() && backing.entrySet().contains(o); }
+                @Override public boolean remove(Object o) {
+                    return o instanceof Entry<?, ?> e && TrackedEffectMap.this.remove(e.getKey(), e.getValue());
+                }
+                @Override public void clear() { TrackedEffectMap.this.clear(); }
+                @Override public Iterator<Entry<Integer, Effect>> iterator() {
+                    if (isEmpty()) return Collections.emptyIterator();
+                    return new RemovalTrackingIterator<>(backing.entrySet().iterator()) {
+                        @Override public Entry<Integer, Effect> next() { return trackedEntry(super.next()); }
+                    };
+                }
+            };
+        }
+    }
 
     private static final ThreadLocal<EffectTickSnapshot> EFFECT_TICK_SNAPSHOT =
             ThreadLocal.withInitial(EffectTickSnapshot::new);
@@ -1077,11 +1365,11 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public Effect getEffect(int effectId) {
-        return this.effects.getOrDefault(effectId, null);
+        return this.effects.isEmpty() ? null : this.effects.getOrDefault(effectId, null);
     }
 
     public boolean hasEffect(int effectId) {
-        return this.effects.containsKey(effectId);
+        return !this.effects.isEmpty() && this.effects.containsKey(effectId);
     }
 
     /**
@@ -2208,7 +2496,10 @@ public abstract class Entity extends Location implements Metadatable {
             }
             Effect[] snapshot = null;
             try {
-                snapshot = this.effects.values().toArray(ownsBuffer ? lease.effects : new Effect[0]);
+                Effect[] buffer = ownsBuffer ? lease.effects : new Effect[0];
+                snapshot = ownsBuffer && this.effects instanceof TrackedEffectMap tracked
+                        ? tracked.copyTickSnapshot(buffer)
+                        : this.effects.values().toArray(buffer);
                 for (Effect effect : snapshot) {
                     if (snapshot == lease.effects && effect == null) {
                         break;
@@ -2862,8 +3153,14 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideBubbleColumn() {
-        double y = this.y + this.getEyeHeight();
-        return this.level.getBlockIdAt(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(y), NukkitMath.floorDouble(this.z)) == Block.BUBBLE_COLUMN;
+        int bx = NukkitMath.floorDouble(this.x);
+        int by = NukkitMath.floorDouble(this.y + this.getEyeHeight());
+        int bz = NukkitMath.floorDouble(this.z);
+        int builtin = this.getBuiltinBlockIdAt(bx, by, bz, 0);
+        if (builtin >= 0) {
+            return builtin == Block.BUBBLE_COLUMN;
+        }
+        return this.level.getBlockIdAt(bx, by, bz) == Block.BUBBLE_COLUMN;
     }
 
     /**
@@ -2872,18 +3169,10 @@ public abstract class Entity extends Location implements Metadatable {
      * Reads ordinary block IDs only through loaded built-in paths; -1 requires materialisation.
      */
     protected final int getBuiltinBlockIdAt(int x, int y, int z, int layer) {
-        Level level = this.level;
-        if (level == null || level.getClass() != Level.class || !level.isYInRange(y)) {
+        ChunkSection section = this.getBuiltinSectionAt(x, y, z);
+        if (section == null) {
             return -1;
         }
-        FullChunk chunk = this.chunk;
-        if (chunk == null || chunk.getX() != x >> 4 || chunk.getZ() != z >> 4) {
-            chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
-        }
-        if (chunk == null || chunk.getClass() != LevelDBChunk.class) {
-            return -1;
-        }
-        ChunkSection section = ((LevelDBChunk) chunk).getSection(y >> 4);
         if (section.getClass() == EmptyChunkSection.class) {
             return Block.AIR;
         }
@@ -2894,18 +3183,42 @@ public abstract class Entity extends Location implements Metadatable {
         return id >= 0 && id < Block.MAX_BLOCK_ID ? id : -1;
     }
 
+    private ChunkSection getBuiltinSectionAt(int x, int y, int z) {
+        Level level = this.level;
+        if (level == null || level.getClass() != Level.class || !level.isYInRange(y)) {
+            return null;
+        }
+        FullChunk chunk = this.chunk;
+        if (chunk == null || chunk.getX() != x >> 4 || chunk.getZ() != z >> 4) {
+            chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+        }
+        if (chunk == null || chunk.getClass() != LevelDBChunk.class) {
+            return null;
+        }
+        return ((LevelDBChunk) chunk).getSection(y >> 4);
+    }
+
     public boolean isSubmerged() {
         int blockX = NukkitMath.floorDouble(this.x);
         int blockY = NukkitMath.floorDouble(this.y + this.getEyeHeight());
         int blockZ = NukkitMath.floorDouble(this.z);
-        int id0 = this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 0);
-        if (id0 >= 0) {
-            if (id0 == Block.WATER || id0 == Block.STILL_WATER) {
-                return true;
+        ChunkSection section = this.getBuiltinSectionAt(blockX, blockY, blockZ);
+        if (section != null) {
+            if (section.getClass() == EmptyChunkSection.class) {
+                return false;
             }
-            int id1 = this.getBuiltinBlockIdAt(blockX, blockY, blockZ, 1);
-            if (id1 >= 0) {
-                return id1 == Block.WATER || id1 == Block.STILL_WATER;
+            if (section.getClass() == LevelDBChunkSection.class) {
+                int lx = blockX & 0xF, ly = blockY & 0xF, lz = blockZ & 0xF;
+                int id0 = section.getBlockId(lx, ly, lz, 0);
+                if (id0 >= 0 && id0 < Block.MAX_BLOCK_ID) {
+                    if (id0 == Block.WATER || id0 == Block.STILL_WATER) {
+                        return true;
+                    }
+                    int id1 = section.getBlockId(lx, ly, lz, 1);
+                    if (id1 >= 0 && id1 < Block.MAX_BLOCK_ID) {
+                        return id1 == Block.WATER || id1 == Block.STILL_WATER;
+                    }
+                }
             }
         }
         Block block = this.level.getBlock(this.temporalVector.setComponents(blockX, blockY, blockZ));
@@ -3761,7 +4074,13 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isOnLadder() {
-        int blockId = this.level.getBlockIdAt(chunk, this.getFloorX(), this.getFloorY(), this.getFloorZ());
+        int fx = this.getFloorX();
+        int fy = this.getFloorY();
+        int fz = this.getFloorZ();
+        int blockId = this.getBuiltinBlockIdAt(fx, fy, fz, 0);
+        if (blockId < 0) {
+            blockId = this.level.getBlockIdAt(chunk, fx, fy, fz);
+        }
         return blockId == Block.LADDER || blockId == Block.VINES || blockId == Block.COBWEB || blockId == Block.SCAFFOLDING;
     }
 

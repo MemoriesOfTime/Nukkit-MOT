@@ -472,7 +472,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 }
             }
 
-            boolean inBubbleColumn = this.isInsideBubbleColumn();
+            boolean inBubbleColumn = inWater && this.isInsideBubbleColumn();
             if (inWater && !inBubbleColumn && !this.hasEffect(Effect.WATER_BREATHING) && !this.hasEffect(Effect.CONDUIT_POWER)) {
                 if (this instanceof EntitySwimming || this.isDrowned || this instanceof EntitySkeletonHorse || this instanceof EntityIronGolem || this instanceof Player player && (player.isCreative() || player.isSpectator())) {
                     this.setAirTicks(400);
@@ -519,11 +519,16 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && floorProbeDue) {
                 int floorY = NukkitMath.floorDouble(this.y - 0.25);
                 if (floorY != getFloorY()) {
-                    Block block = this.level.getBlock(this.chunk, getFloorX(), floorY, getFloorZ(), false);
-                    if (block instanceof BlockCactus) {
-                        block.onEntityCollide(this);
-                    } else if (block instanceof BlockMagma) {
-                        block.onEntityCollide(this);
+                    int fx = getFloorX();
+                    int fz = getFloorZ();
+                    int floorId = this.getBuiltinBlockIdAt(fx, floorY, fz, 0);
+                    if (floorId < 0 || floorId == Block.CACTUS || floorId == Block.MAGMA) {
+                        Block block = this.level.getBlock(this.chunk, fx, floorY, fz, false);
+                        if (block instanceof BlockCactus) {
+                            block.onEntityCollide(this);
+                        } else if (block instanceof BlockMagma) {
+                            block.onEntityCollide(this);
+                        }
                     }
                 }
             }
