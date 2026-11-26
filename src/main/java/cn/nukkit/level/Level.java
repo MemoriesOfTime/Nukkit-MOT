@@ -3592,6 +3592,11 @@ public class Level implements ChunkManager, Metadatable {
         return entities.values().toArray(new Entity[0]);
     }
 
+    /** Copies world membership using the caller's array, with the same contract as Collection.toArray(T[]). */
+    public Entity[] getEntities(Entity[] destination) {
+        return entities.values().toArray(destination);
+    }
+
     /**
      * Checks whether an entity stands in the way of a block that would fill the given box.
      * Arrows, dropped items, spectators, entities without collision and the placing player never block a placement.

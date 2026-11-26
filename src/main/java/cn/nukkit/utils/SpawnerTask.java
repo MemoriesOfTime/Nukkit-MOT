@@ -14,7 +14,6 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.generic.BaseFullChunk;
-import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.spawners.*;
 
 import java.util.HashMap;
@@ -24,6 +23,10 @@ import java.util.Map;
  * Handles the automatic spawning of mobs.
  */
 public class SpawnerTask implements Runnable {
+
+    private static final int MAX_RETAINED_SPAWN_ENTITIES = 16_384;
+    private static final Entity[] EMPTY_ENTITIES = new Entity[0];
+    private static final ThreadLocal<Entity[]> SPAWN_SNAPSHOT = new ThreadLocal<>();
 
     private final Map<Class<?>, EntitySpawner> animalSpawners = new HashMap<>();
     private final Map<Class<?>, EntitySpawner> mobSpawners = new HashMap<>();
@@ -269,16 +272,41 @@ public class SpawnerTask implements Runnable {
         }
         int max = getMaxSpawns(networkId, level.getDimension() == Level.DIMENSION_NETHER, level.getDimension() == Level.DIMENSION_THE_END);
         if (max == 0) return false;
-        int count = 0;
-        for (Entity entity : level.getEntities()) {
-            if (entity.isAlive() && entity.getNetworkId() == networkId && new Vector3(player.x, entity.y, player.z).distanceSquared(entity) < 16384) { // 128 blocks
-                count++;
-                if (count >= max) {
-                    return false;
-                }
-            }
+        if (level.getClass() != Level.class) return belowSpawnCap(level.getEntities(), networkId, player, max, false);
+
+        // Capture membership before virtual predicates. A reentrant scan must borrow its own array.
+        Entity[] buffer = SPAWN_SNAPSHOT.get();
+        if (buffer == null) buffer = EMPTY_ENTITIES;
+        else SPAWN_SNAPSHOT.set(null);
+        Entity[] snapshot = null;
+        try {
+            snapshot = level.getEntities(buffer);
+            if (snapshot == null) return belowSpawnCap(level.getEntities(), networkId, player, max, false);
+            return belowSpawnCap(snapshot, networkId, player, max, snapshot == buffer);
+        } finally {
+            Entity[] keep = snapshot != null && snapshot.length <= MAX_RETAINED_SPAWN_ENTITIES ? snapshot : buffer;
+            // toArray null-terminates a short capture. The untouched tail was already cleared on release.
+            for (int i = 0; i < keep.length && keep[i] != null; i++) keep[i] = null;
+            SPAWN_SNAPSHOT.set(keep);
         }
-        return count < max;
+    }
+
+    private static boolean belowSpawnCap(Entity[] entities, int networkId, Player player, int max, boolean padded) {
+        int count = 0;
+        for (Entity entity : entities) {
+            if (padded && entity == null) break;
+            if (entity.isAlive() && entity.getNetworkId() == networkId &&
+                    withinSpawnRadius(player.x, entity.y, player.z, entity) && ++count >= max) return false;
+        }
+        return true;
+    }
+
+    private static boolean withinSpawnRadius(double x, double y, double z, Entity entity) {
+        double dx = x - entity.x;
+        // Preserve the projected vector's NaN result for non-finite heights.
+        double dy = y - entity.y;
+        double dz = z - entity.z;
+        return dx * dx + dy * dy + dz * dz < 16_384.0;
     }
 
     /**
