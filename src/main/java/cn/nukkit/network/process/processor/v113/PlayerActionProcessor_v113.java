@@ -51,6 +51,10 @@ public class PlayerActionProcessor_v113 extends DataPacketProcessor<PlayerAction
         if (!player.spawned || (!player.isAlive() && pk.action != ACTION_RESPAWN_V113 && pk.action != PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS)) {
             return;
         }
+        if (pk.action != PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS
+                && pk.action != PlayerActionPacket.ACTION_GET_UPDATED_BLOCK) {
+            player.recordClientInput();
+        }
 
         pk.entityId = player.getId();
         Vector3 pos = new Vector3(pk.x, pk.y, pk.z);

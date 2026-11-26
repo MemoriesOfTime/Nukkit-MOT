@@ -693,6 +693,10 @@ public class Server {
      * Only allow NetEase clients to join the server
      */
     public boolean onlyNetEaseMode;
+    /**
+     * Minutes of player inactivity before disconnecting with IDLE_TIMEOUT (0 disables)
+     */
+    private int playerIdleTimeout;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -3739,6 +3743,14 @@ public class Server {
         return shouldSavePlayerData;
     }
 
+    public int getPlayerIdleTimeout() {
+        return this.playerIdleTimeout;
+    }
+
+    public void setPlayerIdleTimeout(int minutes) {
+        this.playerIdleTimeout = Math.max(0, minutes);
+    }
+
     /**
      * How often player is allowed to change skin in game (in seconds)
      *
@@ -4166,6 +4178,7 @@ public class Server {
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.serverAuthoritativeInventory = this.getPropertyBoolean("server-authoritative-inventory", true);
+        this.playerIdleTimeout = Math.max(0, this.getPropertyInt("player-idle-timeout", 0));
 
         // === Advanced MOT settings from nukkit-mot.yml ===
         ServerConfig config = this.serverConfig;
@@ -4403,6 +4416,7 @@ public class Server {
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
             put("server-authoritative-inventory", true);
+            put("player-idle-timeout", 0);
         }
     }
 

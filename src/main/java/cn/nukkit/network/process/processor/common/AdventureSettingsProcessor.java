@@ -36,6 +36,7 @@ public class AdventureSettingsProcessor extends DataPacketProcessor<AdventureSet
         if (player.isSpectator()) {
             playerToggleFlightEvent.setCancelled();
         }
+        player.recordClientInput();
         player.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
         if (playerToggleFlightEvent.isCancelled()) {
             player.getAdventureSettings().update();

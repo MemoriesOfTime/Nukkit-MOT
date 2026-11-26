@@ -22,6 +22,10 @@ public class ServerboundDataDrivenScreenClosedProcessor extends DataPacketProces
             return;
         }
 
+        if (pk.closeReason == ServerboundDataDrivenScreenClosedPacket.CloseReason.CLIENT_CANCELED) {
+            playerHandle.player.recordClientInput();
+        }
+
         screen.removeViewer(playerHandle.player);
 
         // Send close confirmation packet with the formId from the client's close request

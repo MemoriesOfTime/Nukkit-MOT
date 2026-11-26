@@ -25,6 +25,7 @@ public class CommandRequestProcessor_v137 extends DataPacketProcessor<CommandReq
         if (!player.spawned || !player.isAlive()) {
             return;
         }
+        player.resetLastActionTime();
         player.craftingType = Player.CRAFTING_SMALL;
         PlayerCommandPreprocessEvent playerCommandPreprocessEvent = new PlayerCommandPreprocessEvent(player, pk.command + ' ');
         player.getServer().getPluginManager().callEvent(playerCommandPreprocessEvent);

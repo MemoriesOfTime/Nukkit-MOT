@@ -35,6 +35,9 @@ public class PlayerInputProcessor extends DataPacketProcessor<PlayerInputPacket>
             return;
         }
 
+        if (moveVecX != 0 || moveVecY != 0 || pk.jumping || pk.sneaking) {
+            player.recordClientInput();
+        }
         if (player.riding != null && (moveVecX != 0 || moveVecY != 0)) {
             moveVecX = NukkitMath.clamp(pk.motionX, -1, 1);
             moveVecY = NukkitMath.clamp(pk.motionY, -1, 1);

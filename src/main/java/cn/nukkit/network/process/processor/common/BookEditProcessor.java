@@ -25,10 +25,14 @@ public class BookEditProcessor extends DataPacketProcessor<BookEditPacket> {
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull BookEditPacket pk) {
         Player player = playerHandle.player;
+        if (!player.spawned || !player.isAlive()) {
+            return;
+        }
         Item oldBook = player.getInventory().getItem(pk.inventorySlot);
         if (oldBook.getId() != Item.BOOK_AND_QUILL) {
             return;
         }
+        player.recordClientInput();
 
         if (pk.text != null && pk.text.length() > 256) {
             player.getServer().getLogger().debug(playerHandle.getUsername() + ": BookEditPacket with too long text");

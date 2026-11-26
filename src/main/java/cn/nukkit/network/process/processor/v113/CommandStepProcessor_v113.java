@@ -32,6 +32,7 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
         if (!player.spawned || !player.isAlive()) {
             return;
         }
+        player.resetLastActionTime();
         player.craftingType = Player.CRAFTING_SMALL;
 
         StringBuilder commandText = new StringBuilder(pk.command);

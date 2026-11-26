@@ -406,6 +406,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected boolean checkMovement = true;
     private int movementBlockedSinceTick = -1;
+    private int lastActionTick;
+    private long lastActionNanoTime = System.nanoTime();
+    private int lastClientInputTick;
+    private int nextIdleTimeoutCheckTick;
+    private boolean pendingClientMoveInput;
+    private boolean pendingPassiveMove;
+    private boolean passiveDisplacementMove;
+    private float lastInputYaw = Float.NaN;
+    private float lastInputPitch = Float.NaN;
+    private float lastInputHeadYaw = Float.NaN;
+    private int lastInventoryOptionsPacked = -1;
+    private int lastFurnaceOptionsPacked = -1;
 
     private PermissibleBase perm;
     /**
@@ -697,6 +709,128 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void resetInAirTicks() {
         this.inAirTicks = 0;
+    }
+
+    /**
+     * Resets the player's last-action timestamp and tick watermark.
+     * Updated on any genuine player action (physical input, UI interaction, chat, command, form submission).
+     */
+    public void resetLastActionTime() {
+        int currentTick = this.server != null ? this.server.getTick() : 0;
+        if (this.lastActionTick != currentTick || this.lastActionNanoTime == 0L) {
+            this.lastActionTick = currentTick;
+            this.lastActionNanoTime = System.nanoTime();
+        }
+    }
+
+    /**
+     * Records a direct client control or UI input (movement controls, camera rotation, attacks,
+     * block interaction, hotbar switch, inventory/UI actions) without allocating.
+     */
+    public void recordClientInput() {
+        int currentTick = this.server != null ? this.server.getTick() : 0;
+        this.lastClientInputTick = currentTick;
+        if (this.lastActionTick != currentTick || this.lastActionNanoTime == 0L) {
+            this.lastActionTick = currentTick;
+            this.lastActionNanoTime = System.nanoTime();
+        }
+    }
+
+    public int getLastActionTick() {
+        return this.lastActionTick;
+    }
+
+    public long getLastActionNanoTime() {
+        return this.lastActionNanoTime;
+    }
+
+    public int getLastClientInputTick() {
+        return this.lastClientInputTick;
+    }
+
+    public long getIdleMillis() {
+        long elapsedNanos = System.nanoTime() - this.lastActionNanoTime;
+        return elapsedNanos <= 0L ? 0L : elapsedNanos / 1_000_000L;
+    }
+
+    /**
+     * True while {@link #handleMovement(Vector3, int)} is dispatching a {@link PlayerMoveEvent}
+     * caused solely by external physics/displacement (water stream, piston, knockback, gravity)
+     * with zero client control or camera rotation input.
+     */
+    public boolean isPassiveDisplacementMove() {
+        return this.passiveDisplacementMove;
+    }
+
+    /**
+     * True when the player currently has an open inventory, world/custom container, modal form,
+     * NPC dialog, or data-driven UI screen tracked by the server.
+     */
+    public boolean hasActiveUiScreen() {
+        return this.inventoryOpen
+                || this.topWindow != null
+                || this.formOpen
+                || (this.playerHandle != null
+                    && (!this.playerHandle.getFormWindows().isEmpty()
+                        || !this.playerHandle.getDialogWindows().asMap().isEmpty()))
+                || cn.nukkit.ddui.DataDrivenScreen.getActiveScreen(this) != null;
+    }
+
+    public boolean updateInventoryOptionsPacked(int packed) {
+        int previous = this.lastInventoryOptionsPacked;
+        this.lastInventoryOptionsPacked = packed;
+        return (previous != -1 || this.inventoryOpen || this.topWindow != null)
+                && previous != packed;
+    }
+
+    public boolean updateFurnaceOptionsPacked(int packed) {
+        int previous = this.lastFurnaceOptionsPacked;
+        this.lastFurnaceOptionsPacked = packed;
+        return (previous != -1 || this.topWindow != null)
+                && previous != packed;
+    }
+
+    private void syncExpectedClientRotation(float yaw, float pitch, float headYaw) {
+        this.lastInputYaw = normalizeYawFloat(yaw);
+        this.lastInputPitch = pitch % 360.0f;
+        this.lastInputHeadYaw = normalizeYawFloat(headYaw);
+    }
+
+    private boolean checkAndUpdateClientRotation(float rawYaw, float rawPitch, float rawHeadYaw) {
+        float normYaw = normalizeYawFloat(rawYaw);
+        float normPitch = rawPitch % 360.0f;
+        float normHeadYaw = normalizeYawFloat(rawHeadYaw);
+        if (Float.isNaN(this.lastInputYaw)) {
+            this.lastInputYaw = normYaw;
+            this.lastInputPitch = normPitch;
+            this.lastInputHeadYaw = normHeadYaw;
+            return false;
+        }
+        boolean turned = angularDeltaFloat(normYaw, this.lastInputYaw) > 1.0e-3f
+                || Math.abs(normPitch - this.lastInputPitch) > 1.0e-3f
+                || angularDeltaFloat(normHeadYaw, this.lastInputHeadYaw) > 1.0e-3f;
+        if (turned) {
+            this.lastInputYaw = normYaw;
+            this.lastInputPitch = normPitch;
+            this.lastInputHeadYaw = normHeadYaw;
+        }
+        return turned;
+    }
+
+    private static float normalizeYawFloat(float angle) {
+        float r = angle % 360.0f;
+        return r < 0.0f ? r + 360.0f : r;
+    }
+
+    private static float angularDeltaFloat(float a, float b) {
+        float diff = Math.abs(a - b);
+        return diff > 180.0f ? 360.0f - diff : diff;
+    }
+
+    private static boolean isHumanPlayerAction(int action) {
+        return action >= 0
+                && action != PlayerActionPacket.ACTION_GET_UPDATED_BLOCK
+                && action != PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS;
     }
 
     public void setAllowFlight(boolean value) {
@@ -1773,6 +1907,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.spawned = true;
+        this.syncExpectedClientRotation((float) this.yaw, (float) this.pitch, (float) this.headYaw);
+        this.resetLastActionTime();
 
         this.sendMovementSpeed();
 
@@ -3034,9 +3170,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected void handleMovement(Vector3 clientPos, int tickDiff) {
         if (!this.isAlive() || !this.spawned || this.teleportPosition != null || this.isSleeping()) {
+            this.pendingClientMoveInput = false;
+            this.pendingPassiveMove = false;
+            this.passiveDisplacementMove = false;
             return;
         }
 
+        this.passiveDisplacementMove = this.pendingPassiveMove && !this.pendingClientMoveInput;
+        try {
+            this.handleMovementInternal(clientPos, tickDiff);
+        } finally {
+            this.passiveDisplacementMove = false;
+            this.pendingClientMoveInput = false;
+            this.pendingPassiveMove = false;
+        }
+    }
+
+    private void handleMovementInternal(Vector3 clientPos, int tickDiff) {
         // When the player moves, set dirty nearby entities to check the target
         if (!this.isSpectator() && !this.isCreative()) {
             if (clientPos.distanceSquared(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 1.0) {
@@ -3403,6 +3553,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected void resetClientMovement() {
         this.newPosition = null;
         this.movementBlockedSinceTick = -1;
+        this.pendingClientMoveInput = false;
+        this.pendingPassiveMove = false;
+        this.passiveDisplacementMove = false;
     }
 
     protected void setLastLocation(Location location) {
@@ -3720,6 +3873,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.removeExpiredShapes();
+
+        int idleTimeoutMinutes = this.server.getPlayerIdleTimeout();
+        if (idleTimeoutMinutes > 0 && this.spawned && !this.closed && currentTick >= this.nextIdleTimeoutCheckTick) {
+            this.nextIdleTimeoutCheckTick = currentTick + 20;
+            if (!this.hasPermission("nukkit.idle.bypass")
+                    && this.getIdleMillis() >= (long) idleTimeoutMinutes * 60_000L) {
+                if (this.kick(PlayerKickEvent.Reason.IDLE_TIMEOUT, "disconnectionScreen.timeout", false)) {
+                    return false;
+                }
+            }
+        }
 
         return true;
     }
@@ -4892,6 +5056,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         movePlayerPacket.headYaw += 360;
                     }
 
+                    this.recordClientInput();
+                    this.pendingClientMoveInput = true;
+                    this.pendingPassiveMove = false;
+                    this.syncExpectedClientRotation(movePlayerPacket.yaw, movePlayerPacket.pitch, movePlayerPacket.headYaw);
                     this.setRotation(movePlayerPacket.yaw, movePlayerPacket.pitch, movePlayerPacket.headYaw);
                     this.newPosition = newPos;
                     this.forceMovement = null;
@@ -4904,6 +5072,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         || !Float.isFinite(authPacket.getYaw()) || !Float.isFinite(authPacket.getPitch()) || !Float.isFinite(authPacket.getHeadYaw())) {
                     server.getLogger().debug(username + ": infinite input position");
                     return;
+                }
+                boolean authControlInput = authPacket.hasControlInput();
+                if (this.spawned && this.isAlive() && authControlInput) {
+                    this.recordClientInput();
                 }
                 this.handleAuthInputItemStackRequest(authPacket);
 
@@ -5297,6 +5469,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                boolean authRotationInput = false;
+                if (authPacket.getInputData().contains(AuthInputAction.HANDLE_TELEPORT)) {
+                    this.syncExpectedClientRotation(authPacket.getYaw(), authPacket.getPitch(), authPacket.getHeadYaw());
+                } else {
+                    authRotationInput = this.checkAndUpdateClientRotation(authPacket.getYaw(), authPacket.getPitch(), authPacket.getHeadYaw());
+                    if (authRotationInput && !authControlInput && this.spawned && this.isAlive()) {
+                        this.recordClientInput();
+                    }
+                }
+                boolean authHumanMoveInput = authControlInput || authRotationInput;
+
                 double distSqrt = clientPosition.distanceSquared(this);
                 if (this.forceMovement == null && distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
                     this.handleAuthInputCrossbow(authPacket);
@@ -5332,6 +5515,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.setRotation(yaw, pitch, headYaw);
                     if (!ignoreCoordinateMove) {
                         this.newPosition = clientPosition;
+                        if (authHumanMoveInput) {
+                            this.pendingClientMoveInput = true;
+                            this.pendingPassiveMove = false;
+                        } else if (!this.pendingClientMoveInput) {
+                            this.pendingPassiveMove = true;
+                        }
+                    } else if (authHumanMoveInput) {
+                        this.pendingClientMoveInput = true;
+                        this.pendingPassiveMove = false;
                     }
                     this.forceMovement = null;
                     this.handleAuthInputCrossbow(authPacket);
@@ -5342,6 +5534,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 PlayerActionPacket playerActionPacket = (PlayerActionPacket) packet;
                 if (!this.spawned || !this.isAlive() && playerActionPacket.action != PlayerActionPacket.ACTION_RESPAWN) {
                     break;
+                }
+                if (isHumanPlayerAction(playerActionPacket.action)) {
+                    this.recordClientInput();
                 }
 
                 playerActionPacket.entityId = this.id;
@@ -5600,6 +5795,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                if (interactPacket.action == InteractPacket.ACTION_OPEN_INVENTORY
+                        || interactPacket.action == InteractPacket.ACTION_VEHICLE_EXIT
+                        || interactPacket.action == InteractPacket.ACTION_OPEN_NPC
+                        || interactPacket.action == InteractPacket.ACTION_LEFT_CLICK
+                        || interactPacket.action == InteractPacket.ACTION_RIGHT_CLICK) {
+                    this.recordClientInput();
+                }
+
                 switch (interactPacket.action) {
                     case InteractPacket.ACTION_OPEN_INVENTORY:
                         if (!this.inventoryOpen) {
@@ -5652,6 +5855,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
+                this.recordClientInput();
                 // A placed shulker box keeps the tag of the item it came from (lore, plugin data);
                 // pick block creates a new item and must not copy that tag onto it.
                 Item item = block instanceof BlockShulkerBox shulkerBox ? shulkerBox.toPickItem() : block.toItem();
@@ -5738,6 +5942,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         || animatePacket.action == AnimatePacket.Action.MAGIC_CRITICAL_HIT) {
                     break; // maybe we should cancel the event here? but if client send too many packets, server will lag
                 }
+                this.recordClientInput();
 
                 PlayerAnimationEvent animationEvent = new PlayerAnimationEvent(this, ((AnimatePacket) packet).action);
                 this.server.getPluginManager().callEvent(animationEvent);
@@ -5801,6 +6006,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (entityEventPacket.eid != this.id) {
                             break;
                         }
+                        this.recordClientInput();
 
                         if (this.protocol >= ProtocolInfo.v1_16_0) {
                             Inventory inventory = this.getWindowById(ANVIL_WINDOW_ID);
@@ -5827,6 +6033,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (containerClosePacket.windowId == -1) {
                     // At least 1.21 does sometimes send windowId -1 when opening and closing containers quickly
                     if (this.inventoryOpen) {
+                        if (!containerClosePacket.wasServerInitiated) {
+                            this.recordClientInput();
+                        }
                         this.inventoryOpen = false;
 
                         if (this.craftingType == CRAFTING_SMALL) {
@@ -5858,6 +6067,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.removeWindow(tradeInventory, true);
                     }
                 } else if (this.windowIndex.containsKey(containerClosePacket.windowId)) {
+                    if (!containerClosePacket.wasServerInitiated) {
+                        this.recordClientInput();
+                    }
                     this.inventoryOpen = false;
                     Inventory inn = this.windowIndex.get(containerClosePacket.windowId);
                     this.server.getPluginManager().callEvent(new InventoryCloseEvent(inn, this));
@@ -5890,6 +6102,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (pos.distanceSquared(this) > 10000) {
                     break;
                 }
+                this.recordClientInput();
 
                 BlockEntity t = this.level.getBlockEntity(pos);
                 if (t instanceof BlockEntitySpawnable) {
@@ -5937,6 +6150,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (!pendingRequests.isEmpty()) {
+            this.recordClientInput();
             ItemStackRequestHandler.handleRequests(this, pendingRequests);
         }
     }
@@ -5974,6 +6188,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.needSendInventory = true;
             return;
         }
+        this.recordClientInput();
 
         PlayerInventory inventory = this.inventory;
         Level level = this.level;
@@ -8517,6 +8732,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             Server.broadcastPacket(targets, pk);
         } else {
             this.newPosition = null;
+            this.pendingClientMoveInput = false;
+            this.pendingPassiveMove = false;
+            this.syncExpectedClientRotation(pk.yaw, pk.pitch, pk.headYaw);
 
             this.dataPacket(pk);
         }
@@ -8548,6 +8766,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (targets != null) {
             Server.broadcastPacket(targets, pk);
         } else {
+            this.pendingClientMoveInput = false;
+            this.pendingPassiveMove = false;
+            this.syncExpectedClientRotation(pk.yaw, pk.pitch, pk.headYaw);
             this.dataPacket(pk);
         }
     }

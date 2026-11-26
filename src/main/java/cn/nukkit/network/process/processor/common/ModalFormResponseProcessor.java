@@ -34,9 +34,19 @@ public class ModalFormResponseProcessor extends DataPacketProcessor<ModalFormRes
             return;
         }
 
+        String trimmedData = pk.data == null ? "null" : pk.data.trim();
+        boolean submitted = !"null".equals(trimmedData);
+        boolean userClosed = !submitted && (player.protocol < ProtocolInfo.v1_19_20
+                || (pk.hasCancelReason && pk.cancelReason == ModalFormResponsePacket.CANCEL_REASON_USER_CLOSED));
+
         if (playerHandle.getFormWindows().containsKey(pk.formId)) {
+            if (submitted) {
+                player.resetLastActionTime();
+            } else if (userClosed) {
+                player.recordClientInput();
+            }
             FormWindow window = playerHandle.getFormWindows().remove(pk.formId);
-            window.setResponse(player.protocol, pk.data.trim());
+            window.setResponse(player.protocol, trimmedData);
 
             for (FormResponseHandler handler : window.getHandlers()) {
                 handler.handle(player, pk.formId);
@@ -44,8 +54,13 @@ public class ModalFormResponseProcessor extends DataPacketProcessor<ModalFormRes
 
             new PlayerFormRespondedEvent(player, pk.formId, window).call();
         } else if (playerHandle.getServerSettings().containsKey(pk.formId)) {
+            if (submitted) {
+                player.resetLastActionTime();
+            } else if (userClosed) {
+                player.recordClientInput();
+            }
             FormWindow window = playerHandle.getServerSettings().get(pk.formId);
-            window.setResponse(player.protocol, pk.data.trim());
+            window.setResponse(player.protocol, trimmedData);
 
             for (FormResponseHandler handler : window.getHandlers()) {
                 handler.handle(player, pk.formId);
