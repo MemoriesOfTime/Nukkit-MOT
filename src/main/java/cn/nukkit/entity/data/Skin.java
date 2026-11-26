@@ -22,7 +22,7 @@ import java.util.List;
  * @author MagicDroidX
  * Nukkit Project
  */
-@ToString(exclude = {"geometryData", "animationData"})
+@ToString(exclude = {"geometryData", "animationData", "cachedGeometryData", "cachedResourcePatch"})
 public class Skin {
 
     private static final int PIXEL_SIZE = 4;
@@ -47,6 +47,33 @@ public class Skin {
     //1.21.90+
     public static final String STEVE_GEOMETRY = "{\"format_version\":\"1.12.0\",\"minecraft:geometry\":[{\"bones\":[{\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"waist\",\"pivot\":[0.0,12.0,0.0]},{\"cubes\":[{\"origin\":[-5.0,8.0,3.0],\"size\":[10,16,1],\"uv\":[0,0]}],\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0.0,24.0,3.0],\"rotation\":[0.0,180.0,0.0]}],\"description\":{\"identifier\":\"geometry.cape\",\"texture_height\":32,\"texture_width\":64}},{\"bones\":[{\"name\":\"root\",\"pivot\":[0.0,0.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,16]}],\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"waist\",\"parent\":\"root\",\"pivot\":[0.0,12.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[0,0]}],\"name\":\"head\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0.0,24,3.0]},{\"cubes\":[{\"inflate\":0.50,\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[32,0]}],\"name\":\"hat\",\"parent\":\"head\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"origin\":[4.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[32,48]}],\"name\":\"leftArm\",\"parent\":\"body\",\"pivot\":[5.0,22.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[4.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[48,48]}],\"name\":\"leftSleeve\",\"parent\":\"leftArm\",\"pivot\":[5.0,22.0,0.0]},{\"name\":\"leftItem\",\"parent\":\"leftArm\",\"pivot\":[6.0,15.0,1.0]},{\"cubes\":[{\"origin\":[-8.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[40,16]}],\"name\":\"rightArm\",\"parent\":\"body\",\"pivot\":[-5.0,22.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-8.0,12.0,-2.0],\"size\":[4,12,4],\"uv\":[40,32]}],\"name\":\"rightSleeve\",\"parent\":\"rightArm\",\"pivot\":[-5.0,22.0,0.0]},{\"locators\":{\"lead_hold\":[-6,15,1]},\"name\":\"rightItem\",\"parent\":\"rightArm\",\"pivot\":[-6,15,1]},{\"cubes\":[{\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[16,48]}],\"name\":\"leftLeg\",\"parent\":\"root\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,48]}],\"name\":\"leftPants\",\"parent\":\"leftLeg\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,16]}],\"name\":\"rightLeg\",\"parent\":\"root\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,32]}],\"name\":\"rightPants\",\"parent\":\"rightLeg\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,32]}],\"name\":\"jacket\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]}],\"description\":{\"identifier\":\"geometry.humanoid.custom\",\"texture_height\":64,\"texture_width\":64,\"visible_bounds_height\":2,\"visible_bounds_offset\":[0,1,0],\"visible_bounds_width\":1}},{\"bones\":[{\"name\":\"root\",\"pivot\":[0.0,0.0,0.0]},{\"name\":\"waist\",\"parent\":\"root\",\"pivot\":[0.0,12.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,16]}],\"name\":\"body\",\"parent\":\"waist\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[0,0]}],\"name\":\"head\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"inflate\":0.50,\"origin\":[-4.0,24.0,-4.0],\"size\":[8,8,8],\"uv\":[32,0]}],\"name\":\"hat\",\"parent\":\"head\",\"pivot\":[0.0,24.0,0.0]},{\"cubes\":[{\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,16]}],\"name\":\"rightLeg\",\"parent\":\"root\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-3.90,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,32]}],\"name\":\"rightPants\",\"parent\":\"rightLeg\",\"pivot\":[-1.90,12.0,0.0]},{\"cubes\":[{\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[16,48]}],\"name\":\"leftLeg\",\"parent\":\"root\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-0.10,0.0,-2.0],\"size\":[4,12,4],\"uv\":[0,48]}],\"name\":\"leftPants\",\"parent\":\"leftLeg\",\"pivot\":[1.90,12.0,0.0]},{\"cubes\":[{\"origin\":[4.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[32,48]}],\"name\":\"leftArm\",\"parent\":\"body\",\"pivot\":[5.0,21.50,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[4.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[48,48]}],\"name\":\"leftSleeve\",\"parent\":\"leftArm\",\"pivot\":[5.0,21.50,0.0]},{\"name\":\"leftItem\",\"parent\":\"leftArm\",\"pivot\":[6,14.50,1]},{\"cubes\":[{\"origin\":[-7.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[40,16]}],\"name\":\"rightArm\",\"parent\":\"body\",\"pivot\":[-5.0,21.50,0.0]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-7.0,11.50,-2.0],\"size\":[3,12,4],\"uv\":[40,32]}],\"name\":\"rightSleeve\",\"parent\":\"rightArm\",\"pivot\":[-5.0,21.50,0.0]},{\"locators\":{\"lead_hold\":[-6,14.50,1]},\"name\":\"rightItem\",\"parent\":\"rightArm\",\"pivot\":[-6,14.50,1]},{\"cubes\":[{\"inflate\":0.250,\"origin\":[-4.0,12.0,-2.0],\"size\":[8,12,4],\"uv\":[16,32]}],\"name\":\"jacket\",\"parent\":\"body\",\"pivot\":[0.0,24.0,0.0]},{\"name\":\"cape\",\"parent\":\"body\",\"pivot\":[0.0,24,-3.0]}],\"description\":{\"identifier\":\"geometry.humanoid.customSlim\",\"texture_height\":64,\"texture_width\":64,\"visible_bounds_height\":2,\"visible_bounds_offset\":[0,1,0],\"visible_bounds_width\":1}}]}";
     public static Skin NO_PERSONA_SKIN = createDefaultSkin();
+
+    /** UTF-8 field contents. The encoded array stays private even when a packet buffer escapes. */
+    public static final class EncodedText {
+        private final String text;
+        private final byte[] bytes;
+
+        private EncodedText(String text) {
+            this.text = text;
+            this.bytes = text.getBytes(StandardCharsets.UTF_8);
+        }
+
+        public int byteLength() {
+            return bytes.length;
+        }
+
+        public void copyTo(byte[] destination, int offset) {
+            System.arraycopy(bytes, 0, destination, offset, bytes.length);
+        }
+    }
+
+    private static final class DefaultEncoding {
+        private static final EncodedText GEOMETRY = new EncodedText(STEVE_GEOMETRY);
+        private static final EncodedText RESOURCE_PATCH = new EncodedText(GEOMETRY_CUSTOM);
+    }
+
+    private transient volatile EncodedText cachedGeometryData;
+    private transient volatile EncodedText cachedResourcePatch;
 
     private boolean noPlayFab; // Don't attempt to generate missing play fab id multiple times
     private String fullSkinId;
@@ -268,10 +295,12 @@ public class Skin {
     public void setSkinResourcePatch(String skinResourcePatch) {
         if (skinResourcePatch == null || skinResourcePatch.trim().isEmpty()) {
             this.skinResourcePatch = GEOMETRY_CUSTOM;
+            this.cachedResourcePatch = null;
             this.cachedFingerprint = null;
             return;
         }
         this.skinResourcePatch = skinResourcePatch;
+        this.cachedResourcePatch = null;
         this.cachedFingerprint = null;
     }
 
@@ -289,6 +318,16 @@ public class Skin {
 
     public String getSkinResourcePatch() {
         return Objects.requireNonNullElse(this.skinResourcePatch, "");
+    }
+
+    public final EncodedText encodedSkinResourcePatch() {
+        String text = getSkinResourcePatch();
+        if (text == GEOMETRY_CUSTOM) return DefaultEncoding.RESOURCE_PATCH;
+        EncodedText cached = cachedResourcePatch;
+        if (cached != null && cached.text == text) return cached;
+        EncodedText encoded = new EncodedText(text);
+        if (encoded.byteLength() <= MAX_DATA_SIZE) cachedResourcePatch = encoded;
+        return encoded;
     }
 
     public SerializedImage getCapeData() {
@@ -337,11 +376,22 @@ public class Skin {
         return geometryData;
     }
 
+    public final EncodedText encodedGeometryData() {
+        String text = getGeometryData();
+        if (text == STEVE_GEOMETRY) return DefaultEncoding.GEOMETRY;
+        EncodedText cached = cachedGeometryData;
+        if (cached != null && cached.text == text) return cached;
+        EncodedText encoded = new EncodedText(text);
+        if (encoded.byteLength() <= MAX_DATA_SIZE) cachedGeometryData = encoded;
+        return encoded;
+    }
+
     public void setGeometryData(String geometryData) {
         Preconditions.checkNotNull(geometryData, "geometryData");
         if (!geometryData.equals(this.geometryData)) {
             if (Server.getInstance().doNotLimitSkinGeometry || geometryData.getBytes().length < MAX_DATA_SIZE) {
                 this.geometryData = geometryData;
+                this.cachedGeometryData = null;
                 this.cachedFingerprint = null;
             }
         }
